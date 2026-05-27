@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Import Transaction - WMS Pro</title>
+<!-- Google Fonts & Material Symbols -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-lowest": "#ffffff",
+                    "surface-variant": "#e1e2ed",
+                    "outline": "#737686",
+                    "inverse-on-surface": "#f0f0fb",
+                    "tertiary": "#943700",
+                    "on-primary": "#ffffff",
+                    "secondary-fixed": "#d3e4fe",
+                    "surface": "#faf8ff",
+                    "surface-container": "#ededf9",
+                    "surface-container-low": "#f3f3fe",
+                    "surface-tint": "#0053db",
+                    "inverse-surface": "#2e3039",
+                    "on-surface": "#191b23",
+                    "surface-dim": "#d9d9e5",
+                    "on-tertiary-fixed-variant": "#7d2d00",
+                    "tertiary-fixed": "#ffdbcd",
+                    "primary-fixed": "#dbe1ff",
+                    "secondary-fixed-dim": "#b7c8e1",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "on-error": "#ffffff",
+                    "on-secondary-fixed-variant": "#38485d",
+                    "on-tertiary-fixed": "#360f00",
+                    "primary-container": "#2563eb",
+                    "on-secondary-fixed": "#0b1c30",
+                    "on-surface-variant": "#434655",
+                    "background": "#faf8ff",
+                    "primary": "#004ac6",
+                    "outline-variant": "#c3c6d7",
+                    "surface-container-highest": "#e1e2ed",
+                    "inverse-primary": "#b4c5ff",
+                    "on-primary-fixed": "#00174b",
+                    "on-tertiary-container": "#ffede6",
+                    "surface-container-high": "#e7e7f3",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "tertiary-container": "#bc4800",
+                    "on-error-container": "#93000a",
+                    "on-tertiary": "#ffffff",
+                    "secondary-container": "#d0e1fb",
+                    "on-primary-container": "#eeefff",
+                    "on-background": "#191b23",
+                    "error": "#ba1a1a",
+                    "error-container": "#ffdad6",
+                    "on-secondary-container": "#54647a",
+                    "secondary": "#505f76",
+                    "tertiary-fixed-dim": "#ffb596",
+                    "on-secondary": "#ffffff",
+                    "surface-bright": "#faf8ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin-mobile": "16px",
+                    "sidebar-collapsed": "80px",
+                    "margin-desktop": "32px",
+                    "gutter": "24px",
+                    "base": "4px",
+                    "sidebar-width": "260px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "display-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "data-mono": ["JetBrains Mono"]
+            },
+            "fontSize": {
+                    "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                    "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                    "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                    "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                    "display-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                    "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                    "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                    "data-mono": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Ambient Depth Soft Shadows for WMS */
+        .ambient-shadow-sm {
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.04);
+        }
+        .ambient-shadow-md {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.03), 0 2px 4px rgba(0,0,0,0.04);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen antialiased flex selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopNavBar (JSON) -->
+<header class="bg-surface-container-lowest dark:bg-surface-dim border-b border-outline-variant dark:border-outline shadow-sm fixed top-0 left-0 w-full h-16 flex items-center justify-between px-margin-desktop z-50">
+<div class="flex items-center gap-4">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">WMS Pro</span>
+</div>
+<div class="flex items-center gap-6">
+<!-- Search on left of actions -->
+<div class="hidden md:flex items-center bg-surface-container-low rounded-full px-4 py-2 border border-outline-variant focus-within:border-primary transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant mr-2 text-[20px]">search</span>
+<input class="bg-transparent border-none outline-none text-body-md font-body-md w-64 focus:ring-0 p-0 text-on-surface placeholder:text-on-surface-variant" placeholder="Search product or SKU..." type="text"/>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-colors cursor-pointer active:opacity-80 flex items-center justify-center">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-colors cursor-pointer active:opacity-80 flex items-center justify-center">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<div class="w-px h-6 bg-outline-variant mx-2"></div>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-colors cursor-pointer active:opacity-80 flex items-center justify-center">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="ml-2 w-8 h-8 rounded-full bg-primary-container overflow-hidden border border-outline-variant cursor-pointer">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A professional headshot of a person looking at the camera, neutral lighting, minimalist background. Used as a tiny profile avatar in a UI top bar." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCq2doejcoDxUprXdnmjH3FvJHwTCnnRXZccUVJs5Y2Dotdh_Zh9ksbKoeoDsYbvd_W9BLPNOKkrFTRZa6xEaZtr-VTOvaEKndnnGUKiQjD2dqHOZ9gakMNfeLB2Sr3Q0kisS7kAr5vJHN5jY9NauZGKUn3g5yz_pIuFClPSMq7yE5U_zAXvbaF5aRfhxUI4wx709FyFqu6aYt_rKFYOjS0EuL8SKmLn-3e8A2N52RjkiawqYi_efh2CJqRz2o1lI_xr8GSTmOt4FfX"/>
+</div>
+</div>
+</div>
+</header>
+<!-- SideNavBar (JSON) -->
+<nav class="hidden md:flex bg-surface dark:bg-inverse-surface border-r border-outline-variant dark:border-outline fixed left-0 top-0 h-full w-sidebar-width flex-col z-40 pt-16">
+<div class="p-6 border-b border-outline-variant dark:border-outline flex flex-col gap-1">
+<span class="font-headline-md text-headline-md font-extrabold text-primary">Warehouse Manager</span>
+<span class="font-label-md text-label-md text-on-surface-variant">V2.4.0</span>
+</div>
+<div class="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all duration-300 ease-in-out cursor-pointer" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all duration-300 ease-in-out cursor-pointer" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-label-md text-label-md">Products</span>
+</a>
+<!-- ACTIVE TAB -->
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg bg-surface-container-low text-primary dark:text-primary-fixed font-bold border-r-4 border-primary transition-all duration-300 ease-in-out cursor-pointer" href="#">
+<span class="material-symbols-outlined icon-fill">input</span>
+<span class="font-label-md text-label-md">Import</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all duration-300 ease-in-out cursor-pointer" href="#">
+<span class="material-symbols-outlined">output</span>
+<span class="font-label-md text-label-md">Export</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all duration-300 ease-in-out cursor-pointer" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="font-label-md text-label-md">Documents</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all duration-300 ease-in-out cursor-pointer" href="#">
+<span class="material-symbols-outlined">conveyor_belt</span>
+<span class="font-label-md text-label-md">Suppliers</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all duration-300 ease-in-out cursor-pointer" href="#">
+<span class="material-symbols-outlined">assessment</span>
+<span class="font-label-md text-label-md">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all duration-300 ease-in-out cursor-pointer" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-md text-label-md">Employees</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all duration-300 ease-in-out cursor-pointer mt-auto" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+</nav>
+<!-- Main Canvas -->
+<main class="flex-1 ml-0 md:ml-sidebar-width pt-16 flex flex-col">
+<div class="px-margin-mobile md:px-margin-desktop py-gutter flex-1 w-full max-w-[1400px] mx-auto flex flex-col gap-gutter">
+<!-- Page Header -->
+<div class="flex items-center justify-between">
+<div>
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-background">New Import Transaction</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Record incoming stock from suppliers</p>
+</div>
+<div class="hidden sm:flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-md border border-outline-variant">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+<span class="font-data-mono text-data-mono text-on-surface-variant">TRX-90214-A</span>
+</div>
+</div>
+<!-- Meta Data Card (Level 1 Elevation) -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 ambient-shadow-sm flex flex-col gap-6">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Supplier -->
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md text-on-surface-variant uppercase">Supplier</label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface border border-outline-variant rounded p-3 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+<option>Global Logistics Corp</option>
+<option>Apex Manufacturing</option>
+<option>Nolan Industrial</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">arrow_drop_down</span>
+</div>
+</div>
+<!-- Employee -->
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md text-on-surface-variant uppercase">Responsible Employee</label>
+<div class="relative">
+<input class="w-full bg-surface-container border border-outline-variant rounded p-3 font-body-md text-body-md text-on-surface-variant focus:outline-none cursor-not-allowed" readonly="" type="text" value="Jane Doe (ID: 4892)"/>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">person</span>
+</div>
+</div>
+<!-- Date -->
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md text-on-surface-variant uppercase">Transaction Date</label>
+<div class="relative">
+<input class="w-full bg-surface border border-outline-variant rounded p-3 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" type="date" value="2023-10-24"/>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Transaction Area -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-lg ambient-shadow-sm flex flex-col overflow-hidden">
+<!-- Barcode Scanner Input -->
+<div class="p-4 border-b border-outline-variant bg-surface-container-low flex items-center gap-4">
+<div class="w-12 h-12 rounded bg-primary-container flex items-center justify-center text-on-primary shrink-0">
+<span class="material-symbols-outlined">barcode_scanner</span>
+</div>
+<div class="flex-1 relative">
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded p-3 pl-4 font-data-mono text-data-mono text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/50 transition-all placeholder:font-body-md placeholder:text-on-surface-variant text-lg" placeholder="Scan barcode or type SKU to add item..." type="text"/>
+</div>
+</div>
+<!-- Transaction Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse min-w-[800px]">
+<thead>
+<tr class="border-b border-outline-variant bg-surface">
+<th class="py-3 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider w-1/2">Product</th>
+<th class="py-3 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider w-1/6 text-right">Quantity</th>
+<th class="py-3 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider w-1/6 text-right">Unit Price</th>
+<th class="py-3 px-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider w-1/6 text-right">Total</th>
+<th class="py-3 px-6 w-16"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant bg-surface-container-lowest">
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-4 px-6">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface font-semibold">Industrial Grade Ball Bearing</span>
+<span class="font-data-mono text-data-mono text-on-surface-variant text-xs mt-1">SKU: BRG-7729-A</span>
+</div>
+</td>
+<td class="py-4 px-6 text-right">
+<input class="w-24 text-right bg-transparent border border-outline-variant rounded p-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" type="number" value="250"/>
+</td>
+<td class="py-4 px-6 text-right font-data-mono text-data-mono text-on-surface">
+                                    $12.50
+                                </td>
+<td class="py-4 px-6 text-right font-data-mono text-data-mono text-on-surface font-medium">
+                                    $3,125.00
+                                </td>
+<td class="py-4 px-6 text-center">
+<button class="text-on-surface-variant hover:text-error transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 p-1">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-4 px-6">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface font-semibold">Hydraulic Piston Seal Kit</span>
+<span class="font-data-mono text-data-mono text-on-surface-variant text-xs mt-1">SKU: HYD-1024-K</span>
+</div>
+</td>
+<td class="py-4 px-6 text-right">
+<input class="w-24 text-right bg-transparent border border-outline-variant rounded p-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" type="number" value="50"/>
+</td>
+<td class="py-4 px-6 text-right font-data-mono text-data-mono text-on-surface">
+                                    $45.00
+                                </td>
+<td class="py-4 px-6 text-right font-data-mono text-data-mono text-on-surface font-medium">
+                                    $2,250.00
+                                </td>
+<td class="py-4 px-6 text-center">
+<button class="text-on-surface-variant hover:text-error transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 p-1">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-4 px-6">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface font-semibold">Heavy Duty Conveyor Belt (Per Meter)</span>
+<span class="font-data-mono text-data-mono text-on-surface-variant text-xs mt-1">SKU: CNV-883-M</span>
+</div>
+</td>
+<td class="py-4 px-6 text-right">
+<input class="w-24 text-right bg-transparent border border-outline-variant rounded p-1.5 font-data-mono text-data-mono text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" type="number" value="12"/>
+</td>
+<td class="py-4 px-6 text-right font-data-mono text-data-mono text-on-surface">
+                                    $110.00
+                                </td>
+<td class="py-4 px-6 text-right font-data-mono text-data-mono text-on-surface font-medium">
+                                    $1,320.00
+                                </td>
+<td class="py-4 px-6 text-center">
+<button class="text-on-surface-variant hover:text-error transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 p-1">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Bottom Summary -->
+<div class="bg-surface-container border-t border-outline-variant p-6 flex flex-col md:flex-row justify-between items-end md:items-start">
+<div class="hidden md:block w-1/2">
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-4">
+<label class="font-label-md text-label-md text-on-surface-variant uppercase mb-2 block">Transaction Notes</label>
+<textarea class="w-full bg-transparent border-none outline-none resize-none font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant p-0" placeholder="Add internal notes regarding this import..." rows="3"></textarea>
+</div>
+</div>
+<div class="w-full md:w-1/3 flex flex-col gap-3 min-w-[250px]">
+<div class="flex justify-between items-center">
+<span class="font-body-md text-body-md text-on-surface-variant">Subtotal</span>
+<span class="font-data-mono text-data-mono text-on-surface">$6,695.00</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-body-md text-body-md text-on-surface-variant">Tax (8%)</span>
+<span class="font-data-mono text-data-mono text-on-surface">$535.60</span>
+</div>
+<div class="w-full h-px bg-outline-variant my-1"></div>
+<div class="flex justify-between items-center">
+<span class="font-headline-md text-headline-md text-on-surface">Grand Total</span>
+<span class="font-data-mono text-data-mono text-on-surface font-bold text-xl">$7,230.60</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Footer Actions -->
+<div class="flex flex-col-reverse sm:flex-row justify-end items-center gap-4 mt-4 pb-8">
+<button class="w-full sm:w-auto px-6 py-3 rounded border border-outline-variant bg-surface text-on-surface font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-surface-container transition-colors focus:ring-2 focus:ring-outline">
+<span class="material-symbols-outlined text-[18px]">print</span>
+                    Print Receipt
+                </button>
+<button class="w-full sm:w-auto px-6 py-3 rounded border border-outline-variant bg-surface text-on-surface font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-surface-container transition-colors focus:ring-2 focus:ring-outline">
+<span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                    Export PDF
+                </button>
+<button class="w-full sm:w-auto px-8 py-3 rounded bg-primary text-on-primary font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-primary-container transition-colors shadow-sm focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+                    Process Transaction
+                </button>
+</div>
+</div>
+</main>
+</body></html>

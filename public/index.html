@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>WMS Pro - Warehouse Management System</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+    <!-- Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Theme Configuration -->
+    <script src="../shared/tailwind-config.js"></script>
+    <!-- Shared Styles -->
+    <link href="../shared/styles.html" rel="stylesheet"/>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md antialiased">
+    <!-- Navigation -->
+    <nav class="bg-surface border-b border-outline-variant sticky top-0 z-50 px-margin-mobile md:px-margin-desktop py-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary font-bold">W</div>
+                <h1 class="font-headline-md text-headline-md font-bold text-primary">Warehouse Manager Pro</h1>
+            </div>
+            <span class="font-label-md text-label-md text-on-surface-variant">v2.4.0</span>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 w-full max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-margin-mobile md:py-margin-desktop">
+        <!-- Hero Section -->
+        <section class="mb-12 text-center">
+            <h2 class="font-display-lg text-display-lg text-on-surface mb-4">Welcome to WMS Pro</h2>
+            <p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto">
+                A modern warehouse management system designed for efficiency, clarity, and data integrity.
+            </p>
+        </section>
+
+        <!-- Main Features Grid -->
+        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter mb-12">
+            <!-- Dashboard -->
+            <a href="./pages/dashboard.html" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer group">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-3 bg-primary-fixed rounded-lg group-hover:bg-primary/10 transition-colors">
+                        <span class="material-symbols-outlined text-primary" style="font-size: 24px;">dashboard</span>
+                    </div>
+                    <h3 class="font-headline-md text-headline-md text-on-surface">Dashboard</h3>
+                </div>
+                <p class="font-body-md text-body-md text-on-surface-variant">
+                    Real-time inventory metrics and warehouse analytics at a glance.
+                </p>
+            </a>
+
+            <!-- Add Product -->
+            <a href="./pages/add-product.html" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer group">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-3 bg-secondary-fixed rounded-lg group-hover:bg-secondary/10 transition-colors">
+                        <span class="material-symbols-outlined text-on-secondary-fixed" style="font-size: 24px;">add_circle</span>
+                    </div>
+                    <h3 class="font-headline-md text-headline-md text-on-surface">Add Product</h3>
+                </div>
+                <p class="font-body-md text-body-md text-on-surface-variant">
+                    Register new products with SKU, pricing, and warehouse location details.
+                </p>
+            </a>
+
+            <!-- Product Management -->
+            <a href="./pages/product-management.html" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer group">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-3 bg-tertiary-fixed rounded-lg group-hover:bg-tertiary/10 transition-colors">
+                        <span class="material-symbols-outlined text-on-tertiary-fixed" style="font-size: 24px;">inventory_2</span>
+                    </div>
+                    <h3 class="font-headline-md text-headline-md text-on-surface">Product Management</h3>
+                </div>
+                <p class="font-body-md text-body-md text-on-surface-variant">
+                    Manage inventory, track stock levels, and organize products by category.
+                </p>
+            </a>
+
+            <!-- Warehouse Map -->
+            <a href="./pages/warehouse-location-map.html" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer group">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-3 bg-surface-container rounded-lg group-hover:bg-surface/50 transition-colors">
+                        <span class="material-symbols-outlined text-on-surface" style="font-size: 24px;">location_on</span>
+                    </div>
+                    <h3 class="font-headline-md text-headline-md text-on-surface">Warehouse Map</h3>
+                </div>
+                <p class="font-body-md text-body-md text-on-surface-variant">
+                    Visual warehouse layout with location tracking and shelf management.
+                </p>
+            </a>
+
+            <!-- Inventory Reports -->
+            <a href="./pages/inventory-reports.html" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer group">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-3 bg-primary-fixed rounded-lg group-hover:bg-primary/10 transition-colors">
+                        <span class="material-symbols-outlined text-primary" style="font-size: 24px;">assessment</span>
+                    </div>
+                    <h3 class="font-headline-md text-headline-md text-on-surface">Inventory Reports</h3>
+                </div>
+                <p class="font-body-md text-body-md text-on-surface-variant">
+                    Comprehensive reports on inventory levels, revenue, and stock movements.
+                </p>
+            </a>
+
+            <!-- System Settings -->
+            <a href="./pages/system-settings.html" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer group">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-3 bg-surface-container-high rounded-lg group-hover:bg-outline/10 transition-colors">
+                        <span class="material-symbols-outlined text-on-surface" style="font-size: 24px;">settings</span>
+                    </div>
+                    <h3 class="font-headline-md text-headline-md text-on-surface">Settings</h3>
+                </div>
+                <p class="font-body-md text-body-md text-on-surface-variant">
+                    Configure system preferences, users, and warehouse parameters.
+                </p>
+            </a>
+        </section>
+
+        <!-- Additional Modules -->
+        <section class="mb-12">
+            <h3 class="font-headline-lg text-headline-lg text-on-surface mb-6">Additional Modules</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+                <!-- Import/Export -->
+                <a href="./pages/warehouse-import-export.html" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer group">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="material-symbols-outlined text-primary" style="font-size: 20px;">swap_horiz</span>
+                        <h4 class="font-headline-md text-headline-md text-on-surface">Import/Export</h4>
+                    </div>
+                    <p class="font-body-md text-body-md text-on-surface-variant">
+                        Bulk import and export inventory data with file management.
+                    </p>
+                </a>
+
+                <!-- Design System -->
+                <a href="../Assets/inventory_precision_system/DESIGN.md" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer group">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="material-symbols-outlined text-tertiary" style="font-size: 20px;">palette</span>
+                        <h4 class="font-headline-md text-headline-md text-on-surface">Design System</h4>
+                    </div>
+                    <p class="font-body-md text-body-md text-on-surface-variant">
+                        View the complete design system documentation and color palette.
+                    </p>
+                </a>
+            </div>
+        </section>
+
+        <!-- Quick Stats -->
+        <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6">
+                <div class="font-body-md text-body-md text-on-surface-variant mb-2">Total Products</div>
+                <div class="font-display-lg text-display-lg text-on-surface">2,540</div>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6">
+                <div class="font-body-md text-body-md text-on-surface-variant mb-2">Low Stock Alerts</div>
+                <div class="font-display-lg text-display-lg text-error">12</div>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6">
+                <div class="font-body-md text-body-md text-on-surface-variant mb-2">Monthly Revenue</div>
+                <div class="font-headline-md text-headline-md text-on-surface">$124,500</div>
+            </div>
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6">
+                <div class="font-body-md text-body-md text-on-surface-variant mb-2">Warehouse Fill</div>
+                <div class="font-headline-md text-headline-md text-primary">85%</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-surface border-t border-outline-variant mt-auto px-margin-mobile md:px-margin-desktop py-6">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <p class="font-body-md text-body-md text-on-surface-variant">
+                © 2024 Warehouse Manager Pro. All rights reserved.
+            </p>
+            <p class="font-label-md text-label-md text-on-surface-variant">
+                v2.4.0
+            </p>
+        </div>
+    </footer>
+</body>
+</html>

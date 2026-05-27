@@ -109,7 +109,20 @@
         }
     </style>
 </head>
-<body class="bg-background text-on-background font-body-md min-h-screen flex">
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<nav class="bg-surface border-b border-outline-variant z-50 px-margin-mobile md:px-margin-desktop py-3 flex items-center justify-between md:hidden">
+    <a href="../public/index.html" class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary font-bold">W</div>
+        <span class="font-headline-md text-headline-md font-bold text-primary hidden md:block">Warehouse Manager</span>
+    </a>
+    <div class="flex gap-3 md:gap-6 items-center">
+        <a href="../public/index.html" class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors">Home</a>
+        <a href="./dashboard.html" class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors">Dashboard</a>
+        <a href="./add-product.html" class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors">Add</a>
+        <a href="./inventory-reports.html" class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors">Reports</a>
+    </div>
+</nav>
 <!-- SideNavBar -->
 <nav class="fixed left-0 top-0 h-full w-sidebar-width flex flex-col z-40 bg-surface dark:bg-inverse-surface border-r border-outline-variant dark:border-outline transition-all duration-300 ease-in-out hidden md:flex">
 <!-- Header -->

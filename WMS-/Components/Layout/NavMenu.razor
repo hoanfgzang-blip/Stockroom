@@ -1,0 +1,58 @@
+<nav class="bg-surface dark:bg-inverse-surface border-r border-outline-variant dark:border-outline h-full w-sidebar-width flex flex-col z-40 hidden md:flex transition-all duration-300 ease-in-out">
+    <div class="h-16 flex items-center px-6 border-b border-outline-variant border-opacity-50">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary font-bold">W</div>
+            <div>
+                <h1 class="font-headline-md text-headline-md font-extrabold text-primary">Warehouse Manager</h1>
+                <span class="font-label-md text-label-md text-on-surface-variant">V2.4.0</span>
+            </div>
+        </div>
+    </div>
+    <div class="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1">
+        <NavLink class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all cursor-pointer" href="dashboard" Match="NavLinkMatch.All">
+            <span class="material-symbols-outlined">dashboard</span>
+            <span class="font-label-md text-label-md">Dashboard</span>
+        </NavLink>
+        <NavLink class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all cursor-pointer" href="product-management">
+            <span class="material-symbols-outlined">inventory_2</span>
+            <span class="font-label-md text-label-md">Products</span>
+        </NavLink>
+        <NavLink class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all cursor-pointer" href="warehouse-location-map">
+            <span class="material-symbols-outlined">location_on</span>
+            <span class="font-label-md text-label-md">Locations</span>
+        </NavLink>
+        <NavLink class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all cursor-pointer" href="warehouse-import-export">
+            <span class="material-symbols-outlined">input</span>
+            <span class="font-label-md text-label-md">Import</span>
+        </NavLink>
+        <NavLink class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all cursor-pointer" href="warehouse-import-export">
+            <span class="material-symbols-outlined">output</span>
+            <span class="font-label-md text-label-md">Export</span>
+        </NavLink>
+        <NavLink class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all cursor-pointer" href="inventory-reports">
+            <span class="material-symbols-outlined">assessment</span>
+            <span class="font-label-md text-label-md">Reports</span>
+        </NavLink>
+        <NavLink class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all cursor-pointer" href="#">
+            <span class="material-symbols-outlined">group</span>
+            <span class="font-label-md text-label-md">Employees</span>
+        </NavLink>
+        <NavLink class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-highest transition-all cursor-pointer mt-auto" href="system-settings">
+            <span class="material-symbols-outlined">settings</span>
+            <span class="font-label-md text-label-md">Settings</span>
+        </NavLink>
+    </div>
+</nav>
+
+<style>
+    .nav-link.active {
+        color: theme('colors.primary') !important;
+        border-left: 4px solid theme('colors.primary');
+        background-color: theme('colors.surface-container');
+        font-weight: bold;
+    }
+    
+    .nav-link.active .material-symbols-outlined {
+        font-variation-settings: 'FILL' 1;
+    }
+</style>

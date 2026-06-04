@@ -1,0 +1,87 @@
+@page "/system-settings"
+
+<div class="flex flex-col gap-gutter">
+    <!-- Page Header -->
+    <div class="flex flex-col gap-2">
+        <h1 class="font-headline-lg text-headline-lg text-on-surface">Settings</h1>
+        <p class="font-body-md text-body-md text-on-surface-variant">Manage your warehouse configuration and team access.</p>
+    </div>
+
+    <!-- Settings Layout -->
+    <div class="flex flex-col lg:flex-row gap-gutter">
+        <!-- Tab Navigation (Sidebar style on desktop, horizontal on mobile) -->
+        <div class="w-full lg:w-64 flex-shrink-0">
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden sticky top-24 shadow-sm">
+                <div class="flex flex-row lg:flex-col p-2 overflow-x-auto no-scrollbar gap-1">
+                    <button class="flex items-center gap-3 px-4 py-3 rounded-md font-label-md text-label-md whitespace-nowrap bg-surface-tint/10 text-primary transition-colors text-left">
+                        <span class="material-symbols-outlined text-[20px]">tune</span>
+                        General Settings
+                    </button>
+                    <button class="flex items-center gap-3 px-4 py-3 rounded-md font-label-md text-label-md whitespace-nowrap text-on-surface-variant hover:bg-surface-container transition-colors text-left">
+                        <span class="material-symbols-outlined text-[20px]">manage_accounts</span>
+                        User Management
+                    </button>
+                    <button class="flex items-center gap-3 px-4 py-3 rounded-md font-label-md text-label-md whitespace-nowrap text-on-surface-variant hover:bg-surface-container transition-colors text-left">
+                        <span class="material-symbols-outlined text-[20px]">notifications_active</span>
+                        Notification Preferences
+                    </button>
+                    <button class="flex items-center gap-3 px-4 py-3 rounded-md font-label-md text-label-md whitespace-nowrap text-on-surface-variant hover:bg-surface-container transition-colors text-left">
+                        <span class="material-symbols-outlined text-[20px]">receipt_long</span>
+                        System Logs
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Canvas -->
+        <div class="flex-1">
+            <!-- General Settings Tab -->
+            <div class="flex flex-col gap-6">
+                <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 flex flex-col gap-6 shadow-sm">
+                    <h2 class="font-headline-md text-headline-md text-on-surface border-b border-outline-variant/50 pb-4">General Configuration</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="flex flex-col gap-2">
+                            <label class="font-label-md text-label-md text-on-surface-variant">Warehouse Name</label>
+                            <input class="w-full bg-surface-container-lowest border border-outline-variant rounded-md px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary-fixed-dim outline-none transition-shadow" type="text" value="Main Hub Alpha"/>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <label class="font-label-md text-label-md text-on-surface-variant">Default Currency</label>
+                            <select class="w-full bg-surface-container-lowest border border-outline-variant rounded-md px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary-fixed-dim outline-none transition-shadow appearance-none">
+                                <option selected="" value="USD">USD ($) - US Dollar</option>
+                                <option value="EUR">EUR (€) - Euro</option>
+                                <option value="GBP">GBP (£) - British Pound</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="font-label-md text-label-md text-on-surface-variant">Timezone</label>
+                        <select class="w-full md:w-1/2 bg-surface-container-lowest border border-outline-variant rounded-md px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary-fixed-dim outline-none transition-shadow appearance-none">
+                            <option selected="" value="UTC">(UTC+00:00) Coordinated Universal Time</option>
+                            <option value="EST">(UTC-05:00) Eastern Time</option>
+                            <option value="PST">(UTC-08:00) Pacific Time</option>
+                        </select>
+                    </div>
+                    <div class="border-t border-outline-variant/50 pt-6 mt-2">
+                        <h3 class="font-headline-md text-headline-md text-on-surface mb-4">Branding</h3>
+                        <div class="flex items-center gap-6">
+                            <div class="w-24 h-24 rounded-lg bg-surface-container border border-dashed border-outline flex flex-col items-center justify-center text-on-surface-variant cursor-pointer hover:bg-surface-container-highest transition-colors">
+                                <span class="material-symbols-outlined text-[32px] mb-1">add_photo_alternate</span>
+                                <span class="font-label-md text-label-md text-[10px]">Upload Logo</span>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <p class="font-body-md text-body-md text-on-surface font-semibold">Company Logo</p>
+                                <p class="font-body-md text-body-md text-on-surface-variant text-[12px]">Recommended size: 256x256px. PNG or JPG.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="border-t border-outline-variant/50 pt-6 mt-2 flex justify-end">
+                        <button class="bg-primary-container text-on-primary font-label-md text-label-md px-6 py-3 rounded-md hover:bg-primary transition-colors flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px]">save</span>
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

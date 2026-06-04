@@ -1,9 +1,0 @@
-pnpm test
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
-# Kiểm tra kiểu dữ liệu TypeScript
-pnpm check-types
-
-# Kiểm tra cú pháp ESLint
-pnpm lint

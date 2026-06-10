@@ -28,29 +28,55 @@ Hệ thống quản lý kho hàng hiện đại WMS được xây dựng trên n
 ## Sơ Đồ Phân Cấp Chức Năng
 
 ```mermaid
-graph LR
-    HeThongWMS --> QuanLyHeThong
-    HeThongWMS --> NghiepVuNhapKho
-    HeThongWMS --> NghiepVuXuatKho
-    HeThongWMS --> GiamSatBaoCao
+graph TD
+    HeThong[Hệ thống Quản lý Kho vận]
+    
+    %% Level 1
+    Inbound[Quản lý Nhập hàng Inbound]
+    Scan[Quản lý Quét mã và Phân loại]
+    Outbound[Quản lý Xuất hàng Outbound]
+    Exception[Quản lý Xử lý Ngoại lệ]
+    Operation[Quản lý Thiết bị và Vận hành]
 
-    QuanLyHeThong --> QuanLySanPham
-    QuanLyHeThong --> QuanLyViTriKe
-    QuanLyHeThong --> NhatKyHoatDong
+    HeThong --> Inbound
+    HeThong --> Scan
+    HeThong --> Outbound
+    HeThong --> Exception
+    HeThong --> Operation
 
-    NghiepVuNhapKho --> QuanLyDonNhapKho
-    NghiepVuNhapKho --> QuetMaVachNhanHang
-    NghiepVuNhapKho --> CapNhatSoLuongKe
+    %% Level 2 - Inbound
+    Inbound1[Tiếp nhận dỡ hàng tại Dock 1 đến Dock 4]
+    Inbound2[Kiểm đếm tại khu vực hàng chờ phân loại]
+    Inbound --> Inbound1
+    Inbound --> Inbound2
 
-    NghiepVuXuatKho --> QuanLyDonXuatKho
-    NghiepVuXuatKho --> GiuChoTonKhoTamThoi
-    NghiepVuXuatKho --> LoTrinhLayHangToiUu
-    NghiepVuXuatKho --> BaoCaoSanPhamLoi
+    %% Level 2 - Scan
+    Scan1[Quét mã và phân loại lần 1]
+    Scan2[Phân luồng hàng nội tỉnh theo Phương A B C D]
+    Scan3[Phân luồng hàng đi liên tỉnh]
+    Scan --> Scan1
+    Scan --> Scan2
+    Scan --> Scan3
 
-    GiamSatBaoCao --> TrangTongQuanDashboard
-    GiamSatBaoCao --> BanDoViTriTrucQuan
-    GiamSatBaoCao --> BaoCaoTonKho
-    GiamSatBaoCao --> CaiDatHeThong
+    %% Level 2 - Outbound
+    Outbound1[Bốc xếp luồng nội tỉnh tại Dock A đến Dock D]
+    Outbound2[Bốc xếp luồng liên tỉnh tại Dock H và Dock I]
+    Outbound --> Outbound1
+    Outbound --> Outbound2
+
+    %% Level 2 - Exception
+    Exception1[Nhân viên phát hiện và ghi nhận tình trạng]
+    Exception2[Lập phiếu báo cáo hàng hỏng mất nhãn]
+    Exception3[Trưởng kho phê duyệt phương án xử lý]
+    Exception --> Exception1
+    Exception --> Exception2
+    Exception --> Exception3
+
+    %% Level 2 - Operation
+    Operation1[Quản lý pallet rỗng đầy và xe nâng]
+    Operation2[Điều phối hoạt động tại khu vực quản lý]
+    Operation --> Operation1
+    Operation --> Operation2
 ```
 
 ---

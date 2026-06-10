@@ -71,7 +71,6 @@ graph TD
 │   ├── Program.cs             # Cấu hình khởi chạy ứng dụng
 │   └── WMS-.csproj            # Khai báo các thư viện phụ thuộc
 ├── WMS-.sln                   # File Solution quản lý dự án .NET
-└── Xuất kho.md                # Tài liệu chi tiết về quy chuẩn quy trình xuất kho
 ```
 
 ---

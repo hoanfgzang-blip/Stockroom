@@ -7,7 +7,7 @@ Hệ thống quản lý kho hàng hiện đại WMS được xây dựng trên n
 ## Các Tính Năng Nổi Bật
 
 * **Sơ đồ kệ hàng trực quan**: Theo dõi tỉ lệ lấp đầy của từng kệ dưới dạng bản đồ nhiệt. Lựa chọn kệ để xem chi tiết sản phẩm và số lượng đang lưu trữ.
-* **Quy trình nhập kho tinh gọn**: Quản lý nhà cung cấp, đơn đặt hàng và quét mã vạch nhận hàng thực tế.
+* **Quy trình nhập kho tinh gọn**: Quản lý đơn đặt hàng và quét mã vạch nhận hàng thực tế.
 * **Logic xuất kho thông minh**:
   * **Cơ chế giữ chỗ tồn kho** có thời hạn mười hai giờ.
   * **Lập lộ trình lấy hàng tối ưu** tự động sắp xếp theo thứ tự lối đi giúp nhân viên di chuyển ngắn nhất.
@@ -38,7 +38,6 @@ graph LR
     QuanLyHeThong --> QuanLyViTriKe
     QuanLyHeThong --> NhatKyHoatDong
 
-    NghiepVuNhapKho --> QuanLyNhaCungCap
     NghiepVuNhapKho --> QuanLyDonNhapKho
     NghiepVuNhapKho --> QuetMaVachNhanHang
     NghiepVuNhapKho --> CapNhatSoLuongKe

@@ -1,4 +1,6 @@
 @page "/product-management"
+@using WMS_.Data.Entities
+@inject WMS_.Services.InventoryService InventoryService
 
 <div class="space-y-gutter">
     <!-- Page Header & Toolbar -->
@@ -12,15 +14,8 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <span class="material-symbols-outlined text-outline">search</span>
                 </div>
-                <input class="block w-full pl-10 pr-3 py-2 border border-outline-variant rounded-md leading-5 bg-surface-container-lowest placeholder-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary font-body-md text-body-md transition-shadow" placeholder="Search by SKU or name..." type="text"/>
+                <input class="block w-full pl-10 pr-3 py-2 border border-outline-variant rounded-md leading-5 bg-surface-container-lowest placeholder-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary font-body-md text-body-md transition-shadow" placeholder="Search by SKU or name..." type="text" @bind="searchQuery" @bind:event="oninput"/>
             </div>
-            <button class="inline-flex items-center px-[24px] py-[12px] border border-outline-variant rounded-md shadow-sm text-on-surface bg-surface-container-lowest hover:bg-surface-container-low focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary font-label-md text-label-md transition-colors">
-                <span class="material-symbols-outlined mr-2 text-lg">filter_list</span>
-                Filter
-            </button>
-            <button class="inline-flex items-center justify-center p-[12px] border border-outline-variant rounded-md shadow-sm text-on-surface bg-surface-container-lowest hover:bg-surface-container-low focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors" title="Export Excel">
-                <span class="material-symbols-outlined text-lg">download</span>
-            </button>
             <a href="add-product" class="inline-flex items-center px-[24px] py-[12px] border border-transparent rounded-md shadow-sm text-on-primary bg-primary-container hover:bg-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary font-label-md text-label-md transition-colors">
                 <span class="material-symbols-outlined mr-2 text-lg">add</span>
                 Add Product
@@ -33,170 +28,107 @@
             <table class="min-w-full divide-y divide-outline-variant/50">
                 <thead class="bg-surface-container-low">
                     <tr>
-                        <th class="px-6 py-3 text-left font-label-md text-label-md text-on-surface-variant uppercase tracking-wider cursor-pointer hover:bg-surface-container transition-colors group" scope="col">
-                            <div class="flex items-center">
-                                ID
-                                <span class="material-symbols-outlined text-sm ml-1 opacity-0 group-hover:opacity-100 transition-opacity">arrow_downward</span>
-                            </div>
-                        </th>
-                        <th class="px-6 py-3 text-left font-label-md text-label-md text-on-surface-variant uppercase tracking-wider cursor-pointer hover:bg-surface-container transition-colors group" scope="col">
-                            <div class="flex items-center">
-                                Name
-                                <span class="material-symbols-outlined text-sm ml-1 opacity-0 group-hover:opacity-100 transition-opacity">swap_vert</span>
-                            </div>
-                        </th>
-                        <th class="px-6 py-3 text-left font-label-md text-label-md text-on-surface-variant uppercase tracking-wider cursor-pointer hover:bg-surface-container transition-colors group" scope="col">
-                            <div class="flex items-center">
-                                Category
-                                <span class="material-symbols-outlined text-sm ml-1 opacity-0 group-hover:opacity-100 transition-opacity">swap_vert</span>
-                            </div>
-                        </th>
-                        <th class="px-6 py-3 text-right font-label-md text-label-md text-on-surface-variant uppercase tracking-wider cursor-pointer hover:bg-surface-container transition-colors group" scope="col">
-                            <div class="flex items-center justify-end">
-                                Stock
-                                <span class="material-symbols-outlined text-sm ml-1 opacity-0 group-hover:opacity-100 transition-opacity">swap_vert</span>
-                            </div>
-                        </th>
-                        <th class="px-6 py-3 text-right font-label-md text-label-md text-on-surface-variant uppercase tracking-wider cursor-pointer hover:bg-surface-container transition-colors group" scope="col">
-                            <div class="flex items-center justify-end">
-                                Price
-                                <span class="material-symbols-outlined text-sm ml-1 opacity-0 group-hover:opacity-100 transition-opacity">swap_vert</span>
-                            </div>
-                        </th>
-                        <th class="px-6 py-3 text-center font-label-md text-label-md text-on-surface-variant uppercase tracking-wider cursor-pointer hover:bg-surface-container transition-colors group" scope="col">
-                            <div class="flex items-center justify-center">
-                                Status
-                                <span class="material-symbols-outlined text-sm ml-1 opacity-0 group-hover:opacity-100 transition-opacity">swap_vert</span>
-                            </div>
-                        </th>
-                        <th class="px-6 py-3 text-right font-label-md text-label-md text-on-surface-variant uppercase tracking-wider" scope="col">
-                            Actions
-                        </th>
+                        <th class="px-6 py-3 text-left font-label-md text-label-md text-on-surface-variant uppercase tracking-wider" scope="col">ID</th>
+                        <th class="px-6 py-3 text-left font-label-md text-label-md text-on-surface-variant uppercase tracking-wider" scope="col">Name</th>
+                        <th class="px-6 py-3 text-left font-label-md text-label-md text-on-surface-variant uppercase tracking-wider" scope="col">Description</th>
+                        <th class="px-6 py-3 text-right font-label-md text-label-md text-on-surface-variant uppercase tracking-wider" scope="col">Stock</th>
+                        <th class="px-6 py-3 text-right font-label-md text-label-md text-on-surface-variant uppercase tracking-wider" scope="col">Price</th>
+                        <th class="px-6 py-3 text-center font-label-md text-label-md text-on-surface-variant uppercase tracking-wider" scope="col">Status</th>
+                        <th class="px-6 py-3 text-right font-label-md text-label-md text-on-surface-variant uppercase tracking-wider" scope="col">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-surface-container-lowest divide-y divide-outline-variant/30 font-body-md text-body-md">
-                    <!-- Row 1 (In Stock) -->
-                    <tr class="hover:bg-surface-container-low transition-colors">
-                        <td class="px-6 py-4 whitespace-nowrap font-data-mono text-data-mono text-on-surface-variant">PRD-8291</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0 h-10 w-10 bg-surface-container-high rounded border border-outline-variant/50 flex items-center justify-center overflow-hidden">
-                                    <img alt="Industrial Bearing" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3fkG2_CLBwiYI__iCypePY8ohR2NfHkshNpC0x9g8BMZhCBoxkgDjJXRtqtrFoQ8CeOJljIOR6n7XMntgUHyDycgS-IXZgoWyYntXN6fwy5Cn_Y9lKeGuZrktytnVu9zDCtinnbQomIF32jcZ0cUz-SVOtIH-ICtr4-K7ajTyk__owCa68p_iYuWNS0zGXosAJqrFTFBKq91kgib7-Aq7rT6yOTsVqPV9xY0gIzTARyXQoh3v159UhE4A6iwzjnk1yofsd8PFQb8v"/>
-                                </div>
-                                <div class="ml-4">
-                                    <div class="font-label-md text-label-md text-on-surface">Heavy Duty Bearing X-1</div>
-                                    <div class="text-on-surface-variant text-xs mt-0.5">SKU: HD-BR-X1</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-on-surface-variant">Mechanical Parts</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right font-data-mono text-data-mono">1,250</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right font-data-mono text-data-mono">$45.00</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-center">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
-                                In Stock
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button class="text-secondary hover:text-primary transition-colors p-1" title="Edit">
-                                <span class="material-symbols-outlined text-lg">edit</span>
-                            </button>
-                            <button class="text-secondary hover:text-error transition-colors p-1 ml-2" title="Delete">
-                                <span class="material-symbols-outlined text-lg">delete</span>
-                            </button>
-                        </td>
-                    </tr>
-                    <!-- Row 2 (Low Stock) -->
-                    <tr class="hover:bg-surface-container-low transition-colors">
-                        <td class="px-6 py-4 whitespace-nowrap font-data-mono text-data-mono text-on-surface-variant">PRD-8292</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0 h-10 w-10 bg-surface-container-high rounded border border-outline-variant/50 flex items-center justify-center overflow-hidden">
-                                    <img alt="Safety Goggles" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAan2PxlkXCRPqnaxM706hnDxPBxVGxsnkgIxUEjpAgbvkykLpMRbBb1gEAOHqeB9sKF0fBJxhx09tK0bxZ_oHGsaLZuVUurXYS0ShepUqYXvw9KofSeuMje1dJx4OXAU-IV4Xi2fsHZLiZkIisQ3OJwMbCSzhRCnBy61gDNo9GyDx8pbPa-EQLmX2JGdaEi54vczi4jeE7OjRwin_C8rn5z3ZikQ-6HP3y0S0hT6_0Ze8w6Gxq_uF-U8uhEdRjYI2YviWBLTU05cOE"/>
-                                </div>
-                                <div class="ml-4">
-                                    <div class="font-label-md text-label-md text-on-surface">ProVision Safety Goggles</div>
-                                    <div class="text-on-surface-variant text-xs mt-0.5">SKU: PPE-GOG-02</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-on-surface-variant">Safety & PPE</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right font-data-mono text-data-mono text-tertiary font-medium">12</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right font-data-mono text-data-mono">$18.50</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-center">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
-                                Low Stock
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button class="text-secondary hover:text-primary transition-colors p-1" title="Edit">
-                                <span class="material-symbols-outlined text-lg">edit</span>
-                            </button>
-                            <button class="text-secondary hover:text-error transition-colors p-1 ml-2" title="Delete">
-                                <span class="material-symbols-outlined text-lg">delete</span>
-                            </button>
-                        </td>
-                    </tr>
-                    <!-- Row 3 (Out of Stock) -->
-                    <tr class="hover:bg-surface-container-low transition-colors">
-                        <td class="px-6 py-4 whitespace-nowrap font-data-mono text-data-mono text-on-surface-variant">PRD-8293</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0 h-10 w-10 bg-surface-container-high rounded border border-outline-variant/50 flex items-center justify-center overflow-hidden">
-                                    <span class="material-symbols-outlined text-outline-variant text-xl">image</span>
-                                </div>
-                                <div class="ml-4">
-                                    <div class="font-label-md text-label-md text-on-surface">Industrial Lubricant 5G</div>
-                                    <div class="text-on-surface-variant text-xs mt-0.5">SKU: CHM-LUB-5G</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-on-surface-variant">Chemicals</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right font-data-mono text-data-mono text-error font-medium">0</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right font-data-mono text-data-mono">$120.00</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-center">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
-                                Out of Stock
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button class="text-secondary hover:text-primary transition-colors p-1" title="Edit">
-                                <span class="material-symbols-outlined text-lg">edit</span>
-                            </button>
-                            <button class="text-secondary hover:text-error transition-colors p-1 ml-2" title="Delete">
-                                <span class="material-symbols-outlined text-lg">delete</span>
-                            </button>
-                        </td>
-                    </tr>
+                    @if (FilteredProducts != null && FilteredProducts.Any())
+                    {
+                        @foreach (var product in FilteredProducts)
+                        {
+                            var stock = GetStock(product.ProductId);
+                            <tr class="hover:bg-surface-container-low transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap font-data-mono text-data-mono text-on-surface-variant">PRD-@product.ProductId</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 h-10 w-10 bg-surface-container-high rounded border border-outline-variant/50 flex items-center justify-center overflow-hidden">
+                                            <span class="material-symbols-outlined text-outline-variant text-xl">inventory_2</span>
+                                        </div>
+                                        <div class="ml-4">
+                                            <div class="font-label-md text-label-md text-on-surface font-semibold">@product.Name</div>
+                                            <div class="text-on-surface-variant text-xs mt-0.5">SKU: @product.Sku</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-on-surface-variant">@product.Description</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-data-mono text-data-mono @(stock < 100 ? (stock == 0 ? "text-error" : "text-tertiary") : "")">@stock</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-data-mono text-data-mono">$@product.UnitPrice.ToString("0.00")</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-center">
+                                    @if (stock == 0)
+                                    {
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+                                            Out of Stock
+                                        </span>
+                                    }
+                                    else if (stock < 100)
+                                    {
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
+                                            Low Stock
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
+                                            In Stock
+                                        </span>
+                                    }
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button class="text-secondary hover:text-error transition-colors p-1" title="Delete" @onclick="() => DeleteProduct(product.ProductId)">
+                                        <span class="material-symbols-outlined text-lg">delete</span>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="py-4 text-center text-on-surface-variant">No products found in inventory database.</td>
+                        </tr>
+                    }
                 </tbody>
             </table>
         </div>
-        <!-- Pagination -->
-        <div class="bg-surface-container-lowest px-6 py-3 border-t border-outline-variant/30 flex items-center justify-between sm:px-6">
-            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                    <p class="font-body-md text-body-md text-on-surface-variant">
-                        Showing <span class="font-medium text-on-surface">1</span> to <span class="font-medium text-on-surface">5</span> of <span class="font-medium text-on-surface">125</span> results
-                    </p>
-                </div>
-                <div>
-                    <nav aria-label="Pagination" class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                        <button class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-outline-variant bg-surface-container-lowest text-sm font-medium text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50 disabled:cursor-not-allowed" disabled="">
-                            <span class="sr-only">Previous</span>
-                            <span class="material-symbols-outlined text-xl">chevron_left</span>
-                        </button>
-                        <button class="relative inline-flex items-center px-4 py-2 border border-outline-variant bg-primary-container text-sm font-medium text-on-primary">1</button>
-                        <button class="relative inline-flex items-center px-4 py-2 border border-outline-variant bg-surface-container-lowest text-sm font-medium text-on-surface hover:bg-surface-container-low transition-colors">2</button>
-                        <button class="relative inline-flex items-center px-4 py-2 border border-outline-variant bg-surface-container-lowest text-sm font-medium text-on-surface hover:bg-surface-container-low transition-colors">3</button>
-                        <span class="relative inline-flex items-center px-4 py-2 border border-outline-variant bg-surface-container-lowest text-sm font-medium text-on-surface-variant">...</span>
-                        <button class="relative inline-flex items-center px-4 py-2 border border-outline-variant bg-surface-container-lowest text-sm font-medium text-on-surface hover:bg-surface-container-low transition-colors">25</button>
-                        <button class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-outline-variant bg-surface-container-lowest text-sm font-medium text-on-surface-variant hover:bg-surface-container-low transition-colors">
-                            <span class="sr-only">Next</span>
-                            <span class="material-symbols-outlined text-xl">chevron_right</span>
-                        </button>
-                    </nav>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
+
+@code {
+    private List<Product> products = new();
+    private List<Inventory> inventories = new();
+    private string searchQuery = string.Empty;
+
+    private IEnumerable<Product> FilteredProducts =>
+        string.IsNullOrWhiteSpace(searchQuery)
+            ? products
+            : products.Where(p => p.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) || 
+                                  p.Sku.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProductsAsync();
+    }
+
+    private async Task LoadProductsAsync()
+    {
+        products = await InventoryService.GetProductsAsync();
+        inventories = await InventoryService.GetInventoryAsync();
+    }
+
+    private int GetStock(int productId)
+    {
+        return inventories.Where(i => i.ProductId == productId).Sum(i => i.Quantity);
+    }
+
+    private async Task DeleteProduct(int productId)
+    {
+        await InventoryService.DeleteProductAsync(productId);
+        await LoadProductsAsync();
+    }
+}

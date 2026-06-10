@@ -20,7 +20,7 @@ Hệ thống quản lý kho hàng hiện đại WMS được xây dựng trên n
 
 * **Giao diện**: HTML5, Vanilla CSS, Tailwind CSS, Blazor Components.
 * **Hệ thống phía sau**: ASP.NET Core Blazor Server chạy trên bản .NET 9.0.
-* **Tầng dữ liệu**: SQLite Database, Entity Framework Core làm công cụ liên kết cơ sở dữ liệu.
+* **Tầng dữ liệu**: Dữ liệu giả lập chạy trực tiếp trên bộ nhớ giúp chạy thử ứng dụng ngay lập tức mà không cần cài đặt cơ sở dữ liệu.
 * **Biểu tượng**: Google Material Symbols.
 
 ---
@@ -49,7 +49,23 @@ graph LR
 
     GiamSatBaoCao --> TrangTongQuanDashboard
     GiamSatBaoCao --> BanDoViTriTrucQuan
+    GiamSatBaoCao --> BaoCaoTonKho
+    GiamSatBaoCao --> CaiDatHeThong
 ```
+
+---
+
+## Các Trang Chức Năng Trên Giao Diện Web
+
+Hệ thống quản lý kho vận WMS này cung cấp các trang giao diện trực quan sau đây phục vụ công tác vận hành:
+
+* **Trang chủ Tổng quan Dashboard**: Hiển thị nhanh các chỉ số đo lường hiệu suất chính như tổng số lượng sản phẩm, số lượng hàng cảnh báo tồn kho thấp, tổng sản lượng tồn kho và biểu đồ trực quan về tỉ lệ lấp đầy kho.
+* **Bản đồ Vị trí Kệ hàng**: Giao diện trực quan mô phỏng sơ đồ kho thực tế theo các khu vực Zone A và Zone B. Cho phép người dùng theo dõi trạng thái sức chứa của từng kệ và bấm vào để xem danh sách sản phẩm cùng số lượng cụ thể đang lưu trữ tại kệ đó.
+* **Quản lý Sản phẩm**: Danh sách hiển thị toàn bộ thông tin sản phẩm bao gồm tên sản phẩm, mã SKU, mã vạch, đơn giá và tổng số lượng tồn kho thực tế. Hỗ trợ tìm kiếm nhanh theo tên sản phẩm hoặc mã SKU và chức năng xóa sản phẩm.
+* **Thêm Sản phẩm Mới**: Biểu mẫu nhập liệu cho phép khai báo sản phẩm mới vào hệ thống gồm các trường thông tin như tên sản phẩm, mã SKU, mã vạch, đơn giá bán và mô tả chi tiết sản phẩm.
+* **Nhập Xuất Kho Mới**: Giao diện ghi nhận giao dịch nhập kho thực tế từ nhà cung cấp. Hỗ trợ quét mã vạch hoặc nhập mã SKU để thêm sản phẩm vào danh sách giao dịch, tự động tính toán tổng số tiền và in hóa đơn biên nhận.
+* **Báo cáo Tồn kho**: Trang hiển thị báo cáo số liệu chi tiết về tình hình luân chuyển hàng hóa và doanh thu kho hàng.
+* **Cài đặt Hệ thống**: Cấu hình các thông số vận hành chung của hệ thống quản lý kho vận.
 
 ---
 

@@ -97,6 +97,35 @@ erDiagram
 
 ---
 
+## 📊 Sơ Đồ Phân Cấp Chức Năng
+
+```mermaid
+graph TD
+    WMS[Hệ thống WMS] --> HT[Quản lý Hệ thống]
+    WMS --> NK[Nghiệp vụ Nhập kho]
+    WMS --> XK[Nghiệp vụ Xuất kho]
+    WMS --> GS[Giám sát và Báo cáo]
+
+    HT --> QLSP[Quản lý Sản phẩm]
+    HT --> QLVT[Quản lý Vị trí kệ]
+    HT --> NKHT[Nhật ký hoạt động]
+
+    NK --> QLNCC[Quản lý Nhà cung cấp]
+    NK --> QLPO[Quản lý Đơn nhập kho]
+    NK --> QMVNK[Quét mã vạch nhận hàng]
+    NK --> CNKH[Cập nhật số lượng kệ]
+
+    XK --> QLSO[Quản lý Đơn xuất kho]
+    XK --> GCTT[Giữ chỗ tồn kho tạm thời]
+    XK --> LTLH[Lộ trình lấy hàng tối ưu]
+    XK --> BCSPL[Báo cáo sản phẩm lỗi]
+
+    GS --> TQ[Trang tổng quan Dashboard]
+    GS --> BD[Bản đồ vị trí trực quan]
+```
+
+---
+
 ## 📂 Cấu Trúc Thư Mục Dự Án
 
 ```text

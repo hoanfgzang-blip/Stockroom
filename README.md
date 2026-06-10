@@ -1,165 +1,93 @@
-# 📦 Warehouse Management System (WMS)
+# Hệ thống quản lý kho vận WMS
 
-[![.NET Version](https://img.shields.io/badge/.NET-9.0-blue.svg)](https://dotnet.microsoft.com/)
-[![Framework](https://img.shields.io/badge/Blazor-Interactive--Server-purple.svg)](https://learn.microsoft.com/en-us/aspnet/core/blazor/)
-[![Database](https://img.shields.io/badge/Database-SQLite-lightgrey.svg)](https://www.sqlite.org/)
-[![ORM](https://img.shields.io/badge/ORM-EF%20Core-green.svg)](https://learn.microsoft.com/en-us/ef/core/)
-
-Hệ thống quản lý kho hàng hiện đại (WMS) được xây dựng trên nền tảng **Blazor Interactive Server (.NET 9.0)** kết hợp **Entity Framework Core** và cơ sở dữ liệu **SQLite**. Dự án được thiết kế chuẩn chỉnh theo mô hình dịch vụ (Service-oriented) giúp tối ưu hóa toàn bộ các hoạt động vận hành nhập/xuất kho và quản lý sơ đồ kệ hàng thời gian thực.
+Hệ thống quản lý kho hàng hiện đại WMS được xây dựng trên nền tảng Blazor Interactive Server chạy trên bản .NET 9.0 kết hợp với Entity Framework Core và cơ sở dữ liệu SQLite. Dự án được thiết kế chuẩn chỉnh theo mô hình hướng dịch vụ giúp tối ưu hóa toàn bộ các hoạt động vận hành nhập xuất kho và quản lý sơ đồ kệ hàng thời gian thực.
 
 ---
 
-## 🚀 Tính Năng Nổi Bật
+## Các Tính Năng Nổi Bật
 
-* **Sơ đồ kệ hàng trực quan (Interactive Floor Plan)**: Theo dõi tỉ lệ lấp đầy (Capacity fill-rate) của từng Zone/Aisle/Shelf dưới dạng heatmap. Click chọn kệ để xem chi tiết sản phẩm và số lượng đang lưu trữ.
-* **Quy trình nhập kho tinh gọn (Inbound flow)**: Quản lý nhà cung cấp, đơn đặt hàng (Purchase Orders) và quét mã vạch nhận hàng thực tế.
-* **Logic xuất kho thông minh (Outbound Flow)**:
-  * **Cơ chế giữ chỗ tồn kho (Hold Reservation)** có thời hạn 12 giờ.
-  * **Lập lộ trình lấy hàng tối ưu (Optimized Picking Route)** tự động sắp xếp theo thứ tự lối đi (Aisle) giúp nhân viên di chuyển ngắn nhất.
-  * Hỗ trợ báo cáo lỗi ngoại quan sản phẩm, tự động tìm kiếm vị trí thay thế gần nhất.
-* **Nhật ký hệ thống tối bảo mật (Audit Logs)**: Ghi lại chi tiết mọi hoạt động thay đổi dữ liệu của nhân viên (ai sửa, sửa lúc nào, giá trị cũ/mới) dưới dạng *chỉ cho phép ghi thêm (Append-only)* phục vụ công tác thanh tra.
-
----
-
-## 🛠️ Công Nghệ Sử Dụng
-
-* **Frontend**: HTML5, Vanilla CSS, Tailwind CSS (Utility classes), Blazor Components.
-* **Backend**: ASP.NET Core Blazor Server (.NET 9.0).
-* **Database & Access Layer**: SQLite Database, Entity Framework Core (ORM).
-* **Icons**: Google Material Symbols.
+* **Sơ đồ kệ hàng trực quan**: Theo dõi tỉ lệ lấp đầy của từng kệ dưới dạng bản đồ nhiệt. Lựa chọn kệ để xem chi tiết sản phẩm và số lượng đang lưu trữ.
+* **Quy trình nhập kho tinh gọn**: Quản lý nhà cung cấp, đơn đặt hàng và quét mã vạch nhận hàng thực tế.
+* **Logic xuất kho thông minh**:
+  * **Cơ chế giữ chỗ tồn kho** có thời hạn mười hai giờ.
+  * **Lập lộ trình lấy hàng tối ưu** tự động sắp xếp theo thứ tự lối đi giúp nhân viên di chuyển ngắn nhất.
+  * Hỗ trợ báo cáo lỗi ngoại quan sản phẩm và tự động tìm kiếm vị trí thay thế gần nhất.
+* **Nhật ký hệ thống tối bảo mật**: Ghi lại chi tiết mọi hoạt động thay đổi dữ liệu của nhân viên như ai sửa, sửa lúc nào, giá trị cũ và mới dưới dạng chỉ cho phép ghi thêm phục vụ công tác thanh tra.
 
 ---
 
-## 📐 Kiến Trúc Cơ Sở Dữ Liệu (ERD)
+## Công Nghệ Sử Dụng
 
-```mermaid
-erDiagram
-    Product {
-        int ProductId PK
-        string Name
-        string Sku UK
-        string Barcode UK
-        decimal UnitPrice
-    }
-    Location {
-        int LocationId PK
-        string Zone
-        string Aisle
-        string Shelf
-        int Level
-        int MaxCapacity
-        int CurrentCapacity
-    }
-    Inventory {
-        int InventoryId PK
-        int ProductId FK
-        int LocationId FK
-        int Quantity
-        int ReservedQuantity
-    }
-    PurchaseOrder {
-        int PoId PK
-        int SupplierId FK
-        string Status
-        DateTime OrderDate
-    }
-    InboundReceipt {
-        int ReceiptId PK
-        int PoId FK
-        string ResponsibleEmployee
-        DateTime ReceiptDate
-    }
-    SalesOrder {
-        int SoId PK
-        int CustomerId FK
-        string Status
-    }
-    OutboundShipment {
-        int ShipmentId PK
-        int SoId FK
-        string DriverName
-        string SealNumber
-        string Status
-    }
-    AuditLog {
-        int LogId PK
-        DateTime Timestamp
-        string UserId
-        string Action
-        string NewValue
-    }
-
-    Product ||--o{ Inventory : stores
-    Location ||--o{ Inventory : holds
-    PurchaseOrder ||--o{ InboundReceipt : processes
-    SalesOrder ||--o{ OutboundShipment : fulfills
-```
+* **Giao diện**: HTML5, Vanilla CSS, Tailwind CSS, Blazor Components.
+* **Hệ thống phía sau**: ASP.NET Core Blazor Server chạy trên bản .NET 9.0.
+* **Tầng dữ liệu**: SQLite Database, Entity Framework Core làm công cụ liên kết cơ sở dữ liệu.
+* **Biểu tượng**: Google Material Symbols.
 
 ---
 
-## 📊 Sơ Đồ Phân Cấp Chức Năng
+## Sơ Đồ Phân Cấp Chức Năng
 
 ```mermaid
 graph TD
-    WMS[Hệ thống WMS] --> HT[Quản lý Hệ thống]
-    WMS --> NK[Nghiệp vụ Nhập kho]
-    WMS --> XK[Nghiệp vụ Xuất kho]
-    WMS --> GS[Giám sát và Báo cáo]
+    HeThongWMS --> QuanLyHeThong
+    HeThongWMS --> NghiepVuNhapKho
+    HeThongWMS --> NghiepVuXuatKho
+    HeThongWMS --> GiamSatBaoCao
 
-    HT --> QLSP[Quản lý Sản phẩm]
-    HT --> QLVT[Quản lý Vị trí kệ]
-    HT --> NKHT[Nhật ký hoạt động]
+    QuanLyHeThong --> QuanLySanPham
+    QuanLyHeThong --> QuanLyViTriKe
+    QuanLyHeThong --> NhatKyHoatDong
 
-    NK --> QLNCC[Quản lý Nhà cung cấp]
-    NK --> QLPO[Quản lý Đơn nhập kho]
-    NK --> QMVNK[Quét mã vạch nhận hàng]
-    NK --> CNKH[Cập nhật số lượng kệ]
+    NghiepVuNhapKho --> QuanLyNhaCungCap
+    NghiepVuNhapKho --> QuanLyDonNhapKho
+    NghiepVuNhapKho --> QuetMaVachNhanHang
+    NghiepVuNhapKho --> CapNhatSoLuongKe
 
-    XK --> QLSO[Quản lý Đơn xuất kho]
-    XK --> GCTT[Giữ chỗ tồn kho tạm thời]
-    XK --> LTLH[Lộ trình lấy hàng tối ưu]
-    XK --> BCSPL[Báo cáo sản phẩm lỗi]
+    NghiepVuXuatKho --> QuanLyDonXuatKho
+    NghiepVuXuatKho --> GiuChoTonKhoTamThoi
+    NghiepVuXuatKho --> LoTrinhLayHangToiUu
+    NghiepVuXuatKho --> BaoCaoSanPhamLoi
 
-    GS --> TQ[Trang tổng quan Dashboard]
-    GS --> BD[Bản đồ vị trí trực quan]
+    GiamSatBaoCao --> TrangTongQuanDashboard
+    GiamSatBaoCao --> BanDoViTriTrucQuan
 ```
 
 ---
 
-## 📂 Cấu Trúc Thư Mục Dự Án
+## Cấu Trúc Thư Mục Dự Án
 
 ```text
 ├── WMS-                       # Thư mục chứa mã nguồn chính
 │   ├── Components/            # Giao diện Blazor Components
-│   │   ├── Pages/             # Các trang nghiệp vụ (Dashboard, Map, Products...)
+│   │   ├── Pages/             # Các trang nghiệp vụ như Dashboard, Bản đồ, Sản phẩm
 │   │   └── Layout/            # Layout trang trí và thanh điều hướng Navigation
 │   ├── Data/                  # Tầng truy cập dữ liệu
 │   │   ├── Entities/          # Các thực thể C# ánh xạ tới bảng trong Database
-│   │   └── WmsDbContext.cs    # Cấu hình kết nối DB & Khởi tạo dữ liệu mẫu (Seeding)
+│   │   └── WmsDbContext.cs    # Cấu hình kết nối DB và Khởi tạo dữ liệu mẫu
 │   ├── Services/              # Các dịch vụ xử lý logic nghiệp vụ kho
 │   │   ├── InventoryService.cs
 │   │   ├── InboundService.cs
 │   │   └── OutboundService.cs
-│   ├── Program.cs             # Cấu hình khởi chạy ứng dụng & Dependency Injection
-│   └── WMS-.csproj            # Khai báo các thư viện phụ thuộc (Nuget Packages)
+│   ├── Program.cs             # Cấu hình khởi chạy ứng dụng
+│   └── WMS-.csproj            # Khai báo các thư viện phụ thuộc
 ├── WMS-.sln                   # File Solution quản lý dự án .NET
 └── Xuất kho.md                # Tài liệu chi tiết về quy chuẩn quy trình xuất kho
 ```
 
 ---
 
-## 💻 Hướng Dẫn Cài Đặt & Chạy Dự Án
+## Hướng Dẫn Cài Đặt và Chạy Dự Án
 
 ### Yêu Cầu Hệ Thống
-* Đã cài đặt **.NET 9.0 SDK** ([Tải về tại đây](https://dotnet.microsoft.com/download/dotnet/9.0)).
+* Đã cài đặt .NET 9.0 SDK. Tải về tại đường dẫn https://dotnet.microsoft.com/download/dotnet/9.0
 
 ### Các Bước Thực Hiện
-1. **Clone dự án**:
+1. **Tải dự án**:
    ```bash
    git clone https://github.com/hoanfgzang-blip/WMS-.git
    cd WMS-
    ```
-2. **Khôi phục thư viện và build dự án**:
+2. **Khôi phục thư viện và dựng dự án**:
    ```bash
    dotnet restore
    dotnet build
@@ -169,6 +97,6 @@ graph TD
    dotnet run --project WMS-/WMS-.csproj
    ```
 4. **Truy cập giao diện**:
-   Mở trình duyệt và truy cập đường dẫn được hiển thị trên console (mặc định là `http://localhost:5000` hoặc `https://localhost:5001`). 
+   Mở trình duyệt và truy cập đường dẫn được hiển thị trên bảng điều khiển, ví dụ như http://localhost:5000
 
-*Lưu ý: Cơ sở dữ liệu SQLite (`wms.db`) sẽ tự động được tạo và điền dữ liệu mẫu ngay trong lần chạy đầu tiên.*
+*Lưu ý: Cơ sở dữ liệu SQLite sẽ tự động được tạo và điền dữ liệu mẫu ngay trong lần chạy đầu tiên.*

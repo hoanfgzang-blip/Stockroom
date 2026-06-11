@@ -20,6 +20,11 @@ namespace WMS_.Data.Entities
         public string ShelfCode { get; set; } = string.Empty;
         public int Capacity { get; set; }
         public int FillPercent { get; set; }
+
+        public string Shelf => ShelfCode;
+        public int Level => int.TryParse(ShelfCode.Split('-').LastOrDefault(), out int l) ? l : 1;
+        public int MaxCapacity => Capacity;
+        public int CurrentCapacity => (int)Math.Round((double)Capacity * FillPercent / 100.0);
     }
 
     public class Inventory
@@ -34,11 +39,19 @@ namespace WMS_.Data.Entities
 
     public class AuditLog
     {
+        private string? _newValue;
+
         public int AuditLogId { get; set; }
         public string Action { get; set; } = string.Empty;
         public string EntityName { get; set; } = string.Empty;
         public string EntityId { get; set; } = string.Empty;
         public string UserId { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; }
+
+        public string NewValue
+        {
+            get => !string.IsNullOrEmpty(_newValue) ? _newValue : $"{Action} {EntityName} (ID: {EntityId})";
+            set => _newValue = value;
+        }
     }
 }

@@ -28,7 +28,7 @@ Hệ thống quản lý kho hàng hiện đại WMS được xây dựng trên n
 ## Sơ Đồ Phân Cấp Chức Năng
 
 ```mermaid
-graph TD
+graph LR
     HeThong[Hệ thống Quản lý Kho vận]
     
     %% Level 1

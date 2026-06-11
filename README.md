@@ -25,6 +25,17 @@ Hệ thống quản lý kho hàng hiện đại WMS được xây dựng trên n
 
 ---
 
+## Kiến trúc Vận hành
+
+Dưới đây là sơ đồ mặt bằng kho trung chuyển, thể hiện luồng di chuyển vật lý của hàng hóa làm cơ sở để xây dựng các API quét mã:
+
+<div align="center">
+  <img src=".\WMS-\wwwroot\Assets\System Architecture & Core Design\WMS_floor_plan.png" alt="Sơ đồ mặt bằng Kho trung chuyển" width="800"/>
+  <p><i>Hình 1: Sơ đồ mặt bằng và luồng luân chuyển bao tải (Sack) trong kho</i></p>
+</div>
+
+---
+
 ## Sơ Đồ Phân Cấp Chức Năng
 
 ```mermaid

@@ -24,6 +24,16 @@ h1:focus {
     outline: none;
 }
 
+/* Suppress entrance animations on tab/page navigation */
+main > div > div {
+    animation: none !important;
+}
+
+/* Prevent h1 focus ring flash when switching tabs */
+h1 {
+    outline: none !important;
+}
+
 .valid.modified:not([type=checkbox]) {
     outline: 1px solid #26b050;
 }

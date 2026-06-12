@@ -16,4 +16,8 @@
       <Content Include="obj\Debug\net9.0\WMS-.AssemblyInfoInputs.cache" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.2" />
+    </ItemGroup>
+
 </Project>

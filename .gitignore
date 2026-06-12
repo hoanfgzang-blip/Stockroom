@@ -1,8 +1,0 @@
-# .gitignore for .NET
-[Bb]in/
-[Oo]bj/
-.idea/
-*.user
-*.userosscache
-*.sln.docstate
-.vs/

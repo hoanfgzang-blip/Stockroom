@@ -89,6 +89,16 @@ graph LR
     Operation --> Operation1
     Operation --> Operation2
 ```
+---
+
+## Kiến trúc Cơ sở dữ liệu
+
+Hệ thống được thiết kế theo mô hình chuẩn hóa với 16 bảng, bao quát toàn bộ luồng vận hành Cross-docking: từ xử lý đơn nhập/xuất, định tuyến luân chuyển (Routing), đến kiểm soát lưu vết (Audit Log). 
+
+<div align="center">
+  <img src="./assets/erd_database.png" alt="Sơ đồ ERD 16 bảng" width="1000"/>
+  <p><i>Hình 2: Sơ đồ Thực thể - Liên kết (ERD) thể hiện cấu trúc ràng buộc dữ liệu toàn hệ thống</i></p>
+</div>
 
 ---
 

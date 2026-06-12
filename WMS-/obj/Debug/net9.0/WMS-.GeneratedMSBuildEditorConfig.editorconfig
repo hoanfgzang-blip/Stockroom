@@ -52,6 +52,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTeXN0ZW1TZXR0aW5ncy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/document/ki5/CNLTW+CNPM/WMS-/WMS-/Components/Pages/WarehouseExport.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXYXJlaG91c2VFeHBvcnQucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/document/ki5/CNLTW+CNPM/WMS-/WMS-/Components/Pages/WarehouseImportExport.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXYXJlaG91c2VJbXBvcnRFeHBvcnQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 

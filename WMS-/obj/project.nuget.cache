@@ -1,12 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "hdC7TPQbR84=",
+  "dgSpecHash": "uPM6YxTBPl8=",
   "success": true,
-  "projectFilePath": "/home/hy/WMS-/WMS-/WMS-.csproj",
-  "expectedPackageFiles": [
-    "/home/hy/.nuget/packages/microsoft.netcore.app.ref/9.0.16/microsoft.netcore.app.ref.9.0.16.nupkg.sha512",
-    "/home/hy/.nuget/packages/microsoft.aspnetcore.app.ref/9.0.16/microsoft.aspnetcore.app.ref.9.0.16.nupkg.sha512",
-    "/home/hy/.nuget/packages/microsoft.netcore.app.host.linux-x64/9.0.16/microsoft.netcore.app.host.linux-x64.9.0.16.nupkg.sha512"
-  ],
+  "projectFilePath": "D:\\document\\ki5\\CNLTW+CNPM\\WMS-\\WMS-\\WMS-.csproj",
+  "expectedPackageFiles": [],
   "logs": []
 }

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -108,8 +108,49 @@
         }
     </script>
     <style>
+        /* === Material Symbols: Base Reset === */
         .material-symbols-outlined {
+            /* 24x24px canonical size với 2px padding (optical) */
+            font-size: 24px;
+            line-height: 1;
+            vertical-align: middle;
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            transition: color 0.2s ease, font-variation-settings 0.2s ease;
+            /* currentColor: kế thừa màu từ parent, hỗ trợ đổi màu động */
+            color: currentColor;
+            /* Loại bỏ select text mặc định của icon font */
+            user-select: none;
+        }
+
+        /* === Icon Color States (Global) ===
+           Default  : #6B7280 (Gray 500)
+           Hover/Active: #3B82F6 (Blue 500)
+           Disabled : #D1D5DB (Gray 300)
+        */
+
+        /* Default icon color khi không có context */
+        .icon-default {
+            color: #6B7280; /* Gray 500 */
+        }
+
+        /* Hover / Active icon */
+        .icon-active,
+        .icon-hover:hover {
+            color: #3B82F6; /* Blue 500 */
+            font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+        }
+
+        /* Disabled icon */
+        .icon-disabled {
+            color: #D1D5DB; /* Gray 300 */
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* === TopNav Icon Buttons: hover state === */
+        button:hover > .material-symbols-outlined,
+        a:hover > .material-symbols-outlined {
+            color: #3B82F6; /* Blue 500 */
         }
 
         body {
@@ -122,6 +163,28 @@
             border: 1px solid theme('colors.outline-variant');
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             border-radius: theme('borderRadius.lg');
+        }
+
+        /* Filled icon state (dùng class thay vì inline style) */
+        .icon-filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        /* Icon size utilities - thay thế inline style="font-size: Xpx" và Tailwind arbitrary sizes */
+        .icon-xs  { font-size: 14px !important; }  /* badge/chip icons */
+        .icon-sm  { font-size: 16px !important; }  /* compact row icons */
+        .icon-md  { font-size: 18px !important; }  /* button icons */
+        .icon-lg  { font-size: 20px !important; }  /* nav/tab icons */
+        .icon-xl  { font-size: 32px !important; }  /* upload/placeholder */
+        .icon-2xl { font-size: 48px !important; }  /* empty state hero */
+        /* Canonical 24px là mặc định từ base reset ở trên */
+
+        /* === SVG Logo: currentColor support ===
+           SVG logo dùng fill="currentColor" để kế thừa màu từ parent.
+           Thay đổi màu logo: chỉ cần set color trên container element.
+        */
+        .brand-logo svg {
+            transition: color 0.2s ease;
         }
     </style>
     <HeadOutlet/>

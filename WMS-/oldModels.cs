@@ -13,7 +13,7 @@ namespace WMS_.Data.Entities
         public decimal UnitPrice { get; set; }
     }
 
-    public class Location
+    public class location
     {
         public int LocationId { get; set; }
         public string Zone { get; set; } = string.Empty;

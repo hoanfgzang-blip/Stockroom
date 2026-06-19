@@ -1,14 +1,22 @@
 is_global = true
 build_property.TargetFramework = net9.0
+build_property.TargetFramework = net9.0
+build_property.TargetPlatformMinVersion = 
 build_property.TargetPlatformMinVersion = 
 build_property.UsingMicrosoftNETSdkWeb = true
+build_property.UsingMicrosoftNETSdkWeb = true
+build_property.ProjectTypeGuids = 
 build_property.ProjectTypeGuids = 
 build_property.InvariantGlobalization = 
+build_property.InvariantGlobalization = 
+build_property.PlatformNeutralAssembly = 
 build_property.PlatformNeutralAssembly = 
 build_property.EnforceExtendedAnalyzerRules = 
+build_property.EnforceExtendedAnalyzerRules = 
 build_property._SupportedPlatformList = Linux,macOS,Windows
-build_property.RootNamespace = WMS-
-build_property.RootNamespace = WMS-
+build_property._SupportedPlatformList = Linux,macOS,Windows
+build_property.RootNamespace = WMS_
+build_property.RootNamespace = WMS_
 build_property.ProjectDir = D:\document\ki5\CNLTW+CNPM\WMS-\WMS-\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
@@ -50,6 +58,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [D:/document/ki5/CNLTW+CNPM/WMS-/WMS-/Components/Pages/SystemSettings.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTeXN0ZW1TZXR0aW5ncy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/document/ki5/CNLTW+CNPM/WMS-/WMS-/Components/Pages/WarehouseExport.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXYXJlaG91c2VFeHBvcnQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/document/ki5/CNLTW+CNPM/WMS-/WMS-/Components/Pages/WarehouseImportExport.razor]

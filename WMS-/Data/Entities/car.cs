@@ -1,8 +1,24 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-public class Class1
+namespace WMS_.Data.Entities
 {
-	public Class1()
-	{
-	}
+    [Table("car")]
+    public class Car
+    {
+        [Key]
+        [Column("car_id")]
+        [MaxLength(50)]
+        public string CarId { get; set; } = null!;
+
+        [Required]
+        [Column("car_type")]
+        [MaxLength(50)]
+        public string CarType { get; set; } = null!;
+
+        [Required]
+        [Column("capacity", TypeName = "decimal(10,2)")]
+        public decimal Capacity { get; set; }
+    }   
 }

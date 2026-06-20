@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS employee (
 );
 
 -- Bảng Phương tiện vận chuyển
-CREATE TABLE IF NOT EXISTS car (
+CREATE TABLE IF NOT EXISTS car (zx
     car_id VARCHAR(50) PRIMARY KEY,
     type VARCHAR(50) NOT NULL,
     capacity DECIMAL(10,2) NOT NULL

@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using WMS_.Components;
-using WMS_.Services;
 using WMS_.Data.Entities;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,7 +11,6 @@ builder.Services.AddDbContext<WmsDbContext>(options =>
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddScoped<InventoryService>();
 
 var app = builder.Build();
 

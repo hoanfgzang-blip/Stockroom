@@ -10,22 +10,22 @@ namespace WMS_.Data.Entities
         [Key]
         [Column("inbound_order_item_id")]
         [MaxLength(50)]
-        public string InboundOrderItemID { get; set; } = null!;
+        public string InboundOrderItemId { get; set; } = null!;
 
         [Required]
         [Column("inbound_order_id")]
         [MaxLength(50)]
-        public string InboundOrderID { get; set; } = null!;
+        public string InboundOrderId { get; set; } = null!;
 
         [Required]
         [Column("sack_id")]
         [MaxLength(50)]
-        public string SackID { get; set; } = null!;
+        public string SackId { get; set; } = null!;
 
-        [ForeignKey("inbound_order_id")]
-        public virtual InboundOrder InboundOrder { get; set; } = null;
+        [ForeignKey("InboundOrderId")]
+        public virtual InboundOrder InboundOrder { get; set; } = null!;  
 
-        [ForeignKey("sack_id")]
+        [ForeignKey("SackId")]
         public virtual Sack Sack { get; set; } = null!; 
     }
 }

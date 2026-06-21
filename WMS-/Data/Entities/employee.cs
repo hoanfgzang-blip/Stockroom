@@ -26,21 +26,20 @@ namespace WMS_.Data.Entities
         [MaxLength(50)]
         public string LocationId { get; set; } = null!;
 
-        [Required]
         [Column("zone_id")]
         [MaxLength(50)]
-        public string ZoneId { get; set; } = null!;
+        public string? ZoneId { get; set; }
 
         [Required]
         [Column("shift_id")]
         [MaxLength(50)]
         public string ShiftId { get; set; } = null!;
 
-        [ForeignKey("location_id")]
+        [ForeignKey("LocationId")]
         public virtual Location Location { get; set; } = null!;
-        [ForeignKey("zone_id")]
+        [ForeignKey("ZoneId")]
         public virtual Zone Zone { get; set; } = null!;
-        [ForeignKey("shift_id")]
+        [ForeignKey("ShiftId")]
         public virtual Shift Shift { get; set; } = null!;
     }
 }

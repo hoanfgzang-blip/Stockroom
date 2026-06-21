@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using WMS_.Components;
+using WMS_.Data;
 using WMS_.Data.Entities;
 
 var builder = WebApplication.CreateBuilder(args);

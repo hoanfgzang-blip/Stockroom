@@ -28,7 +28,7 @@ namespace WMS_.Data.Entities
         [MaxLength(255)]
         public string LocationName { get; set; } = null!;
 
-        [ForeignKey("province_id")]
+        [ForeignKey("ProvinceId")]
         public virtual Province Province { get; set; } = null!;
     }
 }

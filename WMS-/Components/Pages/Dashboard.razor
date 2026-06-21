@@ -1,9 +1,9 @@
 @page "/dashboard"
 @page "/"
 @using WMS_.Data.Entities
-@inject WMS_.Services.InventoryService InventoryService
+@* @inject WMS_.Services.InventoryService InventoryService *@
 
-<div class="flex flex-col gap-gutter">
+@* <div class="flex flex-col gap-gutter">
     <!-- Page Header -->
     <div class="flex items-end justify-between">
         <div>
@@ -240,4 +240,4 @@
         fillRate = await InventoryService.GetWarehouseFillRateAsync();
         recentLogs = await InventoryService.GetRecentAuditLogsAsync(5);
     }
-}
+} *@

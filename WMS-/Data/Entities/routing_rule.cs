@@ -29,14 +29,13 @@ namespace WMS_.Data.Entities
         [MaxLength(50)]
         public string NextHop { get; set; } = null!;
 
-        [ForeignKey("current_location")]
+        [ForeignKey("CurrentLocationID")]
         public virtual Location CurrentLocation { get; set; } = null!;
 
-        [ForeignKey("c_destination")]
-
+        [ForeignKey("CDestinationID")]
         public virtual Location CDestination { get; set; } = null!;
 
-        [ForeignKey("next_hop")]
+        [ForeignKey("NextHop")]
         public virtual Location NextHopLocation { get; set; } = null!;
     }
 }

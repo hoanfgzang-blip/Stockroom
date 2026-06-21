@@ -31,7 +31,7 @@ namespace WMS_.Data.Entities
         [Column("capacity")]
         public int Capacity { get; set; } = 0;
 
-        [ForeignKey("location_id")]
+        [ForeignKey("LocationId")]
         public virtual Location Location { get; set; } = null!;
     }
 }

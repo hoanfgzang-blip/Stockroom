@@ -10,7 +10,7 @@ namespace WMS_.Data.Entities
         [Key]
         [Column("outbound_order_id")]
         [MaxLength(50)]
-        public string OutboundOrderID { get; set; } = null!;
+        public string OutboundOrderId { get; set; } = null!;
 
         [Required]
         [Column("order_number")]
@@ -20,7 +20,12 @@ namespace WMS_.Data.Entities
         [Required]
         [Column("customer_name")]
         [MaxLength(255)]
-        public string InboundCustomerName { get; set; } = null!;
+        public string OutboundCustomerName { get; set; } = null!;
+
+        [Required]
+        [Column("destination")]
+        [MaxLength(50)]
+        public string OutboundDestination { get; set; } = null!;
 
         [Required]
         [Column("status")]
@@ -28,7 +33,10 @@ namespace WMS_.Data.Entities
         public string Status { get; set; } = "Pending";
 
         [Required]
-        [Column("create_at")]
+        [Column("created_at")]
         public DateTime CreateAt { get; set; } = DateTime.Now;
+
+        [ForeignKey("OutboundDestination")]
+        public virtual Location OutboundDestinationLocation { get; set; } = null!;
     }
 }

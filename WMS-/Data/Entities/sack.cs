@@ -12,15 +12,13 @@ namespace WMS_.Data.Entities
         [MaxLength(50)]
         public string SackId { get; set; } = null!;
 
-        [Required]
         [Column("trip_id")]
         [MaxLength(50)]
-        public string TripId { get; set; } = null!;
+        public string? TripId { get; set; }
 
-        [Required]
         [Column("pallet_id")]
         [MaxLength(50)]
-        public string PalletId { get; set; } = null!;
+        public string? PalletId { get; set; }
 
         [Required]
         [Column("status")]
@@ -31,30 +29,28 @@ namespace WMS_.Data.Entities
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
-        [Required]
         [Column("end_at")]
-        public DateTime EndAt { get; set; }
+        public DateTime? EndAt { get; set; }
 
-        [Required]
         [Column("zone_id")]
         [MaxLength(50)]
-        public string ZoneId { get; set; } = null!;
+        public string? ZoneId { get; set; }
 
         [Required]
         [Column("s_destination")]
         [MaxLength(50)]
         public string SDestination { get; set; } = null!;
 
-        [ForeignKey("trip_id")]
+        [ForeignKey("TripId")]
         public virtual Trip Trip { get; set; } = null!;
 
-        [ForeignKey("pallet_id")]
+        [ForeignKey("PalletId")]
         public virtual Pallet Pallet { get; set; } = null!;
 
-        [ForeignKey("zone_id")]
+        [ForeignKey("ZoneId")]
         public virtual Zone Zone { get; set; } = null!;
 
-        [ForeignKey("s_destination")]
+        [ForeignKey("SDestination")]
         public virtual Location DestinationLocation { get; set; } = null!;
 
     }

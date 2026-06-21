@@ -10,7 +10,7 @@ namespace WMS_.Data.Entities
         [Key]
         [Column("inbound_order_id")]
         [MaxLength(50)]
-        public string InboundOrderID { get; set; } = null!;
+        public string InboundOrderId { get; set; } = null!;
 
         [Required]
         [Column("order_number")]
@@ -28,7 +28,7 @@ namespace WMS_.Data.Entities
         public string Status { get; set; } = "Pending";
 
         [Required]
-        [Column("create_at")]
+        [Column("created_at")]
         public DateTime CreateAt { get; set; } = DateTime.Now;
     }
 }

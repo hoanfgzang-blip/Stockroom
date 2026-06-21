@@ -26,7 +26,7 @@ namespace WMS_.Data.Entities
         [Column("capacity", TypeName = "decimal(10,2)")]
         public decimal Capacity { get; set; } = 1000;
 
-        [ForeignKey("zone_id")]
+        [ForeignKey("ZoneId")]
         public virtual Zone Zone { get; set; } = null!;
     }
 }

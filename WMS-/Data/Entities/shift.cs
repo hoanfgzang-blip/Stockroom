@@ -23,9 +23,6 @@ namespace WMS_.Data.Entities
         [Required]
         [Column("end_at")]
         public TimeSpan EndAt { get; set; }
-
-
-
     }
 }
 

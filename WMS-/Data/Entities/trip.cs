@@ -13,7 +13,7 @@ namespace WMS_.Data.Entities
         public string TripId { get; set; } = null!;
 
         [Required]
-        [Column("empoyee_id")]
+        [Column("employee_id")]
         [MaxLength(50)]
         public string EmployeeId { get; set; } = null!;
 
@@ -46,20 +46,19 @@ namespace WMS_.Data.Entities
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
-        [Required]
         [Column("end_at")]
-        public DateTime UpdatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
 
-        [ForeignKey("employee_id")]
+        [ForeignKey("EmployeeId")]
         public virtual Employee Employee { get; set; } = null!;
 
-        [ForeignKey("car_id")]
+        [ForeignKey("CarId")]
         public virtual Car Car { get; set; } = null!;
 
-        [ForeignKey("OriginId")]
+        [ForeignKey("Origin")]
         public virtual Location OriginLocation { get; set; } = null!;
 
-        [ForeignKey("DestinationId")]
+        [ForeignKey("Destination")]
         public virtual Location DestinationLocation { get; set; } = null!;
     }
 }

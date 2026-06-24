@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS employee (
 );
 
 -- Bảng Phương tiện vận chuyển
-CREATE TABLE IF NOT EXISTS car (
+CREATE TABLE IF NOT EXISTS car (zx
     car_id VARCHAR(50) PRIMARY KEY,
     type VARCHAR(50) NOT NULL,
     capacity DECIMAL(10,2) NOT NULL
@@ -118,8 +118,7 @@ CREATE TABLE IF NOT EXISTS inbound_order (
 CREATE TABLE IF NOT EXISTS inbound_order_item (
     inbound_order_item_id VARCHAR(50) PRIMARY KEY,
     inbound_order_id VARCHAR(50) NOT NULL REFERENCES inbound_order(inbound_order_id) ON DELETE CASCADE,
-    sack_id VARCHAR(50) NOT NULL REFERENCES sack(sack_id) ON DELETE RESTRICT
-);
+    sack_id VARCHAR(50) NOT NULL REFERENCES sack(sack_id) ON DELETE RESTRICT);
 
 -- Bảng Yêu cầu xuất kho
 CREATE TABLE IF NOT EXISTS outbound_order (

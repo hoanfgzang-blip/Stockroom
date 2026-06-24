@@ -1,13 +1,17 @@
+using Microsoft.EntityFrameworkCore;
 using WMS_.Components;
-using WMS_.Services;
+using WMS_.Data;
+using WMS_.Data.Entities;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContext<WmsDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddScoped<InventoryService>();
 
 var app = builder.Build();
 

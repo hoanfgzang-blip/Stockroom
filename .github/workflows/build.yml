@@ -1,0 +1,31 @@
+﻿name: .NET Core CI
+
+# 1. KHI NÀO HỆ THỐNG SẼ CHẠY?
+on:
+  push:
+    branches: [ "main" ]         # Chạy khi có code mới push thẳng vào nhánh main
+  pull_request:
+    branches: [ "main" ]   # Chạy khi ai đó mở Pull Request muốn merge vào main
+
+# 2. HỆ THỐNG SẼ LÀM NHỮNG GÌ?
+jobs:
+  build:
+    runs-on: ubuntu-latest       # Tạo ra một máy ảo chạy hệ điều hành Ubuntu (Linux) trên server GitHub
+
+    steps:
+    # Bước 1: Tải code từ kho chứa GitHub vào máy ảo
+    - uses: actions/checkout@v4
+
+    # Bước 2: Cài đặt môi trường .NET 9.0 vào máy ảo đó
+    - name: Setup .NET Core SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    # Bước 3: Chạy lệnh tải các thư viện Nuget (tương đương dotnet restore)
+    - name: Restore dependencies
+      run: dotnet restore WMS-.sln
+
+    # Bước 4: Chạy lệnh biên dịch thử toàn bộ dự án (tương đương dotnet build)
+    - name: Build with dotnet
+      run: dotnet build WMS-.sln --no-restore

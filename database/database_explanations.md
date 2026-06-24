@@ -2,6 +2,34 @@
 
 Tài liệu này giải thích chi tiết ý nghĩa, mục đích sử dụng và các mối liên kết của tất cả 16 bảng dữ liệu trong hệ thống tích hợp Quản lý kho hàng - WMS và Mạng lưới vận chuyển - Logistics. Đơn vị theo dõi cốt lõi của toàn hệ thống là Bao hàng - Sack.
 
+## Sơ đồ quan hệ thực thể ERD giữa các bảng
+
+```mermaid
+erDiagram
+    province ||--o{ location : "contains"
+    location ||--o{ zone : "divides"
+    zone ||--o{ pallet : "has"
+    zone ||--o{ employee : "assigned"
+    shift ||--o{ employee : "assigned"
+    location ||--o{ employee : "works"
+    employee ||--o{ trip : "drives"
+    car ||--o{ trip : "used"
+    location ||--o{ trip : "starts or ends"
+    trip ||--o{ sack : "transports"
+    pallet ||--o{ sack : "holds"
+    zone ||--o{ sack : "stores"
+    location ||--o{ sack : "destination"
+    location ||--o{ routing_rule : "current or next hop"
+    province ||--o{ routing_rule : "dest province"
+    inbound_order ||--o{ inbound_order_item : "contains"
+    sack ||--o{ inbound_order_item : "item"
+    outbound_order ||--o{ outbound_order_item : "contains"
+    sack ||--o{ outbound_order_item : "item"
+    location ||--o{ outbound_order : "destination"
+    outbound_order ||--o{ inventory_reservation : "holds"
+    sack ||--o{ inventory_reservation : "reserved"
+```
+
 ---
 
 ## 1. Nhóm Địa Lý & Tổ Chức Kho - Topology

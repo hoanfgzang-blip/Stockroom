@@ -1,6 +1,6 @@
 # Hệ thống quản lý kho vận WMS
 
-Hệ thống quản lý kho hàng hiện đại WMS được xây dựng trên nền tảng Blazor Interactive Server chạy trên bản .NET 9.0 kết hợp với Entity Framework Core và cơ sở dữ liệu SQLite. Dự án được thiết kế chuẩn chỉnh theo mô hình hướng dịch vụ giúp tối ưu hóa toàn bộ các hoạt động vận hành nhập xuất kho và quản lý sơ đồ kệ hàng thời gian thực.
+Hệ thống quản lý kho hàng hiện đại WMS được xây dựng trên nền tảng Blazor Interactive Server chạy trên bản .NET 9.0 kết hợp với Entity Framework Core và PostgreSQL (Giai đoạn v0.1 chạy Mock Data trên RAM). Dự án được thiết kế chuẩn chỉnh theo mô hình hướng dịch vụ giúp tối ưu hóa toàn bộ các hoạt động vận hành nhập xuất kho và quản lý sơ đồ kệ hàng thời gian thực.
 
 ---
 
@@ -160,4 +160,4 @@ Hệ thống quản lý kho vận WMS này cung cấp các trang giao diện tr�
 4. **Truy cập giao diện**:
    Mở trình duyệt và truy cập đường dẫn được hiển thị trên bảng điều khiển, ví dụ như http://localhost:5000
 
-*Lưu ý: Cơ sở dữ liệu SQLite sẽ tự động được tạo và điền dữ liệu mẫu ngay trong lần chạy đầu tiên.*
+*Lưu ý: Bản v0.1-alpha chạy hoàn toàn trên RAM (Mock Data) để demo UI/UX, không yêu cầu cài đặt DB. Bản v0.2 sẽ chính thức kết nối PostgreSQL.*

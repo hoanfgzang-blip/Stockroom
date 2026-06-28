@@ -1,0 +1,165 @@
+import { api } from './client'
+import type {
+  AuditLog,
+  Car,
+  DashboardSummary,
+  Employee,
+  InboundOrder,
+  InboundOrderItem,
+  InventoryReservation,
+  Location,
+  OutboundOrder,
+  OutboundOrderItem,
+  Pallet,
+  Province,
+  RoutingRule,
+  Sack,
+  Shift,
+  Trip,
+  Zone,
+} from '@/types'
+
+export const dashboardApi = {
+  summary: () => api.get<DashboardSummary>('/Dashboard/summary'),
+  recentLogs: (count = 10) => api.get<AuditLog[]>(`/Dashboard/recent-audit-logs?count=${count}`),
+}
+
+export const provincesApi = {
+  all: () => api.get<Province[]>('/Provinces'),
+  get: (id: string) => api.get<Province>(`/Provinces/${id}`),
+  create: (data: Province) => api.post<Province>('/Provinces', data),
+  update: (id: string, data: Province) => api.put<void>(`/Provinces/${id}`, data),
+  delete: (id: string) => api.delete(`/Provinces/${id}`),
+}
+
+export const locationsApi = {
+  all: () => api.get<Location[]>('/Locations'),
+  get: (id: string) => api.get<Location>(`/Locations/${id}`),
+  byProvince: (provinceId: string) => api.get<Location[]>(`/Locations/by-province/${provinceId}`),
+  create: (data: Location) => api.post<Location>('/Locations', data),
+  update: (id: string, data: Location) => api.put<void>(`/Locations/${id}`, data),
+  delete: (id: string) => api.delete(`/Locations/${id}`),
+}
+
+export const zonesApi = {
+  all: () => api.get<Zone[]>('/Zones'),
+  get: (id: string) => api.get<Zone>(`/Zones/${id}`),
+  byLocation: (locationId: string) => api.get<Zone[]>(`/Zones/by-location/${locationId}`),
+  create: (data: Zone) => api.post<Zone>('/Zones', data),
+  update: (id: string, data: Zone) => api.put<void>(`/Zones/${id}`, data),
+  delete: (id: string) => api.delete(`/Zones/${id}`),
+}
+
+export const palletsApi = {
+  all: (status?: string) =>
+    api.get<Pallet[]>(`/Pallets${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+  get: (id: string) => api.get<Pallet>(`/Pallets/${id}`),
+  create: (data: Pallet) => api.post<Pallet>('/Pallets', data),
+  update: (id: string, data: Pallet) => api.put<void>(`/Pallets/${id}`, data),
+  delete: (id: string) => api.delete(`/Pallets/${id}`),
+}
+
+export const employeesApi = {
+  all: (params?: { role?: string; locationId?: string; shiftId?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.role) q.set('role', params.role)
+    if (params?.locationId) q.set('locationId', params.locationId)
+    if (params?.shiftId) q.set('shiftId', params.shiftId)
+    const qs = q.toString()
+    return api.get<Employee[]>(`/Employees${qs ? `?${qs}` : ''}`)
+  },
+  get: (id: string) => api.get<Employee>(`/Employees/${id}`),
+  create: (data: Employee) => api.post<Employee>('/Employees', data),
+  update: (id: string, data: Employee) => api.put<void>(`/Employees/${id}`, data),
+  delete: (id: string) => api.delete(`/Employees/${id}`),
+}
+
+export const shiftsApi = {
+  all: () => api.get<Shift[]>('/Shifts'),
+  get: (id: string) => api.get<Shift>(`/Shifts/${id}`),
+  create: (data: Shift) => api.post<Shift>('/Shifts', data),
+  update: (id: string, data: Shift) => api.put<void>(`/Shifts/${id}`, data),
+  delete: (id: string) => api.delete(`/Shifts/${id}`),
+}
+
+export const carsApi = {
+  all: () => api.get<Car[]>('/Cars'),
+  get: (id: string) => api.get<Car>(`/Cars/${id}`),
+  create: (data: Car) => api.post<Car>('/Cars', data),
+  update: (id: string, data: Car) => api.put<void>(`/Cars/${id}`, data),
+  delete: (id: string) => api.delete(`/Cars/${id}`),
+}
+
+export const tripsApi = {
+  all: (status?: string) =>
+    api.get<Trip[]>(`/Trips${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+  get: (id: string) => api.get<Trip>(`/Trips/${id}`),
+  sacks: (id: string) => api.get<Sack[]>(`/Trips/${id}/sacks`),
+  create: (data: Trip) => api.post<Trip>('/Trips', data),
+  update: (id: string, data: Trip) => api.put<void>(`/Trips/${id}`, data),
+  updateStatus: (id: string, status: string) => api.patch(`/Trips/${id}/status`, status),
+  delete: (id: string) => api.delete(`/Trips/${id}`),
+}
+
+export const routingRulesApi = {
+  all: () => api.get<RoutingRule[]>('/RoutingRules'),
+  get: (id: string) => api.get<RoutingRule>(`/RoutingRules/${id}`),
+  create: (data: RoutingRule) => api.post<RoutingRule>('/RoutingRules', data),
+  update: (id: string, data: RoutingRule) => api.put<void>(`/RoutingRules/${id}`, data),
+  delete: (id: string) => api.delete(`/RoutingRules/${id}`),
+}
+
+export const inboundOrdersApi = {
+  all: (status?: string) =>
+    api.get<InboundOrder[]>(`/InboundOrders${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+  get: (id: string) => api.get<InboundOrder>(`/InboundOrders/${id}`),
+  withItems: (id: string) =>
+    api.get<{ order: InboundOrder; items: InboundOrderItem[] }>(`/InboundOrders/${id}/items`),
+  create: (data: InboundOrder) => api.post<InboundOrder>('/InboundOrders', data),
+  updateStatus: (id: string, status: string) => api.patch(`/InboundOrders/${id}/status`, status),
+  delete: (id: string) => api.delete(`/InboundOrders/${id}`),
+}
+
+export const outboundOrdersApi = {
+  all: (status?: string) =>
+    api.get<OutboundOrder[]>(`/OutboundOrders${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+  get: (id: string) => api.get<OutboundOrder>(`/OutboundOrders/${id}`),
+  withItems: (id: string) =>
+    api.get<{ order: OutboundOrder; items: OutboundOrderItem[] }>(`/OutboundOrders/${id}/items`),
+  create: (data: OutboundOrder) => api.post<OutboundOrder>('/OutboundOrders', data),
+  updateStatus: (id: string, status: string) => api.patch(`/OutboundOrders/${id}/status`, status),
+  delete: (id: string) => api.delete(`/OutboundOrders/${id}`),
+}
+
+export const sacksApi = {
+  all: (status?: string) =>
+    api.get<Sack[]>(`/Sacks${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+  get: (id: string) => api.get<Sack>(`/Sacks/${id}`),
+  create: (data: Sack) => api.post<Sack>('/Sacks', data),
+  update: (id: string, data: Sack) => api.put<void>(`/Sacks/${id}`, data),
+  delete: (id: string) => api.delete(`/Sacks/${id}`),
+}
+
+export const reservationsApi = {
+  all: (status?: string) =>
+    api.get<InventoryReservation[]>(
+      `/InventoryReservations${status ? `?status=${encodeURIComponent(status)}` : ''}`,
+    ),
+  expired: () => api.get<InventoryReservation[]>('/InventoryReservations/expired'),
+  updateStatus: (id: string, status: string) =>
+    api.patch(`/InventoryReservations/${id}/status`, status),
+  release: (id: string) => api.delete(`/InventoryReservations/${id}`),
+}
+
+export const auditLogsApi = {
+  all: (params?: { tableName?: string; actionType?: string; userName?: string; page?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.tableName) q.set('tableName', params.tableName)
+    if (params?.actionType) q.set('actionType', params.actionType)
+    if (params?.userName) q.set('userName', params.userName)
+    if (params?.page) q.set('page', String(params.page))
+    const qs = q.toString()
+    return api.get<AuditLog[]>(`/AuditLogs${qs ? `?${qs}` : ''}`)
+  },
+  get: (id: number) => api.get<AuditLog>(`/AuditLogs/${id}`),
+}

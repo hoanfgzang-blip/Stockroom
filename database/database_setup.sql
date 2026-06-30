@@ -166,3 +166,4 @@ CREATE INDEX IF NOT EXISTS idx_sack_pallet ON sack(pallet_id);
 CREATE INDEX IF NOT EXISTS idx_trip_status ON trip(status);
 CREATE INDEX IF NOT EXISTS idx_sack_trip ON sack(trip_id);
 CREATE INDEX IF NOT EXISTS idx_reservation_expires ON inventory_reservation(expires_at) WHERE status = 'Active';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_reservation ON inventory_reservation(sack_id) WHERE status = 'Active';

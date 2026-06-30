@@ -194,3 +194,21 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_prevent_audit_modify
 BEFORE UPDATE OR DELETE ON audit_log
 FOR EACH ROW EXECUTE FUNCTION prevent_audit_modification();
+
+-- Trigger kiểm tra vai trò tài xế khi tạo/cập nhật chuyến xe (Trip)
+CREATE OR REPLACE FUNCTION verify_trip_driver() 
+RETURNS TRIGGER AS $$
+DECLARE
+    v_role VARCHAR(50);
+BEGIN
+    SELECT role_name INTO v_role FROM employee WHERE employee_id = NEW.employee_id;
+    IF v_role <> 'Driver' THEN
+        RAISE EXCEPTION 'Nhân viên (ID: %) không có vai trò Driver, không thể gán lái xe cho chuyến đi.', NEW.employee_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_verify_trip_driver
+BEFORE INSERT OR UPDATE ON trip
+FOR EACH ROW EXECUTE FUNCTION verify_trip_driver();

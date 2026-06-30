@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS zone (
     location_id VARCHAR(50) NOT NULL REFERENCES location(location_id) ON DELETE CASCADE,
     zone_name VARCHAR(100) NOT NULL,
     zone_type VARCHAR(50) NOT NULL,
-    capacity INTEGER NOT NULL DEFAULT 0
+    capacity INTEGER NOT NULL DEFAULT 0 CONSTRAINT chk_zone_capacity CHECK (capacity >= 0)
 );
 
 -- Bảng Pallet lưu trữ
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS pallet (
     pallet_id VARCHAR(50) PRIMARY KEY,
     zone_id VARCHAR(50) NOT NULL REFERENCES zone(zone_id) ON DELETE CASCADE,
     status VARCHAR(50) NOT NULL DEFAULT 'Empty',
-    capacity DECIMAL(10,2) NOT NULL DEFAULT 1000.00
+    capacity DECIMAL(10,2) NOT NULL DEFAULT 1000.00 CONSTRAINT chk_pallet_capacity CHECK (capacity > 0)
 );
 
 -- Bảng Ca làm việc
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS user_account (
 CREATE TABLE IF NOT EXISTS car (
     car_id VARCHAR(50) PRIMARY KEY,
     type VARCHAR(50) NOT NULL,
-    capacity DECIMAL(10,2) NOT NULL
+    capacity DECIMAL(10,2) NOT NULL CONSTRAINT chk_car_capacity CHECK (capacity > 0)
 );
 
 -- Bảng Chuyến xe vận chuyển
@@ -92,7 +92,9 @@ CREATE TABLE IF NOT EXISTS trip (
     type VARCHAR(50) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'Pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    end_at TIMESTAMP
+    end_at TIMESTAMP,
+    CONSTRAINT chk_trip_route CHECK (origin <> destination),
+    CONSTRAINT chk_trip_time CHECK (end_at IS NULL OR end_at >= created_at)
 );
 
 -- Bảng Bao hàng vận chuyển
@@ -104,7 +106,8 @@ CREATE TABLE IF NOT EXISTS sack (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     end_at TIMESTAMP,
     zone_id VARCHAR(50) REFERENCES zone(zone_id) ON DELETE SET NULL,
-    s_destination VARCHAR(50) NOT NULL REFERENCES location(location_id) ON DELETE RESTRICT
+    s_destination VARCHAR(50) NOT NULL REFERENCES location(location_id) ON DELETE RESTRICT,
+    CONSTRAINT chk_sack_time CHECK (end_at IS NULL OR end_at >= created_at)
 );
 
 -- Bảng Quy tắc định tuyến phân luồng
@@ -155,7 +158,8 @@ CREATE TABLE IF NOT EXISTS inventory_reservation (
     sack_id VARCHAR(50) NOT NULL REFERENCES sack(sack_id) ON DELETE CASCADE,
     reserved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'Active'
+    status VARCHAR(50) NOT NULL DEFAULT 'Active',
+    CONSTRAINT chk_reservation_time CHECK (expires_at > reserved_at)
 );
 
 -- Bảng Nhật ký hệ thống

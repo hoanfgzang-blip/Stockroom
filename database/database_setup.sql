@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS routing_rule CASCADE;
 DROP TABLE IF EXISTS sack CASCADE;
 DROP TABLE IF EXISTS trip CASCADE;
 DROP TABLE IF EXISTS car CASCADE;
+DROP TABLE IF EXISTS user_account CASCADE;
 DROP TABLE IF EXISTS employee CASCADE;
 DROP TABLE IF EXISTS shift CASCADE;
 DROP TABLE IF EXISTS pallet CASCADE;
@@ -64,8 +65,18 @@ CREATE TABLE IF NOT EXISTS employee (
     shift_id VARCHAR(50) NOT NULL REFERENCES shift(shift_id) ON DELETE RESTRICT
 );
 
+-- Bảng Tài khoản người dùng
+CREATE TABLE IF NOT EXISTS user_account (
+    user_id VARCHAR(50) PRIMARY KEY,
+    employee_id VARCHAR(50) NOT NULL REFERENCES employee(employee_id) ON DELETE RESTRICT,
+    username VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Bảng Phương tiện vận chuyển
-CREATE TABLE IF NOT EXISTS car (zx
+CREATE TABLE IF NOT EXISTS car (
     car_id VARCHAR(50) PRIMARY KEY,
     type VARCHAR(50) NOT NULL,
     capacity DECIMAL(10,2) NOT NULL
@@ -150,7 +161,7 @@ CREATE TABLE IF NOT EXISTS inventory_reservation (
 -- Bảng Nhật ký hệ thống
 CREATE TABLE IF NOT EXISTS audit_log (
     audit_log_id BIGSERIAL PRIMARY KEY,
-    user_name VARCHAR(100) NOT NULL,
+    user_id VARCHAR(50) NOT NULL REFERENCES user_account(user_id) ON DELETE RESTRICT,
     action_type VARCHAR(50) NOT NULL,
     table_name VARCHAR(100) NOT NULL,
     record_id VARCHAR(100) NOT NULL,

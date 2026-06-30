@@ -169,8 +169,8 @@ CREATE TABLE IF NOT EXISTS audit_log (
     action_type VARCHAR(50) NOT NULL,
     table_name VARCHAR(100) NOT NULL,
     record_id VARCHAR(100) NOT NULL,
-    old_values TEXT,
-    new_values TEXT,
+    old_values JSONB,
+    new_values JSONB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -182,3 +182,15 @@ CREATE INDEX IF NOT EXISTS idx_trip_status ON trip(status);
 CREATE INDEX IF NOT EXISTS idx_sack_trip ON sack(trip_id);
 CREATE INDEX IF NOT EXISTS idx_reservation_expires ON inventory_reservation(expires_at) WHERE status = 'Active';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_reservation ON inventory_reservation(sack_id) WHERE status = 'Active';
+
+-- Trigger ngăn chặn chỉnh sửa/xóa bảng nhật ký hệ thống (Audit Log)
+CREATE OR REPLACE FUNCTION prevent_audit_modification() 
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'Không được phép chỉnh sửa hoặc xóa nhật ký hệ thống (Audit Log).';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_prevent_audit_modify
+BEFORE UPDATE OR DELETE ON audit_log
+FOR EACH ROW EXECUTE FUNCTION prevent_audit_modification();

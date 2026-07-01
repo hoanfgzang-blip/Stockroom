@@ -25,6 +25,7 @@ namespace WMS_.Data
         public DbSet<OutboundOrderItem> OutboundOrderItems { get; set; }
         public DbSet<InventoryReservation> InventoryReservations { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<UserAccount> UserAccounts { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -40,64 +41,64 @@ namespace WMS_.Data
                 .HasOne(e => e.Location)
                 .WithMany()
                 .HasForeignKey(e => e.LocationId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Employee>()
                 .HasOne(e => e.Zone)
                 .WithMany()
                 .HasForeignKey(e => e.ZoneId)
-                .OnDelete(DeleteBehavior.SetNull);  
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Employee>()
                 .HasOne(e => e.Shift)
                 .WithMany()
                 .HasForeignKey(e => e.ShiftId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Trip>()
                 .HasOne(t => t.Employee)
                 .WithMany()
                 .HasForeignKey(t => t.EmployeeId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Trip>()
                 .HasOne(t => t.Car)
                 .WithMany()
                 .HasForeignKey(t => t.CarId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Trip>()
                 .HasOne(t => t.OriginLocation)
                 .WithMany()
                 .HasForeignKey(t => t.Origin)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Trip>()
                 .HasOne(t => t.DestinationLocation)
                 .WithMany()
                 .HasForeignKey(t => t.Destination)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Sack>()
                 .HasOne(s => s.Trip)
                 .WithMany()
                 .HasForeignKey(s => s.TripId)
-                .OnDelete(DeleteBehavior.SetNull);  
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Sack>()
                 .HasOne(s => s.Pallet)
                 .WithMany()
                 .HasForeignKey(s => s.PalletId)
-                .OnDelete(DeleteBehavior.SetNull);  
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Sack>()
                 .HasOne(s => s.Zone)
                 .WithMany()
                 .HasForeignKey(s => s.ZoneId)
-                .OnDelete(DeleteBehavior.SetNull);  
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Sack>()
-                .HasOne(s => s.DestinationLocation) 
+                .HasOne(s => s.DestinationLocation)
                 .WithMany()
                 .HasForeignKey(s => s.SDestination)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -106,19 +107,25 @@ namespace WMS_.Data
                 .HasOne(i => i.Sack)
                 .WithMany()
                 .HasForeignKey(i => i.SackId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<OutboundOrderItem>()
                 .HasOne(o => o.Sack)
                 .WithMany()
                 .HasForeignKey(o => o.SackId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<OutboundOrder>()
-                .HasOne(o => o.OutboundDestinationLocation) 
+                .HasOne(o => o.OutboundDestinationLocation)
                 .WithMany()
                 .HasForeignKey(o => o.OutboundDestination)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<InboundOrder>()
+                .HasIndex(e => e.InboundOrderNumber)
+                .IsUnique();
+            modelBuilder.Entity<OutboundOrder>()
+                .HasIndex(e => e.OutboundOrderNumber)
+                .IsUnique();
         }
     }
 }

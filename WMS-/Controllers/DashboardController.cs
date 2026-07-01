@@ -63,7 +63,7 @@ namespace WMS_.Controllers
             var recentLogs = await _db.AuditLogs
                 .OrderByDescending(l => l.CreatedAt)
                 .Take(5)
-                .Select(l => new { l.AuditLogId, l.UserName, l.ActionType, l.TableName, l.RecordId, l.CreatedAt })
+                .Select(l => new { l.AuditLogId, l.UserId, l.ActionType, l.TableName, l.RecordId, l.CreatedAt })
                 .ToListAsync();
 
             return Ok(new

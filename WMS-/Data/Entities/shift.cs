@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace WMS_.Data.Entities
 {
+    [Table("shift")]
     public class Shift
     {
         [Key]

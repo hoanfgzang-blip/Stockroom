@@ -27,7 +27,7 @@ namespace WMS_.Controllers
             if (!string.IsNullOrWhiteSpace(actionType))
                 query = query.Where(l => l.ActionType == actionType);
             if (!string.IsNullOrWhiteSpace(userName))
-                query = query.Where(l => l.UserName == userName);
+                query = query.Where(l => l.UserId == userName);
 
             return await query
                 .OrderByDescending(l => l.CreatedAt)

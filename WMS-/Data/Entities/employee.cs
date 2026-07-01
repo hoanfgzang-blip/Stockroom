@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace WMS_.Data.Entities
 {
+    [Table("employee")]
     public class Employee
     {
         [Key]
@@ -21,10 +22,9 @@ namespace WMS_.Data.Entities
         [MaxLength(50)]
         public string RoleName { get; set; } = null!;
 
-        [Required]
         [Column("location_id")]
         [MaxLength(50)]
-        public string LocationId { get; set; } = null!;
+        public string? LocationId { get; set; }
 
         [Column("zone_id")]
         [MaxLength(50)]
@@ -36,7 +36,7 @@ namespace WMS_.Data.Entities
         public string ShiftId { get; set; } = null!;
 
         [ForeignKey("LocationId")]
-        public virtual Location Location { get; set; } = null!;
+        public virtual Location? Location { get; set; } = null!;
         [ForeignKey("ZoneId")]
         public virtual Zone Zone { get; set; } = null!;
         [ForeignKey("ShiftId")]

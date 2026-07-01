@@ -13,7 +13,7 @@ namespace WMS_.Data.Entities
         public string CarId { get; set; } = null!;
 
         [Required]
-        [Column("car_type")]
+        [Column("type")]
         [MaxLength(50)]
         public string CarType { get; set; } = null!;
 

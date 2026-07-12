@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using WMS_.Data;
+using WMS_.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +8,7 @@ builder.Services.AddDbContext<WmsDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddControllers();
+builder.Services.AddScoped<IOutboundService, OutboundService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>

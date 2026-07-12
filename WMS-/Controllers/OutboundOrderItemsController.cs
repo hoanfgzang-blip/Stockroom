@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WMS_.Data;
 using WMS_.Data.Entities;
+using WMS_.Services;
 
 namespace WMS_.Controllers
 {
@@ -10,7 +11,13 @@ namespace WMS_.Controllers
     public class OutboundOrderItemsController : ControllerBase
     {
         private readonly WmsDbContext _db;
-        public OutboundOrderItemsController(WmsDbContext db) => _db = db;
+        private readonly IOutboundService _outboundService;
+
+        public OutboundOrderItemsController(WmsDbContext db, IOutboundService outboundService)
+        {
+            _db = db;
+            _outboundService = outboundService;
+        }
 
         /// <summary>Get all items for an outbound order</summary>
         [HttpGet("by-order/{orderId}")]
@@ -29,9 +36,15 @@ namespace WMS_.Controllers
         [HttpPost]
         public async Task<ActionResult<OutboundOrderItem>> Create([FromBody] OutboundOrderItem item)
         {
-            _db.OutboundOrderItems.Add(item);
-            await _db.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = item.OutboundOrderItemId }, item);
+            try
+            {
+                var created = await _outboundService.AddItemAsync(item);
+                return CreatedAtAction(nameof(GetById), new { id = created.OutboundOrderItemId }, created);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(ex.Message);
+            }
         }
 
         /// <summary>Update item</summary>

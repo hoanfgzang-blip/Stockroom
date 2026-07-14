@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using WMS_.Data;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using WMS_.Data.Entities;
+using WMS_.Services.Warehouse; // Khai báo dùng Service của Khải
 
 namespace WMS_.Controllers
 {
@@ -9,57 +10,62 @@ namespace WMS_.Controllers
     [Route("api/[controller]")]
     public class ZonesController : ControllerBase
     {
-        private readonly WmsDbContext _db;
-        public ZonesController(WmsDbContext db) => _db = db;
+        // Gọi Interface thay vì gọi WmsDbContext
+        private readonly IZoneService _zoneService;
 
-        /// <summary>Get all zones (WarehouseLocationMap — Zone A, Zone B, etc.)</summary>
+        public ZonesController(IZoneService zoneService)
+        {
+            _zoneService = zoneService;
+        }
+
+        /// <summary>Get all zones</summary>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Zone>>> GetAll()
-            => await _db.Zones.Include(z => z.Location).ToListAsync();
+        {
+            var zones = await _zoneService.GetAllZonesAsync();
+            return Ok(zones);
+        }
 
         /// <summary>Get zone by ID</summary>
         [HttpGet("{id}")]
         public async Task<ActionResult<Zone>> GetById(string id)
         {
-            var zone = await _db.Zones.Include(z => z.Location).FirstOrDefaultAsync(z => z.ZoneId == id);
+            var zone = await _zoneService.GetZoneByIdAsync(id);
             return zone == null ? NotFound() : Ok(zone);
         }
 
         /// <summary>Get zones by location</summary>
         [HttpGet("by-location/{locationId}")]
         public async Task<ActionResult<IEnumerable<Zone>>> GetByLocation(string locationId)
-            => await _db.Zones.Where(z => z.LocationId == locationId).ToListAsync();
+        {
+            var zones = await _zoneService.GetZonesByLocationAsync(locationId);
+            return Ok(zones);
+        }
 
         /// <summary>Create zone</summary>
         [HttpPost]
         public async Task<ActionResult<Zone>> Create([FromBody] Zone zone)
         {
-            _db.Zones.Add(zone);
-            await _db.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = zone.ZoneId }, zone);
+            var createdZone = await _zoneService.CreateZoneAsync(zone);
+            return CreatedAtAction(nameof(GetById), new { id = createdZone.ZoneId }, createdZone);
         }
 
         /// <summary>Update zone</summary>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(string id, [FromBody] Zone zone)
         {
-            if (id != zone.ZoneId) return BadRequest();
-            _db.Entry(zone).State = EntityState.Modified;
-            try { await _db.SaveChangesAsync(); }
-            catch (DbUpdateConcurrencyException)
-            { if (!_db.Zones.Any(z => z.ZoneId == id)) return NotFound(); throw; }
-            return NoContent();
+            if (id != zone.ZoneId) return BadRequest(); // Báo lỗi 400 nếu truyền sai ID
+
+            var success = await _zoneService.UpdateZoneAsync(id, zone);
+            return success ? NoContent() : NotFound(); // Trả mã 204 nếu thành công, 404 nếu không tìm thấy
         }
 
         /// <summary>Delete zone</summary>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
-            var zone = await _db.Zones.FindAsync(id);
-            if (zone == null) return NotFound();
-            _db.Zones.Remove(zone);
-            await _db.SaveChangesAsync();
-            return NoContent();
+            var success = await _zoneService.DeleteZoneAsync(id);
+            return success ? NoContent() : NotFound();
         }
     }
 }

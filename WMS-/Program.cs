@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using WMS_.Data;
 using WMS_.Services;
+using WMS_.Services.Warehouse;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +10,10 @@ builder.Services.AddDbContext<WmsDbContext>(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddScoped<IOutboundService, OutboundService>();
+builder.Services.AddScoped<IZoneService, ZoneService>();
+builder.Services.AddScoped<IPalletService, PalletService>();
+builder.Services.AddScoped<IWarehouseOperationService, WarehouseOperationService>();
+builder.Services.AddScoped<ITrackingService, TrackingService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>

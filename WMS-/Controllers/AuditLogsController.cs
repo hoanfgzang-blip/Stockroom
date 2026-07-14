@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using WMS_.Data;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using WMS_.Data.Entities;
+using WMS_.Services.Warehouse;
 
 namespace WMS_.Controllers
 {
@@ -9,10 +10,14 @@ namespace WMS_.Controllers
     [Route("api/[controller]")]
     public class AuditLogsController : ControllerBase
     {
-        private readonly WmsDbContext _db;
-        public AuditLogsController(WmsDbContext db) => _db = db;
+        private readonly ITrackingService _trackingService;
 
-        /// <summary>Get audit logs (SystemSettings — System Logs, Dashboard — Recent Activity)</summary>
+        public AuditLogsController(ITrackingService trackingService)
+        {
+            _trackingService = trackingService;
+        }
+
+        /// <summary>Get audit logs (SystemSettings — System Logs)</summary>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<AuditLog>>> GetAll(
             [FromQuery] string? tableName = null,
@@ -21,26 +26,15 @@ namespace WMS_.Controllers
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 50)
         {
-            var query = _db.AuditLogs.AsQueryable();
-            if (!string.IsNullOrWhiteSpace(tableName))
-                query = query.Where(l => l.TableName == tableName);
-            if (!string.IsNullOrWhiteSpace(actionType))
-                query = query.Where(l => l.ActionType == actionType);
-            if (!string.IsNullOrWhiteSpace(userName))
-                query = query.Where(l => l.UserId == userName);
-
-            return await query
-                .OrderByDescending(l => l.CreatedAt)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+            var logs = await _trackingService.GetAllLogsAsync(tableName, actionType, userName, page, pageSize);
+            return Ok(logs);
         }
 
         /// <summary>Get audit log by ID</summary>
         [HttpGet("{id}")]
         public async Task<ActionResult<AuditLog>> GetById(long id)
         {
-            var log = await _db.AuditLogs.FindAsync(id);
+            var log = await _trackingService.GetLogByIdAsync(id);
             return log == null ? NotFound() : Ok(log);
         }
 
@@ -48,9 +42,18 @@ namespace WMS_.Controllers
         [HttpPost]
         public async Task<ActionResult<AuditLog>> Create([FromBody] AuditLog log)
         {
-            _db.AuditLogs.Add(log);
-            await _db.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = log.AuditLogId }, log);
+            var createdLog = await _trackingService.CreateLogAsync(log);
+            return CreatedAtAction(nameof(GetById), new { id = createdLog.AuditLogId }, createdLog);
+        }
+
+        /// <summary>Truy vết Realtime: Tìm vị trí hiện tại của Sack (Dành cho Trưởng Kho)</summary>
+        [HttpGet("realtime-location/{sackId}")]
+        public async Task<IActionResult> GetSackLocation(string sackId)
+        {
+            var result = await _trackingService.GetSackLocationRealtimeAsync(sackId);
+            return result == null
+                ? NotFound(new { message = "Không tìm thấy bao hàng này trong hệ thống." })
+                : Ok(result);
         }
     }
 }

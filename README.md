@@ -4,6 +4,20 @@ Hệ thống quản lý kho hàng hiện đại WMS được xây dựng trên n
 
 ---
 
+## Tầm Nhìn Sản Phẩm
+
+WMS hướng tới việc trở thành nền tảng điều phối kho vận tập trung cho mô hình kho trung chuyển, giúp doanh nghiệp quản lý chính xác từng bao hàng từ lúc tiếp nhận, phân loại, lưu kho, giữ chỗ tồn kho cho đến khi xuất kho và bàn giao vận chuyển.
+
+Sản phẩm tập trung vào ba giá trị cốt lõi:
+
+* **Minh bạch vận hành**: Mọi hoạt động nhập, xuất, phân loại, điều phối và thay đổi dữ liệu đều có thể theo dõi theo thời gian thực thông qua dashboard, trạng thái đơn hàng và nhật ký hệ thống.
+* **Tối ưu luồng hàng**: Hệ thống tổ chức dữ liệu theo tỉnh thành, hub, khu vực, pallet, chuyến xe và bao hàng để hỗ trợ ra quyết định nhanh, giảm sai sót khi gom hàng, giữ chỗ và xuất kho.
+* **Sẵn sàng mở rộng**: Kiến trúc backend API, service nghiệp vụ và cơ sở dữ liệu quan hệ được thiết kế để có thể mở rộng sang quét mã vạch, phân quyền người dùng, tự động hóa định tuyến và tích hợp với hệ thống vận tải bên ngoài.
+
+Mục tiêu dài hạn là xây dựng một hệ thống WMS đủ thực dụng cho vận hành hằng ngày, nhưng vẫn có nền tảng kỹ thuật rõ ràng để phát triển thành giải pháp quản trị logistics hoàn chỉnh.
+
+---
+
 ## Các Tính Năng Nổi Bật
 
 * **Sơ đồ kệ hàng trực quan**: Theo dõi tỉ lệ lấp đầy của từng kệ dưới dạng bản đồ nhiệt. Lựa chọn kệ để xem chi tiết sản phẩm và số lượng đang lưu trữ.

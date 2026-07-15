@@ -55,7 +55,7 @@ namespace WMS_.Controllers
             {
                 SackId = await GenerateSackIdAsync(),
                 Status = "Sorting",
-                CreatedAt = DateTime.Now,
+                CreatedAt = DateTime.UtcNow,
                 SDestination = request.SDestination,
                 ZoneId = request.ZoneId,
                 PalletId = request.PalletId

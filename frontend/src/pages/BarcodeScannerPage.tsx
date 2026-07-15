@@ -1,12 +1,13 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
-import { Barcode, CheckCircle2, CircleAlert, ClipboardCheck, PackageCheck, ScanLine, Send, Undo2 } from 'lucide-react'
-import { outboundOrdersApi, sacksApi } from '@/api/services'
+import { Barcode, CheckCircle2, CircleAlert, ClipboardCheck, PackageCheck, Plus, ScanLine, Send, Undo2 } from 'lucide-react'
+import { locationsApi, outboundOrdersApi, sacksApi } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog } from '@/components/ui/dialog'
 import { Label, Select } from '@/components/ui/input'
 import { PageHeader } from '@/components/shared/PageHeader'
-import type { OutboundOrder, Sack } from '@/types'
+import type { Location, OutboundOrder, Sack } from '@/types'
 
 type ScanMode = 'inbound' | 'sorting' | 'outbound' | 'received'
 type ScanResult = {
@@ -41,16 +42,25 @@ export default function BarcodeScannerPage() {
   const [mode, setMode] = useState<ScanMode>('inbound')
   const [barcode, setBarcode] = useState('')
   const [orders, setOrders] = useState<OutboundOrder[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
   const [outboundOrderId, setOutboundOrderId] = useState('')
   const [lastSack, setLastSack] = useState<Sack | null>(null)
   const [results, setResults] = useState<ScanResult[]>([])
   const [processing, setProcessing] = useState(false)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [destinationId, setDestinationId] = useState('')
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
-    outboundOrdersApi
-      .all()
-      .then((items) => setOrders(items.filter((order) => order.status !== 'Completed')))
-      .catch(() => setOrders([]))
+    Promise.all([outboundOrdersApi.all(), locationsApi.all()])
+      .then(([outboundOrders, warehouseLocations]) => {
+        setOrders(outboundOrders.filter((order) => order.status !== 'Completed'))
+        setLocations(warehouseLocations)
+      })
+      .catch(() => {
+        setOrders([])
+        setLocations([])
+      })
   }, [])
 
   useEffect(() => {
@@ -98,11 +108,39 @@ export default function BarcodeScannerPage() {
 
   const selectedOrder = orders.find((order) => order.outboundOrderId === outboundOrderId)
 
+  const createSack = async () => {
+    if (!destinationId || creating) return
+
+    setCreating(true)
+    try {
+      const sack = await sacksApi.create({
+        sackId: '',
+        status: 'Sorting',
+        createdAt: new Date().toISOString(),
+        sDestination: destinationId,
+      })
+      setLastSack(sack)
+      setCreateDialogOpen(false)
+      setDestinationId('')
+      addResult(sack.sackId, 'Đã tạo bao hàng mới. Dùng mã này để in tem và quét.', true)
+    } catch (error) {
+      addResult('TẠO-BAO', error instanceof Error ? error.message : 'Không thể tạo bao hàng.', false)
+    } finally {
+      setCreating(false)
+    }
+  }
+
   return (
     <div>
       <PageHeader
         title="Quét mã vạch"
         description="Chọn nghiệp vụ, đặt con trỏ vào ô quét và quét mã bao hàng. Máy quét USB hoặc Bluetooth hoạt động như bàn phím."
+        action={
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Tạo bao hàng
+          </Button>
+        }
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
@@ -231,6 +269,41 @@ export default function BarcodeScannerPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        title="Tạo bao hàng mới"
+        description="Hệ thống tự sinh mã bao hàng. Người dùng chỉ chọn điểm đến."
+      >
+        <div className="space-y-5">
+          <div>
+            <Label htmlFor="destination">Điểm đến</Label>
+            <Select
+              id="destination"
+              value={destinationId}
+              onChange={(event) => setDestinationId(event.target.value)}
+              className="mt-1"
+            >
+              <option value="">Chọn điểm đến</option>
+              {locations.map((location) => (
+                <option key={location.locationId} value={location.locationId}>
+                  {location.locationName}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+            Sau khi tạo, server trả về mã duy nhất dạng <span className="font-mono font-semibold">SACK-...</span> để in thành tem mã vạch.
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={creating}>Hủy</Button>
+            <Button onClick={createSack} disabled={!destinationId || creating}>
+              {creating ? 'Đang tạo' : 'Tạo mã tự động'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   )
 }

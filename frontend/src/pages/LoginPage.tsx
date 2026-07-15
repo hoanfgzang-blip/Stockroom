@@ -45,7 +45,7 @@ export default function LoginPage() {
           </div>
           <div>
             <Label htmlFor="password">Mật khẩu</Label>
-            <Input id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required className="mt-1" />
+            <Input id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value.replace(/[^\x21-\x7E]/g, ''))} autoComplete="current-password" required className="mt-1" />
           </div>
           <label className="flex items-center gap-2 text-sm text-slate-600">
             <input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} />

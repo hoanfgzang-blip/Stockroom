@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using WMS_.Data;
 using WMS_.Data.Entities;
+using WMS_.Services;
 
 namespace WMS_.Controllers
 {
@@ -9,24 +8,23 @@ namespace WMS_.Controllers
     [Route("api/[controller]")]
     public class InboundOrdersController : ControllerBase
     {
-        private readonly WmsDbContext _db;
-        public InboundOrdersController(WmsDbContext db) => _db = db;
+        private readonly IInboundService _inboundService;
+
+        public InboundOrdersController(IInboundService inboundService)
+        {
+            _inboundService = inboundService;
+        }
 
         /// <summary>Get all inbound orders with optional status filter</summary>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<InboundOrder>>> GetAll([FromQuery] string? status = null)
-        {
-            var query = _db.InboundOrders.AsQueryable();
-            if (!string.IsNullOrWhiteSpace(status))
-                query = query.Where(o => o.Status == status);
-            return await query.OrderByDescending(o => o.CreateAt).ToListAsync();
-        }
+            => Ok(await _inboundService.GetOrdersAsync(status));
 
         /// <summary>Get inbound order by ID</summary>
         [HttpGet("{id}")]
         public async Task<ActionResult<InboundOrder>> GetById(string id)
         {
-            var order = await _db.InboundOrders.FindAsync(id);
+            var order = await _inboundService.GetOrderAsync(id);
             return order == null ? NotFound() : Ok(order);
         }
 
@@ -34,20 +32,15 @@ namespace WMS_.Controllers
         [HttpGet("{id}/items")]
         public async Task<ActionResult<object>> GetWithItems(string id)
         {
-            var order = await _db.InboundOrders.FindAsync(id);
-            if (order == null) return NotFound();
-            var items = await _db.InboundOrderItems
-                .Where(i => i.InboundOrderId == id)
-                .ToListAsync();
-            return Ok(new { order, items });
+            var (order, items) = await _inboundService.GetOrderWithItemsAsync(id);
+            return order == null ? NotFound() : Ok(new { order, items });
         }
 
         /// <summary>Create new inbound order (Quản lý Nhập kho)</summary>
         [HttpPost]
         public async Task<ActionResult<InboundOrder>> Create([FromBody] InboundOrder order)
         {
-            _db.InboundOrders.Add(order);
-            await _db.SaveChangesAsync();
+            await _inboundService.CreateOrderAsync(order);
             return CreatedAtAction(nameof(GetById), new { id = order.InboundOrderId }, order);
         }
 
@@ -55,34 +48,24 @@ namespace WMS_.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(string id, [FromBody] InboundOrder order)
         {
-            if (id != order.InboundOrderId) return BadRequest();
-            _db.Entry(order).State = EntityState.Modified;
-            try { await _db.SaveChangesAsync(); }
-            catch (DbUpdateConcurrencyException)
-            { if (!_db.InboundOrders.Any(o => o.InboundOrderId == id)) return NotFound(); throw; }
-            return NoContent();
+            try
+            {
+                return await _inboundService.UpdateOrderAsync(id, order) ? NoContent() : NotFound();
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         /// <summary>Update status (Pending → InProgress → Completed)</summary>
         [HttpPatch("{id}/status")]
         public async Task<IActionResult> UpdateStatus(string id, [FromBody] string status)
-        {
-            var order = await _db.InboundOrders.FindAsync(id);
-            if (order == null) return NotFound();
-            order.Status = status;
-            await _db.SaveChangesAsync();
-            return NoContent();
-        }
+            => await _inboundService.UpdateOrderStatusAsync(id, status) ? NoContent() : NotFound();
 
         /// <summary>Delete inbound order</summary>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
-        {
-            var order = await _db.InboundOrders.FindAsync(id);
-            if (order == null) return NotFound();
-            _db.InboundOrders.Remove(order);
-            await _db.SaveChangesAsync();
-            return NoContent();
-        }
+            => await _inboundService.DeleteOrderAsync(id) ? NoContent() : NotFound();
     }
 }

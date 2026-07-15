@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
+using System.ComponentModel.DataAnnotations;
 using WMS_.Data;
 using WMS_.Data.Entities;
 
@@ -48,16 +49,34 @@ namespace WMS_.Controllers
 
         /// <summary>Create new sack</summary>
         [HttpPost]
-        public async Task<ActionResult<Sack>> Create([FromBody] Sack sack)
+        public async Task<ActionResult<Sack>> Create([FromBody] CreateSackRequest request)
         {
-            sack.SackId = await GenerateSackIdAsync();
-            sack.CreatedAt = DateTime.Now;
-            if (string.IsNullOrWhiteSpace(sack.Status))
-                sack.Status = "Sorting";
+            var sack = new Sack
+            {
+                SackId = await GenerateSackIdAsync(),
+                Status = "Sorting",
+                CreatedAt = DateTime.Now,
+                SDestination = request.SDestination,
+                ZoneId = request.ZoneId,
+                PalletId = request.PalletId
+            };
 
             _db.Sacks.Add(sack);
             await _db.SaveChangesAsync();
             return CreatedAtAction(nameof(GetById), new { id = sack.SackId }, sack);
+        }
+
+        public sealed class CreateSackRequest
+        {
+            [Required]
+            [MaxLength(50)]
+            public string SDestination { get; set; } = null!;
+
+            [MaxLength(50)]
+            public string? ZoneId { get; set; }
+
+            [MaxLength(50)]
+            public string? PalletId { get; set; }
         }
 
         private async Task<string> GenerateSackIdAsync()

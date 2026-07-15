@@ -27,6 +27,30 @@ export const authApi = {
   logout: () => api.post<void>('/Auth/logout', {}),
 }
 
+export type ManagedAccount = {
+  userId: string
+  employeeId: string
+  employeeName: string
+  username: string
+  roleName: string
+  isActive: boolean
+}
+
+export type SaveAccountRequest = {
+  employeeId: string
+  username: string
+  password?: string
+  roleName: string
+  isActive: boolean
+}
+
+export const accountsApi = {
+  all: () => api.get<ManagedAccount[]>('/Auth/accounts'),
+  create: (data: SaveAccountRequest) => api.post<ManagedAccount>('/Auth/accounts', data),
+  update: (id: string, data: SaveAccountRequest) => api.put<ManagedAccount>(`/Auth/accounts/${id}`, data),
+  disable: (id: string) => api.delete(`/Auth/accounts/${id}`),
+}
+
 export const dashboardApi = {
   summary: () => api.get<DashboardSummary>('/Dashboard/summary'),
   recentLogs: (count = 10) => api.get<AuditLog[]>(`/Dashboard/recent-audit-logs?count=${count}`),

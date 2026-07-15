@@ -17,6 +17,7 @@ import PalletsPage from '@/pages/PalletsPage'
 import BarcodeScannerPage from '@/pages/BarcodeScannerPage'
 import LoginPage from '@/pages/LoginPage'
 import { useAuth } from '@/auth/AuthContext'
+import AccountsPage from '@/pages/AccountsPage'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/hr/employees" element={<EmployeesPage />} />
         <Route path="/hr/shifts" element={<ShiftsPage />} />
         <Route path="/audit-logs" element={<AuditLogsPage />} />
+        <Route path="/system/accounts" element={<AccountsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>

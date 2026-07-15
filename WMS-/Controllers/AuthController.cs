@@ -70,6 +70,113 @@ public class AuthController : ControllerBase
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return NoContent();
     }
+
+    [Authorize(Policy = "ManagerOnly")]
+    [HttpGet("accounts")]
+    public async Task<ActionResult<IEnumerable<AccountResponse>>> GetAccounts()
+    {
+        var accounts = await _db.UserAccounts
+            .Include(account => account.Employee)
+            .AsNoTracking()
+            .OrderBy(account => account.Username)
+            .ToListAsync();
+
+        return Ok(accounts.Select(AccountResponse.From));
+    }
+
+    [Authorize(Policy = "ManagerOnly")]
+    [HttpPost("accounts")]
+    public async Task<ActionResult<AccountResponse>> CreateAccount([FromBody] SaveAccountRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
+            return BadRequest(new { message = "Mật khẩu phải có ít nhất 8 ký tự." });
+
+        var employee = await _db.Employees.FindAsync(request.EmployeeId);
+        if (employee == null)
+            return BadRequest(new { message = "Không tìm thấy nhân viên." });
+
+        var username = request.Username.Trim();
+        if (await _db.UserAccounts.AnyAsync(account => account.Username == username))
+            return Conflict(new { message = "Tên đăng nhập đã tồn tại." });
+        if (await _db.UserAccounts.AnyAsync(account => account.EmployeeId == request.EmployeeId))
+            return Conflict(new { message = "Nhân viên này đã có tài khoản." });
+
+        employee.RoleName = request.RoleName;
+        var account = new WMS_.Data.Entities.UserAccount
+        {
+            UserId = await GenerateUserIdAsync(),
+            EmployeeId = employee.EmployeeId,
+            Username = username,
+            PasswordHash = PasswordHasher.Hash(request.Password),
+            IsActive = request.IsActive,
+            CreatedAt = DateTime.UtcNow,
+            Employee = employee
+        };
+        _db.UserAccounts.Add(account);
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetAccounts), AccountResponse.From(account));
+    }
+
+    [Authorize(Policy = "ManagerOnly")]
+    [HttpPut("accounts/{id}")]
+    public async Task<ActionResult<AccountResponse>> UpdateAccount(string id, [FromBody] SaveAccountRequest request)
+    {
+        var account = await _db.UserAccounts
+            .Include(item => item.Employee)
+            .SingleOrDefaultAsync(item => item.UserId == id);
+        if (account == null)
+            return NotFound();
+
+        var username = request.Username.Trim();
+        if (await _db.UserAccounts.AnyAsync(item => item.Username == username && item.UserId != id))
+            return Conflict(new { message = "Tên đăng nhập đã tồn tại." });
+
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (currentUserId == id && !request.IsActive)
+            return BadRequest(new { message = "Không thể vô hiệu hóa tài khoản đang đăng nhập." });
+
+        account.Username = username;
+        account.IsActive = request.IsActive;
+        account.Employee.RoleName = request.RoleName;
+        if (!string.IsNullOrWhiteSpace(request.Password))
+        {
+            if (request.Password.Length < 8)
+                return BadRequest(new { message = "Mật khẩu phải có ít nhất 8 ký tự." });
+            account.PasswordHash = PasswordHasher.Hash(request.Password);
+        }
+
+        await _db.SaveChangesAsync();
+        return Ok(AccountResponse.From(account));
+    }
+
+    [Authorize(Policy = "ManagerOnly")]
+    [HttpDelete("accounts/{id}")]
+    public async Task<IActionResult> DisableAccount(string id)
+    {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (currentUserId == id)
+            return BadRequest(new { message = "Không thể vô hiệu hóa tài khoản đang đăng nhập." });
+
+        var account = await _db.UserAccounts.FindAsync(id);
+        if (account == null)
+            return NotFound();
+
+        account.IsActive = false;
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    private async Task<string> GenerateUserIdAsync()
+    {
+        string userId;
+        do
+        {
+            userId = $"USR-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}"[..48];
+        } while (await _db.UserAccounts.AnyAsync(account => account.UserId == userId));
+
+        return userId;
+    }
 }
 
 public sealed class LoginRequest
@@ -87,4 +194,27 @@ public sealed record AuthUserResponse(string UserId, string Username, string Emp
 {
     public static AuthUserResponse From(string userId, string username, string employeeName, string roleName)
         => new(userId, username, employeeName, roleName);
+}
+
+public sealed class SaveAccountRequest
+{
+    [Required, MaxLength(50)]
+    public string EmployeeId { get; set; } = null!;
+
+    [Required, MaxLength(100)]
+    public string Username { get; set; } = null!;
+
+    [MaxLength(200)]
+    public string? Password { get; set; }
+
+    [Required, MaxLength(50)]
+    public string RoleName { get; set; } = null!;
+
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed record AccountResponse(string UserId, string EmployeeId, string EmployeeName, string Username, string RoleName, bool IsActive)
+{
+    public static AccountResponse From(WMS_.Data.Entities.UserAccount account)
+        => new(account.UserId, account.EmployeeId, account.Employee.EmployeeName, account.Username, account.Employee.RoleName, account.IsActive);
 }

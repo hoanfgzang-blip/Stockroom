@@ -18,6 +18,14 @@ import type {
   Trip,
   Zone,
 } from '@/types'
+import type { AuthUser } from '@/auth/AuthContext'
+
+export const authApi = {
+  login: (data: { username: string; password: string; rememberMe: boolean }) =>
+    api.post<AuthUser>('/Auth/login', data),
+  me: () => api.get<AuthUser>('/Auth/me'),
+  logout: () => api.post<void>('/Auth/logout', {}),
+}
 
 export const dashboardApi = {
   summary: () => api.get<DashboardSummary>('/Dashboard/summary'),

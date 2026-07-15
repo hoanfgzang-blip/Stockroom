@@ -7,6 +7,7 @@ using WMS_.Data.Entities;
 
 namespace WMS_.Controllers
 {
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
     [ApiController]
     [Route("api/[controller]")]
     public class SacksController : ControllerBase

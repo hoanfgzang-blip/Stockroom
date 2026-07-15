@@ -6,6 +6,7 @@ using WMS_.Services.Warehouse;
 
 namespace WMS_.Controllers
 {
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
     [ApiController]
     [Route("api/[controller]")]
     public class PalletsController : ControllerBase

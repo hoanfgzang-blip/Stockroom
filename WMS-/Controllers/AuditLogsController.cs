@@ -6,6 +6,7 @@ using WMS_.Services.Warehouse;
 
 namespace WMS_.Controllers
 {
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOnly")]
     [ApiController]
     [Route("api/[controller]")]
     public class AuditLogsController : ControllerBase

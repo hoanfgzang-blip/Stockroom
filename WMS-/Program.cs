@@ -35,7 +35,7 @@ builder.Services.AddAuthorization(options =>
         .RequireAuthenticatedUser()
         .Build();
     options.AddPolicy("WarehouseOperations", policy =>
-        policy.RequireRole("Manager", "Supervisor", "WarehouseStaff", "Operator"));
+        policy.RequireRole("Manager", "Supervisor", "WarehouseStaff", "Operator", "Driver"));
     options.AddPolicy("DispatchOperations", policy =>
         policy.RequireRole("Manager", "Supervisor"));
     options.AddPolicy("ManagerOnly", policy => policy.RequireRole("Manager"));

@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using WMS_.Data;
 using WMS_.Data.Entities;
+using WMS_.Services;
 
 namespace WMS_.Controllers
 {
@@ -9,19 +8,23 @@ namespace WMS_.Controllers
     [Route("api/[controller]")]
     public class InboundOrderItemsController : ControllerBase
     {
-        private readonly WmsDbContext _db;
-        public InboundOrderItemsController(WmsDbContext db) => _db = db;
+        private readonly IInboundService _inboundService;
+
+        public InboundOrderItemsController(IInboundService inboundService)
+        {
+            _inboundService = inboundService;
+        }
 
         /// <summary>Get all items for an inbound order</summary>
         [HttpGet("by-order/{orderId}")]
         public async Task<ActionResult<IEnumerable<InboundOrderItem>>> GetByOrder(string orderId)
-            => await _db.InboundOrderItems.Where(i => i.InboundOrderId == orderId).ToListAsync();
+            => Ok(await _inboundService.GetItemsByOrderAsync(orderId));
 
         /// <summary>Get item by ID</summary>
         [HttpGet("{id}")]
         public async Task<ActionResult<InboundOrderItem>> GetById(string id)
         {
-            var item = await _db.InboundOrderItems.FindAsync(id);
+            var item = await _inboundService.GetItemByIdAsync(id);
             return item == null ? NotFound() : Ok(item);
         }
 
@@ -29,20 +32,24 @@ namespace WMS_.Controllers
         [HttpPost]
         public async Task<ActionResult<InboundOrderItem>> Create([FromBody] InboundOrderItem item)
         {
-            _db.InboundOrderItems.Add(item);
-            await _db.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = item.InboundOrderItemId }, item);
+            try
+            {
+                var created = await _inboundService.AddItemAsync(item);
+                return CreatedAtAction(nameof(GetById), new { id = created.InboundOrderItemId }, created);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(ex.Message);
+            }
         }
 
         /// <summary>Remove item from inbound order</summary>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
-        {
-            var item = await _db.InboundOrderItems.FindAsync(id);
-            if (item == null) return NotFound();
-            _db.InboundOrderItems.Remove(item);
-            await _db.SaveChangesAsync();
-            return NoContent();
-        }
+            => await _inboundService.RemoveItemAsync(id) ? NoContent() : NotFound();
     }
 }

@@ -9,6 +9,7 @@ builder.Services.AddDbContext<WmsDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddControllers();
+builder.Services.AddScoped<IInboundService, InboundService>();
 builder.Services.AddScoped<IOutboundService, OutboundService>();
 builder.Services.AddScoped<IZoneService, ZoneService>();
 builder.Services.AddScoped<IPalletService, PalletService>();

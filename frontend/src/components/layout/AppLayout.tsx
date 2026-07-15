@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   MapPin,
   Package,
+  ScanLine,
   Route,
   Shield,
   Timer,
@@ -36,6 +37,7 @@ const navGroups = [
   {
     label: 'Inventory & Orders',
     items: [
+      { to: '/operations/barcode-scanner', label: 'Quét mã vạch', icon: ScanLine },
       { to: '/inventory/inbound', label: 'Inbound Orders', icon: ArrowDownToLine },
       { to: '/inventory/outbound', label: 'Outbound Orders', icon: ArrowUpFromLine },
       { to: '/inventory/sacks', label: 'Sack / Bundle', icon: Package },

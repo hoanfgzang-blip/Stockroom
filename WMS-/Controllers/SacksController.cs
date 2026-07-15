@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
 using WMS_.Data;
 using WMS_.Data.Entities;
 
@@ -49,9 +50,25 @@ namespace WMS_.Controllers
         [HttpPost]
         public async Task<ActionResult<Sack>> Create([FromBody] Sack sack)
         {
+            sack.SackId = await GenerateSackIdAsync();
+            sack.CreatedAt = DateTime.Now;
+            if (string.IsNullOrWhiteSpace(sack.Status))
+                sack.Status = "Sorting";
+
             _db.Sacks.Add(sack);
             await _db.SaveChangesAsync();
             return CreatedAtAction(nameof(GetById), new { id = sack.SackId }, sack);
+        }
+
+        private async Task<string> GenerateSackIdAsync()
+        {
+            string sackId;
+            do
+            {
+                sackId = $"SACK-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{RandomNumberGenerator.GetHexString(3)}";
+            } while (await _db.Sacks.AnyAsync(s => s.SackId == sackId));
+
+            return sackId;
         }
 
         /// <summary>Update sack</summary>

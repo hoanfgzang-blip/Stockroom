@@ -128,6 +128,8 @@ export const outboundOrdersApi = {
     api.get<{ order: OutboundOrder; items: OutboundOrderItem[] }>(`/OutboundOrders/${id}/items`),
   create: (data: OutboundOrder) => api.post<OutboundOrder>('/OutboundOrders', data),
   updateStatus: (id: string, status: string) => api.patch(`/OutboundOrders/${id}/status`, status),
+  reserveSack: (id: string, sackId: string, reservationHours = 12) =>
+    api.post<InventoryReservation>(`/OutboundOrders/${id}/reserve-sack`, { sackId, reservationHours }),
   delete: (id: string) => api.delete(`/OutboundOrders/${id}`),
 }
 
@@ -137,6 +139,7 @@ export const sacksApi = {
   get: (id: string) => api.get<Sack>(`/Sacks/${id}`),
   create: (data: Sack) => api.post<Sack>('/Sacks', data),
   update: (id: string, data: Sack) => api.put<void>(`/Sacks/${id}`, data),
+  updateStatus: (id: string, status: string) => api.patch(`/Sacks/${id}/status`, status),
   delete: (id: string) => api.delete(`/Sacks/${id}`),
 }
 

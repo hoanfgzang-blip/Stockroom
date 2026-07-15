@@ -15,6 +15,9 @@ public static class PasswordHasher
         return $"PBKDF2${Iterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(hash)}";
     }
 
+    public static bool IsAscii(string password)
+        => password.All(character => character is >= '!' and <= '~');
+
     public static bool Verify(string password, string passwordHash)
     {
         var parts = passwordHash.Split('$');

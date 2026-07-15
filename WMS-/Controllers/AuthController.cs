@@ -22,6 +22,9 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult<AuthUserResponse>> Login([FromBody] LoginRequest request)
     {
+        if (!PasswordHasher.IsAscii(request.Password))
+            return Unauthorized(new { message = "Mật khẩu chỉ dùng ký tự không dấu." });
+
         var username = request.Username.Trim();
         var account = await _db.UserAccounts
             .Include(user => user.Employee)
@@ -90,6 +93,8 @@ public class AuthController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
             return BadRequest(new { message = "Mật khẩu phải có ít nhất 8 ký tự." });
+        if (!PasswordHasher.IsAscii(request.Password))
+            return BadRequest(new { message = "Mật khẩu chỉ dùng ký tự không dấu." });
 
         var employee = await _db.Employees.FindAsync(request.EmployeeId);
         if (employee == null)
@@ -143,6 +148,8 @@ public class AuthController : ControllerBase
         {
             if (request.Password.Length < 8)
                 return BadRequest(new { message = "Mật khẩu phải có ít nhất 8 ký tự." });
+            if (!PasswordHasher.IsAscii(request.Password))
+                return BadRequest(new { message = "Mật khẩu chỉ dùng ký tự không dấu." });
             account.PasswordHash = PasswordHasher.Hash(request.Password);
         }
 

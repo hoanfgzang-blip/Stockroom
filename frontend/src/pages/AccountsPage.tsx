@@ -137,7 +137,7 @@ export default function AccountsPage() {
             </Select>
           </div>
           <div><Label htmlFor="account-username">Tên đăng nhập</Label><Input id="account-username" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} className="mt-1" /></div>
-          <div><Label htmlFor="account-password">{form.userId ? 'Mật khẩu mới' : 'Mật khẩu'}</Label><Input id="account-password" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={form.userId ? 'Để trống nếu không đổi' : 'Ít nhất 8 ký tự'} className="mt-1" /></div>
+          <div><Label htmlFor="account-password">{form.userId ? 'Mật khẩu mới' : 'Mật khẩu'}</Label><Input id="account-password" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value.replace(/[^\x21-\x7E]/g, '') })} placeholder={form.userId ? 'Để trống nếu không đổi' : 'Ít nhất 8 ký tự'} className="mt-1" /></div>
           <div>
             <Label htmlFor="account-role">Vai trò</Label>
             <Select id="account-role" value={form.roleName} onChange={(event) => setForm({ ...form, roleName: event.target.value })} className="mt-1">

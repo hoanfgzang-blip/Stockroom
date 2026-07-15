@@ -17,6 +17,7 @@ import {
   Timer,
   Truck,
   Users,
+  UserCog,
   Warehouse,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -67,7 +68,10 @@ const navGroups: NavGroup[] = [
   },
   {
     label: 'System Security',
-    items: [{ to: '/audit-logs', label: 'Audit Logs', icon: Shield, roles: ['Manager'] }],
+    items: [
+      { to: '/system/accounts', label: 'Quản lý tài khoản', icon: UserCog, roles: ['Manager'] },
+      { to: '/audit-logs', label: 'Audit Logs', icon: Shield, roles: ['Manager'] },
+    ],
   },
 ]
 

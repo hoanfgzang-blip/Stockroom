@@ -5,6 +5,7 @@ using WMS_.Data.Entities;
 
 namespace WMS_.Controllers
 {
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOnly")]
     [ApiController]
     [Route("api/[controller]")]
     public class EmployeesController : ControllerBase

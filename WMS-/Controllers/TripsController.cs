@@ -5,6 +5,7 @@ using WMS_.Data.Entities;
 
 namespace WMS_.Controllers
 {
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
     [ApiController]
     [Route("api/[controller]")]
     public class TripsController : ControllerBase

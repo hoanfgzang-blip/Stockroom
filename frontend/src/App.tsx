@@ -15,8 +15,15 @@ import FleetPage from '@/pages/FleetPage'
 import ShiftsPage from '@/pages/ShiftsPage'
 import PalletsPage from '@/pages/PalletsPage'
 import BarcodeScannerPage from '@/pages/BarcodeScannerPage'
+import LoginPage from '@/pages/LoginPage'
+import { useAuth } from '@/auth/AuthContext'
 
 export default function App() {
+  const { user, loading } = useAuth()
+
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Đang kiểm tra phiên đăng nhập...</div>
+  if (!user) return <LoginPage />
+
   return (
     <AppLayout>
       <Routes>

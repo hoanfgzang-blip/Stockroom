@@ -114,9 +114,6 @@ export default function BarcodeScannerPage() {
     setCreating(true)
     try {
       const sack = await sacksApi.create({
-        sackId: '',
-        status: 'Sorting',
-        createdAt: new Date().toISOString(),
         sDestination: destinationId,
       })
       setLastSack(sack)

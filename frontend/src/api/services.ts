@@ -137,7 +137,8 @@ export const sacksApi = {
   all: (status?: string) =>
     api.get<Sack[]>(`/Sacks${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Sack>(`/Sacks/${id}`),
-  create: (data: Sack) => api.post<Sack>('/Sacks', data),
+  create: (data: Pick<Sack, 'sDestination'> & Partial<Pick<Sack, 'zoneId' | 'palletId'>>) =>
+    api.post<Sack>('/Sacks', data),
   update: (id: string, data: Sack) => api.put<void>(`/Sacks/${id}`, data),
   updateStatus: (id: string, status: string) => api.patch(`/Sacks/${id}/status`, status),
   delete: (id: string) => api.delete(`/Sacks/${id}`),

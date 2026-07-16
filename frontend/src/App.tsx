@@ -18,6 +18,7 @@ import BarcodeScannerPage from '@/pages/BarcodeScannerPage'
 import LoginPage from '@/pages/LoginPage'
 import { useAuth } from '@/auth/AuthContext'
 import AccountsPage from '@/pages/AccountsPage'
+import DriverDeliveriesPage from '@/pages/DriverDeliveriesPage'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -28,7 +29,7 @@ export default function App() {
   return (
     <AppLayout>
       <Routes>
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/" element={user.roleName === 'Driver' ? <Navigate to="/driver/deliveries" replace /> : <DashboardPage />} />
         <Route path="/infrastructure/provinces" element={<Navigate to="/infrastructure/locations" replace />} />
         <Route path="/infrastructure/locations" element={<InfrastructureLocationsPage />} />
         <Route path="/infrastructure/zones" element={<InfrastructureZonesPage />} />
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/inventory/sacks" element={<SacksPage />} />
         <Route path="/inventory/reservations" element={<ReservationsPage />} />
         <Route path="/operations/barcode-scanner" element={<BarcodeScannerPage />} />
+        <Route path="/driver/deliveries" element={<DriverDeliveriesPage />} />
         <Route path="/logistics/fleet" element={<FleetPage />} />
         <Route path="/logistics/trips" element={<TripsPage />} />
         <Route path="/logistics/routing" element={<RoutingRulesPage />} />

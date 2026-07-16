@@ -183,7 +183,7 @@ export default function DashboardPage() {
               </PieChart>
             </ResponsiveContainer>
             <div className="mt-2 flex flex-wrap gap-2">
-              {sackPie.map((s, i) => (
+              {sackPie.map((s) => (
                 <Badge key={s.name} status={s.name}>
                   {s.name}: {s.value}
                 </Badge>

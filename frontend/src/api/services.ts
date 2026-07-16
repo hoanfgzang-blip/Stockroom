@@ -131,6 +131,10 @@ export const tripsApi = {
   update: (id: string, data: Trip) => api.put<void>(`/Trips/${id}`, data),
   updateStatus: (id: string, status: string) => api.patch(`/Trips/${id}/status`, status),
   delete: (id: string) => api.delete(`/Trips/${id}`),
+  mine: () => api.get<Trip[]>('/Trips/my'),
+  mySacks: (id: string) => api.get<Sack[]>(`/Trips/my/${id}/sacks`),
+  updateMyStatus: (id: string, status: 'InProgress' | 'Completed') =>
+    api.patch(`/Trips/my/${id}/status`, status),
 }
 
 export const routingRulesApi = {

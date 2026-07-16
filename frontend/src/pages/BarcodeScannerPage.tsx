@@ -1,5 +1,7 @@
-import { FormEvent, useEffect, useRef, useState } from 'react'
-import { Barcode, CheckCircle2, CircleAlert, ClipboardCheck, PackageCheck, Plus, ScanLine, Send, Undo2 } from 'lucide-react'
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { Barcode, Camera, CheckCircle2, CircleAlert, ClipboardCheck, PackageCheck, Plus, Printer, ScanLine, Send, Undo2 } from 'lucide-react'
+import { BrowserMultiFormatReader, BrowserQRCodeSvgWriter, type IScannerControls } from '@zxing/browser'
+import { BarcodeFormat, DecodeHintType } from '@zxing/library'
 import { locationsApi, outboundOrdersApi, sacksApi } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,6 +10,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { Label, Select } from '@/components/ui/input'
 import { PageHeader } from '@/components/shared/PageHeader'
 import type { Location, OutboundOrder, Sack } from '@/types'
+import { useAuth } from '@/auth/AuthContext'
 
 type ScanMode = 'inbound' | 'sorting' | 'outbound' | 'received'
 type ScanResult = {
@@ -16,6 +19,92 @@ type ScanResult = {
   message: string
   success: boolean
   at: Date
+}
+
+const code39Patterns: Record<string, string> = {
+  '0': 'nnnwwnwnn', '1': 'wnnwnnnnw', '2': 'nnwwnnnnw', '3': 'wnwwnnnnn', '4': 'nnnwwnnnw',
+  '5': 'wnnwwnnnn', '6': 'nnwwwnnnn', '7': 'nnnwnnwnw', '8': 'wnnwnnwnn', '9': 'nnwwnnwnn',
+  A: 'wnnnnwnnw', B: 'nnwnnwnnw', C: 'wnwnnwnnn', D: 'nnnnwwnnw', E: 'wnnnwwnnn',
+  F: 'nnwnwwnnn', G: 'nnnnnwwnw', H: 'wnnnnwwnn', I: 'nnwnnwwnn', J: 'nnnnwwwnn',
+  K: 'wnnnnnnww', L: 'nnwnnnnww', M: 'wnwnnnnwn', N: 'nnnnwnnww', O: 'wnnnwnnwn',
+  P: 'nnwnwnnwn', Q: 'nnnnnnwww', R: 'wnnnnnwwn', S: 'nnwnnnwwn', T: 'nnnnwnwwn',
+  U: 'wwnnnnnnw', V: 'nwwnnnnnw', W: 'wwwnnnnnn', X: 'nwnnwnnnw', Y: 'wwnnwnnnn',
+  Z: 'nwwnwnnnn', '-': 'nwnnnnwnw', '.': 'wwnnnnwnn', ' ': 'nwwnnnwnn',
+  '$': 'nwnwnwnnn', '/': 'nwnwnnnwn', '+': 'nwnnnwnwn', '%': 'nnnwnwnwn', '*': 'nwnnwnwnn',
+}
+
+function getCode39Bars(value: string) {
+  const characters = `*${value.toUpperCase()}*`
+  const bars: Array<{ x: number; width: number }> = []
+  let x = 16
+
+  for (const character of characters) {
+    const pattern = code39Patterns[character] ?? code39Patterns['-']
+    for (let index = 0; index < pattern.length; index += 1) {
+      const width = pattern[index] === 'w' ? 6 : 2
+      if (index % 2 === 0) bars.push({ x, width })
+      x += width + 2
+    }
+    x += 4
+  }
+
+  return { bars, width: x + 16 }
+}
+
+function QrCode({ value }: { value: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const svg = new BrowserQRCodeSvgWriter().write(value, 160, 160)
+    svg.classList.add('h-full', 'w-full')
+    svg.setAttribute('aria-label', `Mã QR ${value}`)
+    container.replaceChildren(svg)
+  }, [value])
+
+  return <div ref={containerRef} className="aspect-square w-28 shrink-0 bg-white p-1" />
+}
+
+function BarcodeLabel({ value }: { value: string }) {
+  const { bars, width } = getCode39Bars(value)
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4 text-center shadow-sm">
+      <div className="grid items-center gap-3 sm:grid-cols-[minmax(0,1fr)_112px]">
+        <div>
+          <svg className="h-24 w-full" viewBox={`0 0 ${width} 108`} preserveAspectRatio="none" role="img" aria-label={`Mã vạch ${value}`}>
+            <rect width="100%" height="100%" fill="white" />
+            {bars.map((bar, index) => <rect key={`${bar.x}-${index}`} x={bar.x} y="4" width={bar.width} height="84" fill="black" />)}
+          </svg>
+          <p className="mt-2 font-mono text-sm font-semibold tracking-widest text-slate-900">{value}</p>
+          <p className="mt-1 text-xs text-slate-500">Code 39</p>
+        </div>
+        <div className="justify-self-center">
+          <QrCode value={value} />
+          <p className="mt-1 text-xs text-slate-500">QR dự phòng</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function printBarcode(value: string) {
+  const { bars, width } = getCode39Bars(value)
+  const barcodeSvg = bars
+    .map((bar) => `<rect x="${bar.x}" y="8" width="${bar.width}" height="112" fill="#000" />`)
+    .join('')
+  const qrSvg = new BrowserQRCodeSvgWriter().write(value, 160, 160).outerHTML
+  const printWindow = window.open('', '_blank', 'width=640,height=420')
+
+  if (!printWindow) return
+
+  printWindow.document.write(`<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><title>Tem ${value}</title>
+<style>body{font-family:Arial,sans-serif;margin:0;padding:24px;color:#111}main{width:88mm;text-align:center;border:1px solid #ddd;padding:8mm}h1{font-size:15pt;margin:0 0 5mm}.codes{display:grid;grid-template-columns:1fr 32mm;align-items:center;gap:5mm}.barcode{width:100%;height:32mm}.qr{width:30mm;height:30mm}.code{font-family:monospace;font-size:13pt;letter-spacing:1.5px;font-weight:700;margin:3mm 0}.note{font-size:9pt;color:#555;margin:0}@page{size:auto;margin:10mm}</style>
+</head><body><main><h1>WMS - Tem bao hàng</h1><div class="codes"><div><svg class="barcode" viewBox="0 0 ${width} 128" preserveAspectRatio="none" aria-label="${value}">${barcodeSvg}</svg><p class="code">${value}</p><p class="note">Mã Code 39</p></div><div><div class="qr">${qrSvg}</div><p class="note">QR dự phòng</p></div></div></main><script>window.onload=()=>window.print();</script></body></html>`)
+  printWindow.document.close()
 }
 
 const modes: Array<{ id: ScanMode; title: string; description: string; icon: typeof PackageCheck }> = [
@@ -38,8 +127,10 @@ function statusLabel(status: string) {
 }
 
 export default function BarcodeScannerPage() {
+  const { user } = useAuth()
+  const isDriver = user?.roleName === 'Driver'
   const inputRef = useRef<HTMLInputElement>(null)
-  const [mode, setMode] = useState<ScanMode>('inbound')
+  const [mode, setMode] = useState<ScanMode>(isDriver ? 'received' : 'inbound')
   const [barcode, setBarcode] = useState('')
   const [orders, setOrders] = useState<OutboundOrder[]>([])
   const [locations, setLocations] = useState<Location[]>([])
@@ -50,8 +141,23 @@ export default function BarcodeScannerPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [destinationId, setDestinationId] = useState('')
   const [creating, setCreating] = useState(false)
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraError, setCameraError] = useState('')
+  const cameraVideoRef = useRef<HTMLVideoElement>(null)
+  const scannerControlsRef = useRef<IScannerControls | null>(null)
+
+  const stopCamera = useCallback(() => {
+    scannerControlsRef.current?.stop()
+    scannerControlsRef.current = null
+    setCameraOpen(false)
+  }, [])
 
   useEffect(() => {
+    if (isDriver) {
+      setOrders([])
+      setLocations([])
+      return
+    }
     Promise.all([outboundOrdersApi.all(), locationsApi.all()])
       .then(([outboundOrders, warehouseLocations]) => {
         setOrders(outboundOrders.filter((order) => order.status !== 'Completed'))
@@ -61,11 +167,13 @@ export default function BarcodeScannerPage() {
         setOrders([])
         setLocations([])
       })
-  }, [])
+  }, [isDriver])
 
   useEffect(() => {
     inputRef.current?.focus()
   }, [mode, processing])
+
+  useEffect(() => () => stopCamera(), [stopCamera])
 
   const addResult = (sackId: string, message: string, success: boolean) => {
     setResults((current) => [{ id: Date.now(), sackId, message, success, at: new Date() }, ...current].slice(0, 8))
@@ -127,23 +235,64 @@ export default function BarcodeScannerPage() {
     }
   }
 
+  const startCamera = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Trình duyệt hoặc thiết bị này chưa hỗ trợ truy cập camera.')
+      setCameraOpen(true)
+      return
+    }
+
+    stopCamera()
+    setCameraError('')
+    setCameraOpen(true)
+
+    try {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      const video = cameraVideoRef.current
+      if (!video) throw new Error('Không thể mở vùng xem trước của camera.')
+
+      const hints = new Map<DecodeHintType, BarcodeFormat[]>()
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_39, BarcodeFormat.CODE_128, BarcodeFormat.QR_CODE])
+      const reader = new BrowserMultiFormatReader(hints)
+
+      scannerControlsRef.current = await reader.decodeFromConstraints(
+        { video: { facingMode: { ideal: 'environment' } }, audio: false },
+        video,
+        (result, _error, controls) => {
+          if (!result) return
+
+          const scannedValue = result.getText().trim()
+          if (!scannedValue) return
+
+          controls.stop()
+          scannerControlsRef.current = null
+          setBarcode(scannedValue)
+          addResult(scannedValue, 'Đã đọc mã từ camera. Nhấn Xử lý để thực hiện nghiệp vụ đã chọn.', true)
+          setCameraOpen(false)
+        },
+      )
+    } catch (error) {
+      setCameraError(error instanceof Error ? error.message : 'Không thể truy cập camera.')
+    }
+  }
+
   return (
     <div>
       <PageHeader
         title="Quét mã vạch"
         description="Chọn nghiệp vụ, đặt con trỏ vào ô quét và quét mã bao hàng. Máy quét USB hoặc Bluetooth hoạt động như bàn phím."
-        action={
+        action={!isDriver ? (
           <Button onClick={() => setCreateDialogOpen(true)}>
             <Plus className="h-4 w-4" />
             Tạo bao hàng
           </Button>
-        }
+        ) : undefined}
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {modes.map((item) => {
+            {(isDriver ? modes.filter((item) => item.id === 'received') : modes).map((item) => {
               const Icon = item.icon
               const active = mode === item.id
               return (
@@ -209,6 +358,10 @@ export default function BarcodeScannerPage() {
                       className="flex h-14 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-base outline-none ring-primary focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={processing}
                     />
+                    <Button type="button" variant="outline" size="lg" className="h-14 shrink-0 px-4" onClick={() => void startCamera()} title="Quét mã bằng camera">
+                      <Camera className="h-5 w-5" />
+                      Camera
+                    </Button>
                     <Button type="submit" size="lg" disabled={!barcode.trim() || processing} className="h-14 shrink-0">
                       <ScanLine className="h-5 w-5" />
                       {processing ? 'Đang xử lý' : 'Xử lý'}
@@ -232,6 +385,23 @@ export default function BarcodeScannerPage() {
                 <div><p className="text-xs text-slate-500">Mã bao</p><p className="mt-1 font-mono font-semibold">{lastSack.sackId}</p></div>
                 <div><p className="text-xs text-slate-500">Trạng thái</p><div className="mt-1"><Badge status={lastSack.status}>{statusLabel(lastSack.status)}</Badge></div></div>
                 <div><p className="text-xs text-slate-500">Điểm đến</p><p className="mt-1 text-sm font-medium">{lastSack.sDestination}</p></div>
+              </CardContent>
+            </Card>
+          )}
+
+          {lastSack && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="text-base">Tem mã vạch để in</CardTitle>
+                  <Button variant="outline" size="sm" onClick={() => printBarcode(lastSack.sackId)}>
+                    <Printer className="h-4 w-4" />
+                    In tem
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <BarcodeLabel value={lastSack.sackId} />
               </CardContent>
             </Card>
           )}
@@ -298,6 +468,26 @@ export default function BarcodeScannerPage() {
             <Button onClick={createSack} disabled={!destinationId || creating}>
               {creating ? 'Đang tạo' : 'Tạo mã tự động'}
             </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={cameraOpen}
+        onClose={stopCamera}
+        title="Quét mã bằng camera"
+        description="Đưa tem mã vạch vào giữa khung hình. Mã đọc được sẽ tự điền vào ô quét."
+      >
+        <div className="space-y-4">
+          {cameraError ? (
+            <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{cameraError}</p>
+          ) : (
+            <div className="overflow-hidden rounded-lg bg-black">
+              <video ref={cameraVideoRef} className="aspect-video w-full object-cover" muted playsInline />
+            </div>
+          )}
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={stopCamera}>Đóng camera</Button>
           </div>
         </div>
       </Dialog>

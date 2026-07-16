@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { locationsApi, provincesApi } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input, Label, Select } from '@/components/ui/input'
+import { Label, Select } from '@/components/ui/input'
 import {
   Table,
   TableBody,

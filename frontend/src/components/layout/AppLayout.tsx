@@ -30,7 +30,11 @@ type NavGroup = { label: string; items: NavItem[] }
 const navGroups: NavGroup[] = [
   {
     label: 'Overview',
-    items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard }],
+    items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] }],
+  },
+  {
+    label: 'Công việc',
+    items: [{ to: '/driver/deliveries', label: 'Giao hàng của tôi', icon: Truck, roles: ['Driver'] }],
   },
   {
     label: 'Infrastructure',
@@ -44,7 +48,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Inventory & Orders',
     items: [
-      { to: '/operations/barcode-scanner', label: 'Quét mã vạch', icon: ScanLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator', 'Driver'] },
+      { to: '/operations/barcode-scanner', label: 'Quét mã vạch', icon: ScanLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
       { to: '/inventory/inbound', label: 'Inbound Orders', icon: ArrowDownToLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
       { to: '/inventory/outbound', label: 'Outbound Orders', icon: ArrowUpFromLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
       { to: '/inventory/sacks', label: 'Sack / Bundle', icon: Package, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },

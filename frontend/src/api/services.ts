@@ -44,6 +44,15 @@ export type SaveAccountRequest = {
   isActive: boolean
 }
 
+export type PalletAssignmentResult = {
+  succeeded: boolean
+  message: string
+  sackId?: string
+  palletId?: string
+  zoneId?: string
+  assignedSackCount: number
+}
+
 export const accountsApi = {
   all: () => api.get<ManagedAccount[]>('/Auth/accounts'),
   create: (data: SaveAccountRequest) => api.post<ManagedAccount>('/Auth/accounts', data),
@@ -89,6 +98,12 @@ export const palletsApi = {
   create: (data: Pallet) => api.post<Pallet>('/Pallets', data),
   update: (id: string, data: Pallet) => api.put<void>(`/Pallets/${id}`, data),
   delete: (id: string) => api.delete(`/Pallets/${id}`),
+  assignSack: (palletId: string, sackId: string) =>
+    api.post<PalletAssignmentResult>(`/Pallets/${palletId}/assign-sack/${sackId}`, {}),
+  reassignSack: (palletId: string, sackId: string) =>
+    api.post<PalletAssignmentResult>(`/Pallets/${palletId}/reassign-sack/${sackId}`, {}),
+  removeSack: (palletId: string, sackId: string) =>
+    api.delete<PalletAssignmentResult>(`/Pallets/${palletId}/sacks/${sackId}`),
 }
 
 export const employeesApi = {

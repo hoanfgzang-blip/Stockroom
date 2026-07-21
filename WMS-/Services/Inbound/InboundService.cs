@@ -1,7 +1,9 @@
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using WMS_.Data;
 using WMS_.Data.Entities;
@@ -11,17 +13,28 @@ namespace WMS_.Services
     public class InboundService : IInboundService
     {
         private readonly WmsDbContext _db;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public InboundService(WmsDbContext db)
+        public InboundService(WmsDbContext db, IHttpContextAccessor httpContextAccessor)
         {
             _db = db;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<IReadOnlyList<InboundOrder>> GetOrdersAsync(string? status = null)
         {
+            // Lấy mã Hub của nhân viên đang đăng nhập từ Token
+            var myLocationId = _httpContextAccessor.HttpContext?.User.FindFirstValue("location_id");
+
             var query = _db.InboundOrders.AsQueryable();
+
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(o => o.Status == status);
+
+            if (!string.IsNullOrEmpty(myLocationId))
+            {
+                query = query.Where(o => o.InboundSuplierName == myLocationId);
+            }
 
             return await query.OrderByDescending(o => o.CreateAt).ToListAsync();
         }
@@ -46,6 +59,13 @@ namespace WMS_.Services
         {
             if (string.IsNullOrWhiteSpace(order.InboundOrderId))
                 order.InboundOrderId = GenerateId("IMP");
+
+            // Tự động gán Hub xuất phát theo Hub của user đang tạo nếu chưa có
+            if (string.IsNullOrWhiteSpace(order.InboundSuplierName))
+            {
+                var myLocationId = _httpContextAccessor.HttpContext?.User.FindFirstValue("location_id");
+                order.InboundSuplierName = myLocationId ?? "DEFAULT-HUB";
+            }
 
             _db.InboundOrders.Add(order);
             await _db.SaveChangesAsync();

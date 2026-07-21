@@ -18,6 +18,47 @@ import type {
   Trip,
   Zone,
 } from '@/types'
+import type { AuthUser } from '@/auth/AuthContext'
+
+export const authApi = {
+  login: (data: { username: string; password: string; rememberMe: boolean }) =>
+    api.post<AuthUser>('/Auth/login', data),
+  me: () => api.get<AuthUser>('/Auth/me'),
+  logout: () => api.post<void>('/Auth/logout', {}),
+}
+
+export type ManagedAccount = {
+  userId: string
+  employeeId: string
+  employeeName: string
+  username: string
+  roleName: string
+  isActive: boolean
+}
+
+export type SaveAccountRequest = {
+  employeeId: string
+  username: string
+  password?: string
+  roleName: string
+  isActive: boolean
+}
+
+export type PalletAssignmentResult = {
+  succeeded: boolean
+  message: string
+  sackId?: string
+  palletId?: string
+  zoneId?: string
+  assignedSackCount: number
+}
+
+export const accountsApi = {
+  all: () => api.get<ManagedAccount[]>('/Auth/accounts'),
+  create: (data: SaveAccountRequest) => api.post<ManagedAccount>('/Auth/accounts', data),
+  update: (id: string, data: SaveAccountRequest) => api.put<ManagedAccount>(`/Auth/accounts/${id}`, data),
+  disable: (id: string) => api.delete(`/Auth/accounts/${id}`),
+}
 
 export const dashboardApi = {
   summary: () => api.get<DashboardSummary>('/Dashboard/summary'),
@@ -57,6 +98,12 @@ export const palletsApi = {
   create: (data: Pallet) => api.post<Pallet>('/Pallets', data),
   update: (id: string, data: Pallet) => api.put<void>(`/Pallets/${id}`, data),
   delete: (id: string) => api.delete(`/Pallets/${id}`),
+  assignSack: (palletId: string, sackId: string) =>
+    api.post<PalletAssignmentResult>(`/Pallets/${palletId}/assign-sack/${sackId}`, {}),
+  reassignSack: (palletId: string, sackId: string) =>
+    api.post<PalletAssignmentResult>(`/Pallets/${palletId}/reassign-sack/${sackId}`, {}),
+  removeSack: (palletId: string, sackId: string) =>
+    api.delete<PalletAssignmentResult>(`/Pallets/${palletId}/sacks/${sackId}`),
 }
 
 export const employeesApi = {
@@ -99,6 +146,10 @@ export const tripsApi = {
   update: (id: string, data: Trip) => api.put<void>(`/Trips/${id}`, data),
   updateStatus: (id: string, status: string) => api.patch(`/Trips/${id}/status`, status),
   delete: (id: string) => api.delete(`/Trips/${id}`),
+  mine: () => api.get<Trip[]>('/Trips/my'),
+  mySacks: (id: string) => api.get<Sack[]>(`/Trips/my/${id}/sacks`),
+  updateMyStatus: (id: string, status: 'InProgress' | 'Completed') =>
+    api.patch(`/Trips/my/${id}/status`, status),
 }
 
 export const routingRulesApi = {
@@ -128,6 +179,8 @@ export const outboundOrdersApi = {
     api.get<{ order: OutboundOrder; items: OutboundOrderItem[] }>(`/OutboundOrders/${id}/items`),
   create: (data: OutboundOrder) => api.post<OutboundOrder>('/OutboundOrders', data),
   updateStatus: (id: string, status: string) => api.patch(`/OutboundOrders/${id}/status`, status),
+  reserveSack: (id: string, sackId: string, reservationHours = 12) =>
+    api.post<InventoryReservation>(`/OutboundOrders/${id}/reserve-sack`, { sackId, reservationHours }),
   delete: (id: string) => api.delete(`/OutboundOrders/${id}`),
 }
 
@@ -135,8 +188,10 @@ export const sacksApi = {
   all: (status?: string) =>
     api.get<Sack[]>(`/Sacks${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Sack>(`/Sacks/${id}`),
-  create: (data: Sack) => api.post<Sack>('/Sacks', data),
+  create: (data: Pick<Sack, 'sDestination'> & Partial<Pick<Sack, 'zoneId' | 'palletId'>>) =>
+    api.post<Sack>('/Sacks', data),
   update: (id: string, data: Sack) => api.put<void>(`/Sacks/${id}`, data),
+  updateStatus: (id: string, status: string) => api.patch(`/Sacks/${id}/status`, status),
   delete: (id: string) => api.delete(`/Sacks/${id}`),
 }
 

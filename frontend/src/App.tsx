@@ -14,12 +14,22 @@ import AuditLogsPage from '@/pages/AuditLogsPage'
 import FleetPage from '@/pages/FleetPage'
 import ShiftsPage from '@/pages/ShiftsPage'
 import PalletsPage from '@/pages/PalletsPage'
+import BarcodeScannerPage from '@/pages/BarcodeScannerPage'
+import LoginPage from '@/pages/LoginPage'
+import { useAuth } from '@/auth/AuthContext'
+import AccountsPage from '@/pages/AccountsPage'
+import DriverDeliveriesPage from '@/pages/DriverDeliveriesPage'
 
 export default function App() {
+  const { user, loading } = useAuth()
+
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Đang kiểm tra phiên đăng nhập...</div>
+  if (!user) return <LoginPage />
+
   return (
     <AppLayout>
       <Routes>
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/" element={user.roleName === 'Driver' ? <Navigate to="/driver/deliveries" replace /> : <DashboardPage />} />
         <Route path="/infrastructure/provinces" element={<Navigate to="/infrastructure/locations" replace />} />
         <Route path="/infrastructure/locations" element={<InfrastructureLocationsPage />} />
         <Route path="/infrastructure/zones" element={<InfrastructureZonesPage />} />
@@ -28,12 +38,15 @@ export default function App() {
         <Route path="/inventory/outbound" element={<OutboundOrdersPage />} />
         <Route path="/inventory/sacks" element={<SacksPage />} />
         <Route path="/inventory/reservations" element={<ReservationsPage />} />
+        <Route path="/operations/barcode-scanner" element={<BarcodeScannerPage />} />
+        <Route path="/driver/deliveries" element={<DriverDeliveriesPage />} />
         <Route path="/logistics/fleet" element={<FleetPage />} />
         <Route path="/logistics/trips" element={<TripsPage />} />
         <Route path="/logistics/routing" element={<RoutingRulesPage />} />
         <Route path="/hr/employees" element={<EmployeesPage />} />
         <Route path="/hr/shifts" element={<ShiftsPage />} />
         <Route path="/audit-logs" element={<AuditLogsPage />} />
+        <Route path="/system/accounts" element={<AccountsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>

@@ -1,10 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.ComponentModel.DataAnnotations;
 using WMS_.Data;
 using WMS_.Data.Entities;
 
 namespace WMS_.Controllers
 {
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
     [ApiController]
     [Route("api/[controller]")]
     public class SacksController : ControllerBase
@@ -47,11 +50,45 @@ namespace WMS_.Controllers
 
         /// <summary>Create new sack</summary>
         [HttpPost]
-        public async Task<ActionResult<Sack>> Create([FromBody] Sack sack)
+        public async Task<ActionResult<Sack>> Create([FromBody] CreateSackRequest request)
         {
+            var sack = new Sack
+            {
+                SackId = await GenerateSackIdAsync(),
+                Status = "Sorting",
+                CreatedAt = DateTime.UtcNow,
+                SDestination = request.SDestination,
+                ZoneId = request.ZoneId,
+                PalletId = request.PalletId
+            };
+
             _db.Sacks.Add(sack);
             await _db.SaveChangesAsync();
             return CreatedAtAction(nameof(GetById), new { id = sack.SackId }, sack);
+        }
+
+        public sealed class CreateSackRequest
+        {
+            [Required]
+            [MaxLength(50)]
+            public string SDestination { get; set; } = null!;
+
+            [MaxLength(50)]
+            public string? ZoneId { get; set; }
+
+            [MaxLength(50)]
+            public string? PalletId { get; set; }
+        }
+
+        private async Task<string> GenerateSackIdAsync()
+        {
+            string sackId;
+            do
+            {
+                sackId = $"SACK-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{RandomNumberGenerator.GetHexString(3)}";
+            } while (await _db.Sacks.AnyAsync(s => s.SackId == sackId));
+
+            return sackId;
         }
 
         /// <summary>Update sack</summary>

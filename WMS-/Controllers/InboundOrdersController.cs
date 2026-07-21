@@ -4,6 +4,7 @@ using WMS_.Services;
 
 namespace WMS_.Controllers
 {
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
     [ApiController]
     [Route("api/[controller]")]
     public class InboundOrdersController : ControllerBase

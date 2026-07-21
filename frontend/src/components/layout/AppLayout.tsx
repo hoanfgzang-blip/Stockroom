@@ -8,62 +8,83 @@ import {
   ChevronRight,
   ClipboardList,
   LayoutDashboard,
+  LogOut,
   MapPin,
   Package,
+  ScanLine,
   Route,
   Shield,
   Timer,
   Truck,
   Users,
+  UserCog,
   Warehouse,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import { useAuth } from '@/auth/AuthContext'
 import { cn } from '@/lib/utils'
 
-const navGroups = [
+type NavItem = { to: string; label: string; icon: LucideIcon; roles?: string[] }
+type NavGroup = { label: string; items: NavItem[] }
+
+const navGroups: NavGroup[] = [
   {
     label: 'Overview',
-    items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard }],
+    items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] }],
+  },
+  {
+    label: 'Công việc',
+    items: [{ to: '/driver/deliveries', label: 'Giao hàng của tôi', icon: Truck, roles: ['Driver'] }],
   },
   {
     label: 'Infrastructure',
     items: [
-      { to: '/infrastructure/provinces', label: 'Provinces', icon: MapPin },
-      { to: '/infrastructure/locations', label: 'Locations / Hubs', icon: Building2 },
-      { to: '/infrastructure/zones', label: 'Warehouse Zones', icon: Warehouse },
-      { to: '/infrastructure/pallets', label: 'Pallet Management', icon: Package },
+      { to: '/infrastructure/provinces', label: 'Provinces', icon: MapPin, roles: ['Manager'] },
+      { to: '/infrastructure/locations', label: 'Locations / Hubs', icon: Building2, roles: ['Manager'] },
+      { to: '/infrastructure/zones', label: 'Warehouse Zones', icon: Warehouse, roles: ['Manager'] },
+      { to: '/infrastructure/pallets', label: 'Pallet Management', icon: Package, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
     ],
   },
   {
     label: 'Inventory & Orders',
     items: [
-      { to: '/inventory/inbound', label: 'Inbound Orders', icon: ArrowDownToLine },
-      { to: '/inventory/outbound', label: 'Outbound Orders', icon: ArrowUpFromLine },
-      { to: '/inventory/sacks', label: 'Sack / Bundle', icon: Package },
-      { to: '/inventory/reservations', label: 'Inventory Reservations', icon: Timer },
+      { to: '/operations/barcode-scanner', label: 'Quét mã vạch', icon: ScanLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
+      { to: '/inventory/inbound', label: 'Inbound Orders', icon: ArrowDownToLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
+      { to: '/inventory/outbound', label: 'Outbound Orders', icon: ArrowUpFromLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
+      { to: '/inventory/sacks', label: 'Sack / Bundle', icon: Package, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
+      { to: '/inventory/reservations', label: 'Inventory Reservations', icon: Timer, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
     ],
   },
   {
     label: 'Logistics & Dispatch',
     items: [
-      { to: '/logistics/fleet', label: 'Fleet Management', icon: Truck },
-      { to: '/logistics/trips', label: 'Trip Scheduling', icon: Route },
-      { to: '/logistics/routing', label: 'Routing Rules', icon: Route },
+      { to: '/logistics/fleet', label: 'Fleet Management', icon: Truck, roles: ['Manager', 'Supervisor'] },
+      { to: '/logistics/trips', label: 'Trip Scheduling', icon: Route, roles: ['Manager', 'Supervisor'] },
+      { to: '/logistics/routing', label: 'Routing Rules', icon: Route, roles: ['Manager', 'Supervisor'] },
     ],
   },
   {
     label: 'Human Resources',
     items: [
-      { to: '/hr/employees', label: 'Employee Directory', icon: Users },
-      { to: '/hr/shifts', label: 'Shift Planning', icon: Calendar },
+      { to: '/hr/employees', label: 'Employee Directory', icon: Users, roles: ['Manager'] },
+      { to: '/hr/shifts', label: 'Shift Planning', icon: Calendar, roles: ['Manager'] },
     ],
   },
   {
     label: 'System Security',
-    items: [{ to: '/audit-logs', label: 'Audit Logs', icon: Shield }],
+    items: [
+      { to: '/system/accounts', label: 'Quản lý tài khoản', icon: UserCog, roles: ['Manager'] },
+      { to: '/audit-logs', label: 'Audit Logs', icon: Shield, roles: ['Manager'] },
+    ],
   },
 ]
 
 export function Sidebar() {
+  const { user } = useAuth()
+  const visibleGroups = navGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => !item.roles || item.roles.includes(user!.roleName)) }))
+    .filter((group) => group.items.length > 0)
+
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-5">
@@ -77,7 +98,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4 scrollbar-thin">
-        {navGroups.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.label} className="mb-5">
             <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               {group.label}
@@ -119,6 +140,8 @@ export function Sidebar() {
 }
 
 export function Topbar() {
+  const { user, logout } = useAuth()
+
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b bg-white/95 px-6 backdrop-blur">
       <div>
@@ -151,9 +174,12 @@ export function Topbar() {
             OP
           </div>
           <div className="hidden text-sm sm:block">
-            <p className="font-medium">Ops Manager</p>
-            <p className="text-xs text-slate-500">Administrator</p>
+            <p className="font-medium">{user?.employeeName}</p>
+            <p className="text-xs text-slate-500">{user?.roleName}</p>
           </div>
+          <button type="button" onClick={() => void logout()} className="rounded p-1 text-slate-500 hover:bg-slate-100" title="Đăng xuất" aria-label="Đăng xuất">
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </header>

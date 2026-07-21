@@ -1,10 +1,11 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WMS_.Data;
 using WMS_.Data.Entities;
 
 namespace WMS_.Controllers
 {
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
     [ApiController]
     [Route("api/[controller]")]
     public class CarsController : ControllerBase
@@ -34,9 +35,28 @@ namespace WMS_.Controllers
         [HttpPost]
         public async Task<ActionResult<Car>> Create([FromBody] Car car)
         {
+            // Nếu Frontend không gửi ID hoặc gửi chuỗi rỗng thì Server tự sinh mã
+            if (string.IsNullOrWhiteSpace(car.CarId))
+            {
+                car.CarId = await GenerateCarIdAsync();
+            }
+
             _db.Cars.Add(car);
             await _db.SaveChangesAsync();
             return CreatedAtAction(nameof(GetById), new { id = car.CarId }, car);
+        }
+
+        // Hàm tự sinh ID cho xe (Đảm bảo không trùng)
+        private async Task<string> GenerateCarIdAsync()
+        {
+            string carId;
+            do
+            {
+                // Format: CAR-20260715123045123-A1B2
+                carId = $"CAR-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid().ToString("N")[..4]}";
+            } while (await _db.Cars.AnyAsync(c => c.CarId == carId));
+
+            return carId;
         }
 
         /// <summary>Update vehicle</summary>

@@ -4,8 +4,10 @@ namespace WMS_.Services.Warehouse
 {
     public interface IWarehouseOperationService
     {
-        Task<bool> AssignSackToPalletAsync(string sackId, string palletId);
-        Task<bool> MovePalletToZoneAsync(string palletId, string newZoneId);
+        Task<PalletAssignmentResult> AssignSackToPalletAsync(string sackId, string palletId, string userId);
+        Task<PalletAssignmentResult> ReassignSackToPalletAsync(string sackId, string palletId, string userId);
+        Task<PalletAssignmentResult> RemoveSackFromPalletAsync(string sackId, string palletId, string userId);
+        Task<bool> MovePalletToZoneAsync(string palletId, string newZoneId, string userId);
         Task<bool> FinalizePalletAsync(string palletId);
     }
 }

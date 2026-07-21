@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using WMS_.Data;
 using WMS_.Data.Entities;
@@ -10,15 +12,28 @@ namespace WMS_.Services.Warehouse
     public class ZoneService : IZoneService
     {
         private readonly WmsDbContext _db;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public ZoneService(WmsDbContext db)
+        public ZoneService(WmsDbContext db, IHttpContextAccessor httpContextAccessor)
         {
             _db = db;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<IEnumerable<Zone>> GetAllZonesAsync()
         {
-            return await _db.Zones.Include(z => z.Location).ToListAsync();
+            // L?y mã Hub c?a nhân viên ?ang ??ng nh?p t? Token
+            var myLocationId = _httpContextAccessor.HttpContext?.User.FindFirstValue("location_id");
+
+            var query = _db.Zones.Include(z => z.Location).AsQueryable();
+
+            // L?c ??c quy?n theo Hub: Ch? tr? v? các khu v?c (Zone) thu?c ?úng Hub c?a nhân viên ?ó
+            if (!string.IsNullOrEmpty(myLocationId))
+            {
+                query = query.Where(z => z.LocationId == myLocationId);
+            }
+
+            return await query.ToListAsync();
         }
 
         public async Task<Zone?> GetZoneByIdAsync(string id)

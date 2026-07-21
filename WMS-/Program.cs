@@ -40,6 +40,7 @@ builder.Services.AddAuthorization(options =>
         policy.RequireRole("Manager", "Supervisor"));
     options.AddPolicy("ManagerOnly", policy => policy.RequireRole("Manager"));
 });
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IInboundService, InboundService>();
 builder.Services.AddScoped<IOutboundService, OutboundService>();
 builder.Services.AddScoped<IZoneService, ZoneService>();

@@ -42,9 +42,28 @@ namespace WMS_.Controllers
         [HttpPost]
         public async Task<ActionResult<Employee>> Create([FromBody] Employee employee)
         {
+            // Tự sinh ID cho nhân viên nếu chưa có
+            if (string.IsNullOrWhiteSpace(employee.EmployeeId))
+            {
+                employee.EmployeeId = await GenerateEmployeeIdAsync();
+            }
+
             _db.Employees.Add(employee);
             await _db.SaveChangesAsync();
             return CreatedAtAction(nameof(GetById), new { id = employee.EmployeeId }, employee);
+        }
+
+        // Hàm tự sinh ID cho nhân viên (Đảm bảo không trùng)
+        private async Task<string> GenerateEmployeeIdAsync()
+        {
+            string empId;
+            do
+            {
+                // Format: EMP-20260715123045123-C3D4
+                empId = $"EMP-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid().ToString("N")[..4]}";
+            } while (await _db.Employees.AnyAsync(e => e.EmployeeId == empId));
+
+            return empId;
         }
 
         /// <summary>Update employee</summary>

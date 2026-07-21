@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { Barcode, Camera, CheckCircle2, CircleAlert, ClipboardCheck, PackageCheck, Plus, Printer, ScanLine, Send, Undo2 } from 'lucide-react'
 import { BrowserMultiFormatReader, BrowserQRCodeSvgWriter, type IScannerControls } from '@zxing/browser'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
-import { locationsApi, outboundOrdersApi, sacksApi } from '@/api/services'
+import { locationsApi, outboundOrdersApi, palletsApi, sacksApi } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -130,8 +130,10 @@ export default function BarcodeScannerPage() {
   const { user } = useAuth()
   const isDriver = user?.roleName === 'Driver'
   const inputRef = useRef<HTMLInputElement>(null)
+  const palletInputRef = useRef<HTMLInputElement>(null)
   const [mode, setMode] = useState<ScanMode>(isDriver ? 'received' : 'inbound')
   const [barcode, setBarcode] = useState('')
+  const [sortingPalletId, setSortingPalletId] = useState('')
   const [orders, setOrders] = useState<OutboundOrder[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [outboundOrderId, setOutboundOrderId] = useState('')
@@ -189,7 +191,13 @@ export default function BarcodeScannerPage() {
       const sack = await sacksApi.get(sackId)
       setLastSack(sack)
 
-      if (mode === 'outbound') {
+      if (mode === 'sorting') {
+        const palletId = sortingPalletId.trim()
+        if (!palletId) throw new Error('Quét hoặc nhập mã pallet trước khi quét bao hàng.')
+        const result = await palletsApi.assignSack(palletId, sack.sackId)
+        setLastSack({ ...sack, palletId: result.palletId ?? palletId, zoneId: result.zoneId ?? null, status: 'Sorted' })
+        addResult(sack.sackId, `${result.message} Pallet hiện có ${result.assignedSackCount} bao.`, true)
+      } else if (mode === 'outbound') {
         if (!outboundOrderId) throw new Error('Chọn đơn xuất trước khi quét bao hàng.')
         await outboundOrdersApi.reserveSack(outboundOrderId, sack.sackId)
         addResult(sack.sackId, 'Đã giữ bao hàng cho đơn xuất.', true)
@@ -199,9 +207,7 @@ export default function BarcodeScannerPage() {
         setLastSack({ ...sack, status: nextStatus })
         const message = mode === 'received'
           ? 'Đã xác nhận nhận hàng tại điểm đích.'
-          : mode === 'sorting'
-            ? 'Đã xác nhận bao hàng đang chia chọn.'
-            : 'Đã ghi nhận bao hàng vào kho.'
+          : 'Đã ghi nhận bao hàng vào kho.'
         addResult(sack.sackId, message, true)
       }
     } catch (error) {
@@ -235,7 +241,38 @@ export default function BarcodeScannerPage() {
     }
   }
 
-  const startCamera = async () => {
+  const reassignLastSack = async () => {
+    const palletId = sortingPalletId.trim()
+    if (!lastSack || !palletId || processing) return
+
+    setProcessing(true)
+    try {
+      const result = await palletsApi.reassignSack(palletId, lastSack.sackId)
+      setLastSack({ ...lastSack, palletId: result.palletId ?? palletId, zoneId: result.zoneId ?? null, status: 'Sorted' })
+      addResult(lastSack.sackId, result.message, true)
+    } catch (error) {
+      addResult(lastSack.sackId, error instanceof Error ? error.message : 'Không thể chuyển bao sang pallet mới.', false)
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const removeLastSack = async () => {
+    if (!lastSack?.palletId || processing) return
+
+    setProcessing(true)
+    try {
+      const result = await palletsApi.removeSack(lastSack.palletId, lastSack.sackId)
+      setLastSack({ ...lastSack, palletId: null, zoneId: null, status: 'Sorting' })
+      addResult(lastSack.sackId, result.message, true)
+    } catch (error) {
+      addResult(lastSack.sackId, error instanceof Error ? error.message : 'Không thể tháo bao khỏi pallet.', false)
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const startCamera = async (target: 'sack' | 'pallet' = 'sack') => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError('Trình duyệt hoặc thiết bị này chưa hỗ trợ truy cập camera.')
       setCameraOpen(true)
@@ -266,8 +303,13 @@ export default function BarcodeScannerPage() {
 
           controls.stop()
           scannerControlsRef.current = null
-          setBarcode(scannedValue)
-          addResult(scannedValue, 'Đã đọc mã từ camera. Nhấn Xử lý để thực hiện nghiệp vụ đã chọn.', true)
+          if (target === 'pallet') {
+            setSortingPalletId(scannedValue)
+            addResult(scannedValue, 'Đã chọn pallet phân loại.', true)
+          } else {
+            setBarcode(scannedValue)
+            addResult(scannedValue, 'Đã đọc mã từ camera. Nhấn Xử lý để thực hiện nghiệp vụ đã chọn.', true)
+          }
           setCameraOpen(false)
         },
       )
@@ -345,6 +387,31 @@ export default function BarcodeScannerPage() {
                   </div>
                 )}
 
+                {mode === 'sorting' && (
+                  <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="sorting-pallet">Pallet đang phân loại</Label>
+                      {sortingPalletId && <span className="font-mono text-xs font-semibold text-primary">{sortingPalletId}</span>}
+                    </div>
+                    <div className="mt-1 flex gap-3">
+                      <input
+                        ref={palletInputRef}
+                        id="sorting-pallet"
+                        value={sortingPalletId}
+                        onChange={(event) => setSortingPalletId(event.target.value)}
+                        placeholder="Quét hoặc nhập mã pallet"
+                        autoComplete="off"
+                        className="flex h-12 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-base outline-none ring-primary focus:ring-2"
+                        disabled={processing}
+                      />
+                      <Button type="button" variant="outline" className="h-12 shrink-0 px-4" onClick={() => void startCamera('pallet')} title="Quét pallet bằng camera">
+                        <Camera className="h-5 w-5" />
+                        Quét pallet
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <Label htmlFor="barcode">Mã bao hàng</Label>
                   <div className="mt-1 flex gap-3">
@@ -362,7 +429,7 @@ export default function BarcodeScannerPage() {
                       <Camera className="h-5 w-5" />
                       Camera
                     </Button>
-                    <Button type="submit" size="lg" disabled={!barcode.trim() || processing} className="h-14 shrink-0">
+                    <Button type="submit" size="lg" disabled={!barcode.trim() || processing || (mode === 'sorting' && !sortingPalletId.trim())} className="h-14 shrink-0">
                       <ScanLine className="h-5 w-5" />
                       {processing ? 'Đang xử lý' : 'Xử lý'}
                     </Button>
@@ -370,7 +437,7 @@ export default function BarcodeScannerPage() {
                 </div>
 
                 <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                  Mẹo: cấu hình máy quét gửi phím Enter sau mã để tự động xử lý ngay sau khi quét.
+                  {mode === 'sorting' ? 'Quét pallet trước, sau đó quét từng bao để đưa vào pallet đó.' : 'Mẹo: cấu hình máy quét gửi phím Enter sau mã để tự động xử lý ngay sau khi quét.'}
                 </p>
               </form>
             </CardContent>
@@ -381,10 +448,19 @@ export default function BarcodeScannerPage() {
               <CardHeader>
                 <CardTitle className="text-base">Bao hàng vừa quét</CardTitle>
               </CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-3">
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-4">
                 <div><p className="text-xs text-slate-500">Mã bao</p><p className="mt-1 font-mono font-semibold">{lastSack.sackId}</p></div>
                 <div><p className="text-xs text-slate-500">Trạng thái</p><div className="mt-1"><Badge status={lastSack.status}>{statusLabel(lastSack.status)}</Badge></div></div>
                 <div><p className="text-xs text-slate-500">Điểm đến</p><p className="mt-1 text-sm font-medium">{lastSack.sDestination}</p></div>
+                <div><p className="text-xs text-slate-500">Pallet</p><p className="mt-1 font-mono text-sm font-semibold">{lastSack.palletId ?? 'Chưa gán'}</p></div>
+                </div>
+                {mode === 'sorting' && lastSack.palletId && (
+                  <div className="mt-5 flex flex-wrap gap-3 border-t border-slate-100 pt-4">
+                    {sortingPalletId.trim() && sortingPalletId.trim() !== lastSack.palletId && <Button variant="outline" size="sm" onClick={() => void reassignLastSack()} disabled={processing}>Chuyển sang pallet đang quét</Button>}
+                    <Button variant="destructive" size="sm" onClick={() => void removeLastSack()} disabled={processing}>Tháo khỏi pallet</Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

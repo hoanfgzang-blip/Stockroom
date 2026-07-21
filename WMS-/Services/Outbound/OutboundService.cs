@@ -33,7 +33,7 @@ namespace WMS_.Services
 
             if (!string.IsNullOrEmpty(myLocationId))
             {
-                query = query.Where(o => o.OutboundDestination == myLocationId || o.OutboundOrigin == myLocationId);
+                query = query.Where(o => o.OutboundDestination == myLocationId);
             }
 
             return await query.OrderByDescending(o => o.CreateAt).ToListAsync();
@@ -66,12 +66,6 @@ namespace WMS_.Services
                 order.OutboundCustomerName = "Dieu phoi noi bo Hub";
             }
 
-            // Tự động gán điểm xuất phát theo Hub của user đang tạo nếu chưa có
-            if (string.IsNullOrWhiteSpace(order.OutboundOrigin))
-            {
-                var myLocationId = _httpContextAccessor.HttpContext?.User.FindFirstValue("location_id");
-                order.OutboundOrigin = myLocationId ?? "DEFAULT-HUB";
-            }
 
             _db.OutboundOrders.Add(order);
             await _db.SaveChangesAsync();

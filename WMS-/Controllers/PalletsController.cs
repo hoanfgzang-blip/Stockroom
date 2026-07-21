@@ -1,11 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using WMS_.Data.Entities;
 using WMS_.Services.Warehouse;
 
 namespace WMS_.Controllers
 {
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
     [ApiController]
     [Route("api/[controller]")]
     public class PalletsController : ControllerBase
@@ -73,15 +75,43 @@ namespace WMS_.Controllers
         [HttpPost("{palletId}/assign-sack/{sackId}")]
         public async Task<IActionResult> AssignSackToPallet(string palletId, string sackId)
         {
-            var success = await _operationService.AssignSackToPalletAsync(sackId, palletId);
-            return success ? Ok(new { message = "Gán bao hàng thành công!" }) : BadRequest("Sack hoặc Pallet không hợp lệ.");
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null) return Forbid();
+
+            var result = await _operationService.AssignSackToPalletAsync(sackId, palletId, userId);
+            return result.Succeeded ? Ok(result) : Conflict(new { message = result.Message });
+        }
+
+        /// <summary>Nghiệp vụ: Chuyển bao hàng sang pallet khác sau khi quét pallet đích.</summary>
+        [HttpPost("{palletId}/reassign-sack/{sackId}")]
+        public async Task<IActionResult> ReassignSackToPallet(string palletId, string sackId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null) return Forbid();
+
+            var result = await _operationService.ReassignSackToPalletAsync(sackId, palletId, userId);
+            return result.Succeeded ? Ok(result) : Conflict(new { message = result.Message });
+        }
+
+        /// <summary>Nghiệp vụ: Tháo bao hàng khỏi pallet đã quét.</summary>
+        [HttpDelete("{palletId}/sacks/{sackId}")]
+        public async Task<IActionResult> RemoveSackFromPallet(string palletId, string sackId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null) return Forbid();
+
+            var result = await _operationService.RemoveSackFromPalletAsync(sackId, palletId, userId);
+            return result.Succeeded ? Ok(result) : Conflict(new { message = result.Message });
         }
 
         /// <summary>Nghiệp vụ: di chuyển Pallet sang Zone khác</summary>
         [HttpPost("{palletId}/move-to-zone/{zoneId}")]
         public async Task<IActionResult> MovePallet(string palletId, string zoneId)
         {
-            var success = await _operationService.MovePalletToZoneAsync(palletId, zoneId);
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null) return Forbid();
+
+            var success = await _operationService.MovePalletToZoneAsync(palletId, zoneId, userId);
             return success ? Ok(new { message = "Di chuyển Pallet thành công!" }) : BadRequest("Lỗi khi di chuyển Pallet.");
         }
 

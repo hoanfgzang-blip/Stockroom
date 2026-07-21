@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using WMS_.Data;
 using WMS_.Data.Entities;
+using Microsoft.AspNetCore.Http;
+using System.Security.Claims;
 
 namespace WMS_.Controllers
 {
@@ -19,9 +21,19 @@ namespace WMS_.Controllers
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
         public async Task<ActionResult<IEnumerable<Trip>>> GetAll([FromQuery] string? status = null)
         {
-            var query = _db.Trips.AsQueryable();
+            // 1. Lấy location_id của user đang đăng nhập từ Token
+            var myLocationId = User.FindFirstValue("location_id");
+
+            var query = _db.Trips.Include(t => t.OriginLocation).AsQueryable();
+
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(t => t.Status == status);
+
+            if (!string.IsNullOrEmpty(myLocationId))
+            {
+                query = query.Where(t => t.Origin == myLocationId);
+            }
+
             return await query.OrderByDescending(t => t.CreatedAt).ToListAsync();
         }
 

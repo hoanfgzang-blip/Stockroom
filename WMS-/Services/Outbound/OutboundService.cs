@@ -1,4 +1,10 @@
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
 using WMS_.Data;
 using WMS_.Data.Entities;
 
@@ -7,17 +13,28 @@ namespace WMS_.Services
     public class OutboundService : IOutboundService
     {
         private readonly WmsDbContext _db;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public OutboundService(WmsDbContext db)
+        public OutboundService(WmsDbContext db, IHttpContextAccessor httpContextAccessor)
         {
             _db = db;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<IReadOnlyList<OutboundOrder>> GetOrdersAsync(string? status = null)
         {
+            // Lấy mã Hub của nhân viên đang đăng nhập từ Token
+            var myLocationId = _httpContextAccessor.HttpContext?.User.FindFirstValue("location_id");
+
             var query = _db.OutboundOrders.AsQueryable();
+
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(o => o.Status == status);
+
+            if (!string.IsNullOrEmpty(myLocationId))
+            {
+                query = query.Where(o => o.OutboundDestination == myLocationId || o.OutboundOrigin == myLocationId);
+            }
 
             return await query.OrderByDescending(o => o.CreateAt).ToListAsync();
         }
@@ -40,6 +57,22 @@ namespace WMS_.Services
 
         public async Task<OutboundOrder> CreateOrderAsync(OutboundOrder order)
         {
+            if (string.IsNullOrWhiteSpace(order.OutboundOrderId))
+                order.OutboundOrderId = GenerateId("OUP");
+
+            // Xử lý chuẩn hóa Outbound: Nếu không truyền tên khách hàng lẻ, tự gán là điều phối nội bộ Hub
+            if (string.IsNullOrWhiteSpace(order.OutboundCustomerName))
+            {
+                order.OutboundCustomerName = "Dieu phoi noi bo Hub";
+            }
+
+            // Tự động gán điểm xuất phát theo Hub của user đang tạo nếu chưa có
+            if (string.IsNullOrWhiteSpace(order.OutboundOrigin))
+            {
+                var myLocationId = _httpContextAccessor.HttpContext?.User.FindFirstValue("location_id");
+                order.OutboundOrigin = myLocationId ?? "DEFAULT-HUB";
+            }
+
             _db.OutboundOrders.Add(order);
             await _db.SaveChangesAsync();
             return order;

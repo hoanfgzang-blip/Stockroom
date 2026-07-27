@@ -135,5 +135,25 @@ namespace WMS_.Controllers
             var success = await _operationService.FinalizePalletAsync(palletId);
             return success ? Ok(new { message = "Đã chốt Pallet. Sẵn sàng xuất kho!" }) : BadRequest("Pallet trống hoặc không tồn tại.");
         }
+
+        /// <summary>Nghiệp vụ: Quét mã vạch lấy hàng và đóng gói (Picking & Packing)</summary>
+        [HttpPost("{outboundOrderId}/pack")]
+        public async Task<IActionResult> PackSacks(string outboundOrderId, [FromBody] List<string> sackIds)
+        {
+            var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier) ?? "SYSTEM";
+
+            try
+            {
+                var success = await _operationService.PackSacksForOutboundAsync(outboundOrderId, sackIds, userId);
+
+                return success
+                    ? Ok(new { message = "Đã lấy hàng và đóng gói thành công!" })
+                    : BadRequest(new { message = "Dữ liệu quét không hợp lệ." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }

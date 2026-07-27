@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { ArrowRight, PackageCheck, Plus } from 'lucide-react'
+import { BrowserQRCodeSvgWriter } from '@zxing/browser'
+import { ArrowRight, PackageCheck, Plus, Printer } from 'lucide-react'
 import { carsApi, employeesApi, locationsApi, sacksApi, tripsApi, type CreateTripRequest } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,6 +13,14 @@ import type { Car, Employee, Location, Sack, Trip } from '@/types'
 
 const emptyForm = (): CreateTripRequest => ({ employeeId: '', carId: '', origin: '', destination: '', type: 'Inbound', sackIds: [] })
 
+function printTripCode(trip: Trip) {
+  const printWindow = window.open('', '_blank', 'width=480,height=560')
+  if (!printWindow) return
+
+  const qrSvg = new BrowserQRCodeSvgWriter().write(trip.tripId, 240, 240).outerHTML
+  printWindow.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Tem xe ${trip.tripId}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}main{width:82mm;border:1px solid #ddd;padding:8mm;text-align:center}h1{font-size:16pt;margin:0 0 4mm}.code{font:700 12pt monospace;word-break:break-all}.hint{font-size:9pt;color:#555}@page{size:auto;margin:10mm}</style></head><body><main><h1>WMS - Tem xe inbound</h1><p class="code">${trip.tripId}</p><div>${qrSvg}</div><p class="hint">Quét mã tại màn hình Xe inbound khi xe đến kho.</p></main><script>window.onload=()=>window.print();</script></body></html>`)
+  printWindow.document.close()
+}
 export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -81,7 +90,7 @@ export default function TripsPage() {
       {(error || notice) && <div className={`mb-5 rounded-lg border px-4 py-3 text-sm ${error ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>{error ?? notice}</div>}
       <div className="grid gap-4 xl:grid-cols-4">
         {TRIP_COLUMNS.map((status) => <Card key={status} className="flex flex-col"><CardHeader className="pb-3"><div className="flex items-center justify-between"><CardTitle className="text-base">{tripColumnLabel(status)}</CardTitle><Badge status={status}>{grouped[status]?.length ?? 0}</Badge></div><CardDescription>{status}</CardDescription></CardHeader><CardContent className="flex flex-1 flex-col gap-3">
-          {(grouped[status] ?? []).map((trip) => <div key={trip.tripId} className="rounded-lg border bg-slate-50 p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><p className="font-mono text-xs font-semibold text-primary">{trip.tripId}</p><Badge status={trip.type}>{trip.type === 'Inbound' ? 'Nhập hàng' : 'Xuất hàng'}</Badge></div><p className="mt-2 text-sm font-medium">{getDriver(trip.employeeId)}</p><p className="text-xs text-slate-500">{getCar(trip.carId)}</p><div className="mt-3 flex items-center gap-1 text-xs text-slate-600"><span className="truncate">{getLocation(trip.origin)}</span><ArrowRight className="h-3 w-3 shrink-0" /><span className="truncate">{getLocation(trip.destination)}</span></div><p className="mt-3 flex items-center gap-1 text-xs font-medium text-slate-700"><PackageCheck className="h-4 w-4 text-primary" />{trip.sackCount ?? 0} sack trong chuyến</p><Button className="mt-3 w-full" size="sm" variant="outline" onClick={() => void showTripSacks(trip)}>Xem danh sách sack</Button><p className="mt-2 text-[11px] text-slate-400">Tạo {formatDateTime(trip.createdAt)}</p></div>)}
+          {(grouped[status] ?? []).map((trip) => <div key={trip.tripId} className="rounded-lg border bg-slate-50 p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><p className="font-mono text-xs font-semibold text-primary">{trip.tripId}</p><Badge status={trip.type}>{trip.type === 'Inbound' ? 'Nhập hàng' : 'Xuất hàng'}</Badge></div><p className="mt-2 text-sm font-medium">{getDriver(trip.employeeId)}</p><p className="text-xs text-slate-500">{getCar(trip.carId)}</p><div className="mt-3 flex items-center gap-1 text-xs text-slate-600"><span className="truncate">{getLocation(trip.origin)}</span><ArrowRight className="h-3 w-3 shrink-0" /><span className="truncate">{getLocation(trip.destination)}</span></div><p className="mt-3 flex items-center gap-1 text-xs font-medium text-slate-700"><PackageCheck className="h-4 w-4 text-primary" />{trip.sackCount ?? 0} sack trong chuyến</p><div className="mt-3 grid gap-2"><Button size="sm" variant="outline" onClick={() => void showTripSacks(trip)}>Xem danh sách sack</Button>{trip.type === 'Inbound' && <Button size="sm" onClick={() => printTripCode(trip)}><Printer className="h-4 w-4" />In mã xe</Button>}</div><p className="mt-2 text-[11px] text-slate-400">Tạo {formatDateTime(trip.createdAt)}</p></div>)}
           {(grouped[status] ?? []).length === 0 && <p className="py-8 text-center text-xs text-slate-400">Chưa có chuyến</p>}
         </CardContent></Card>)}
       </div>

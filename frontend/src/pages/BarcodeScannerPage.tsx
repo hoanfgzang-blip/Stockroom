@@ -1,8 +1,8 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
-import { Barcode, Camera, CheckCircle2, CircleAlert, ClipboardCheck, PackageCheck, Plus, Printer, ScanLine, Send, Undo2 } from 'lucide-react'
+import { Barcode, Camera, CheckCircle2, CircleAlert, ClipboardCheck, PackageCheck, Plus, Printer, ScanLine, Send, Truck, Undo2 } from 'lucide-react'
 import { BrowserMultiFormatReader, BrowserQRCodeSvgWriter, type IScannerControls } from '@zxing/browser'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
-import { locationsApi, outboundOrdersApi, palletsApi, sacksApi } from '@/api/services'
+import { locationsApi, outboundOrdersApi, palletsApi, sacksApi, tripsApi, type TripCheckInResult } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -108,7 +108,7 @@ function printBarcode(value: string) {
 }
 
 const modes: Array<{ id: ScanMode; title: string; description: string; icon: typeof PackageCheck }> = [
-  { id: 'inbound', title: 'Nhập kho', description: 'Ghi nhận bao vào khu chia chọn', icon: PackageCheck },
+  { id: 'inbound', title: 'Xe inbound', description: 'Quét mã chuyến xe đến để nhận toàn bộ bao vào zone nhập', icon: Truck },
   { id: 'sorting', title: 'Chia chọn', description: 'Xác nhận bao đang được xử lý', icon: ScanLine },
   { id: 'outbound', title: 'Xuất kho', description: 'Giữ bao cho đơn xuất đã chọn', icon: Send },
   { id: 'received', title: 'Nhận hàng', description: 'Xác nhận bao đã đến điểm đích', icon: ClipboardCheck },
@@ -138,6 +138,8 @@ export default function BarcodeScannerPage() {
   const [locations, setLocations] = useState<Location[]>([])
   const [outboundOrderId, setOutboundOrderId] = useState('')
   const [lastSack, setLastSack] = useState<Sack | null>(null)
+  const [lastTrip, setLastTrip] = useState<TripCheckInResult | null>(null)
+  const [classification, setClassification] = useState<{ label: string; destinationName?: string | null; zoneName?: string | null } | null>(null)
   const [results, setResults] = useState<ScanResult[]>([])
   const [processing, setProcessing] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -183,37 +185,44 @@ export default function BarcodeScannerPage() {
 
   const processScan = async (event: FormEvent) => {
     event.preventDefault()
-    const sackId = barcode.trim()
-    if (!sackId || processing) return
+    const scannedCode = barcode.trim()
+    if (!scannedCode || processing) return
 
     setProcessing(true)
     try {
-      const sack = await sacksApi.get(sackId)
+      if (mode === 'inbound') {
+        const trip = await tripsApi.checkIn(scannedCode)
+        setLastTrip(trip)
+        setLastSack(null)
+        addResult(trip.tripId, `Xe ${trip.carId} đã đến kho. ${trip.sackCount} bao được đưa vào ${trip.zoneName ?? trip.zoneId ?? 'zone nhập'}.`, true)
+        return
+      }
+
+      const sack = await sacksApi.get(scannedCode)
       setLastSack(sack)
+      setLastTrip(null)
 
       if (mode === 'sorting') {
         const palletId = sortingPalletId.trim()
         if (!palletId) throw new Error('Quét hoặc nhập mã pallet trước khi quét bao hàng.')
         const result = await palletsApi.assignSack(palletId, sack.sackId)
         setLastSack({ ...sack, palletId: result.palletId ?? palletId, zoneId: result.zoneId ?? null, status: 'Sorted' })
+        const label = result.classification === 'IntraProvince' ? 'Hàng nội tỉnh' : result.classification === 'InterProvince' ? 'Hàng liên tỉnh' : 'Đã phân loại'
+        setClassification({ label, destinationName: result.destinationName, zoneName: result.zoneName })
         addResult(sack.sackId, `${result.message} Pallet hiện có ${result.assignedSackCount} bao.`, true)
       } else if (mode === 'outbound') {
         if (!outboundOrderId) throw new Error('Chọn đơn xuất trước khi quét bao hàng.')
         await outboundOrdersApi.reserveSack(outboundOrderId, sack.sackId)
         addResult(sack.sackId, 'Đã giữ bao hàng cho đơn xuất.', true)
       } else {
-        const nextStatus = mode === 'received' ? 'Received' : 'Sorting'
-        await sacksApi.updateStatus(sack.sackId, nextStatus)
-        setLastSack({ ...sack, status: nextStatus })
-        const message = mode === 'received'
-          ? 'Đã xác nhận nhận hàng tại điểm đích.'
-          : 'Đã ghi nhận bao hàng vào kho.'
-        addResult(sack.sackId, message, true)
+        await sacksApi.confirmReceived(sack.sackId)
+        setLastSack({ ...sack, status: 'Received' })
+        addResult(sack.sackId, 'Đã xác nhận nhận hàng tại điểm đích.', true)
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Không thể xử lý mã vừa quét.'
       setLastSack(null)
-      addResult(sackId, message, false)
+      addResult(scannedCode, message, false)
     } finally {
       setBarcode('')
       setProcessing(false)
@@ -413,14 +422,14 @@ export default function BarcodeScannerPage() {
                 )}
 
                 <div>
-                  <Label htmlFor="barcode">Mã bao hàng</Label>
+                  <Label htmlFor="barcode">{mode === 'inbound' ? 'Mã chuyến xe inbound' : 'Mã bao hàng'}</Label>
                   <div className="mt-1 flex gap-3">
                     <input
                       ref={inputRef}
                       id="barcode"
                       value={barcode}
                       onChange={(event) => setBarcode(event.target.value)}
-                      placeholder="Quét hoặc nhập mã, ví dụ DEMO-SACK-001"
+                      placeholder={mode === 'inbound' ? 'Quét mã TRIP-IN-...' : 'Quét hoặc nhập mã, ví dụ SACK-...'}
                       autoComplete="off"
                       className="flex h-14 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-base outline-none ring-primary focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={processing}
@@ -437,23 +446,34 @@ export default function BarcodeScannerPage() {
                 </div>
 
                 <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                  {mode === 'sorting' ? 'Quét pallet trước, sau đó quét từng bao để đưa vào pallet đó.' : 'Mẹo: cấu hình máy quét gửi phím Enter sau mã để tự động xử lý ngay sau khi quét.'}
+                  {mode === 'inbound' ? 'Quét tem QR hoặc Code 39 của xe inbound. Hệ thống sẽ đưa toàn bộ bao của chuyến vào zone nhập.' : mode === 'sorting' ? 'Quét pallet trước, sau đó quét từng bao để đưa vào pallet đó.' : 'Mẹo: cấu hình máy quét gửi phím Enter sau mã để tự động xử lý ngay sau khi quét.'}
                 </p>
               </form>
             </CardContent>
           </Card>
 
+          {lastTrip && (
+            <Card className="border-emerald-200 bg-emerald-50/40">
+              <CardHeader><CardTitle className="text-base">Xe inbound vừa vào kho</CardTitle></CardHeader>
+              <CardContent><div className="grid gap-4 sm:grid-cols-4">
+                <div><p className="text-xs text-slate-500">Mã chuyến</p><p className="mt-1 font-mono font-semibold">{lastTrip.tripId}</p></div>
+                <div><p className="text-xs text-slate-500">Xe</p><p className="mt-1 font-medium">{lastTrip.carId}</p></div>
+                <div><p className="text-xs text-slate-500">Bao đã nhận</p><p className="mt-1 font-semibold">{lastTrip.sackCount} bao</p></div>
+                <div><p className="text-xs text-slate-500">Zone hiện tại</p><p className="mt-1 font-medium">{lastTrip.zoneName ?? lastTrip.zoneId ?? 'Chưa xác định'}</p></div>
+              </div></CardContent>
+            </Card>
+          )}
           {lastSack && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Bao hàng vừa quét</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4 sm:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-5">
                 <div><p className="text-xs text-slate-500">Mã bao</p><p className="mt-1 font-mono font-semibold">{lastSack.sackId}</p></div>
                 <div><p className="text-xs text-slate-500">Trạng thái</p><div className="mt-1"><Badge status={lastSack.status}>{statusLabel(lastSack.status)}</Badge></div></div>
                 <div><p className="text-xs text-slate-500">Điểm đến</p><p className="mt-1 text-sm font-medium">{lastSack.sDestination}</p></div>
-                <div><p className="text-xs text-slate-500">Pallet</p><p className="mt-1 font-mono text-sm font-semibold">{lastSack.palletId ?? 'Chưa gán'}</p></div>
+                <div><p className="text-xs text-slate-500">Pallet</p><p className="mt-1 font-mono text-sm font-semibold">{lastSack.palletId ?? 'Chưa gán'}</p></div><div><p className="text-xs text-slate-500">Zone</p><p className="mt-1 font-mono text-sm font-semibold">{lastSack.zoneId ?? 'Chưa gán'}</p></div>
                 </div>
                 {mode === 'sorting' && lastSack.palletId && (
                   <div className="mt-5 flex flex-wrap gap-3 border-t border-slate-100 pt-4">
@@ -546,6 +566,11 @@ export default function BarcodeScannerPage() {
             </Button>
           </div>
         </div>
+      </Dialog>
+
+
+      <Dialog open={classification !== null} onClose={() => setClassification(null)} title={classification?.label ?? 'Kết quả phân loại'} description="Kết quả được xác định từ tỉnh của điểm đến và zone của pallet đã quét.">
+        <div className="space-y-3 text-sm text-slate-700"><p><span className="font-semibold">Điểm đến:</span> {classification?.destinationName ?? 'Chưa xác định'}</p><p><span className="font-semibold">Zone hiện tại:</span> {classification?.zoneName ?? 'Chưa xác định'}</p><div className="flex justify-end"><Button onClick={() => setClassification(null)}>Tiếp tục quét</Button></div></div>
       </Dialog>
 
       <Dialog

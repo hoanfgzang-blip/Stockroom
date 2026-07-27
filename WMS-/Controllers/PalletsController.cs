@@ -58,24 +58,6 @@ namespace WMS_.Controllers
             return CreatedAtAction(nameof(GetById), new { id = createdPallet.PalletId }, createdPallet);
         }
 
-        /// <summary>Update pallet</summary>
-        [HttpPut("{id}")]
-        public async Task<IActionResult> Update(string id, [FromBody] Pallet pallet)
-        {
-            if (id != pallet.PalletId) return BadRequest();
-
-            var success = await _palletService.UpdatePalletAsync(id, pallet);
-            return success ? NoContent() : NotFound();
-        }
-
-        /// <summary>Update pallet status</summary>
-        [HttpPatch("{id}/status")]
-        public async Task<IActionResult> UpdateStatus(string id, [FromBody] string status)
-        {
-            var success = await _palletService.UpdatePalletStatusAsync(id, status);
-            return success ? NoContent() : NotFound();
-        }
-
         /// <summary>Delete pallet</summary>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)

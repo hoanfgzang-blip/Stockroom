@@ -118,8 +118,28 @@ namespace WMS_.Services.Warehouse
 
             await _db.SaveChangesAsync();
             var assignedCount = await _db.Sacks.CountAsync(item => item.PalletId == palletId);
+            var classification = await GetSackClassificationAsync(targetPallet.ZoneId, sack.SDestination);
             await transaction.CommitAsync();
-            return new(true, allowReassignment ? "Đã chuyển bao hàng sang pallet mới." : "Đã gán bao hàng vào pallet và khu phân loại.", sack.SackId, palletId, targetPallet.ZoneId, assignedCount);
+            return new(
+                true,
+                allowReassignment ? "Đã chuyển bao hàng sang pallet mới." : "Đã gán bao hàng vào pallet và khu phân loại.",
+                sack.SackId,
+                palletId,
+                targetPallet.ZoneId,
+                assignedCount,
+                classification.Classification,
+                classification.DestinationName,
+                classification.ZoneName);
+        }
+
+        private async Task<(string? Classification, string? DestinationName, string? ZoneName)> GetSackClassificationAsync(string zoneId, string destinationId)
+        {
+            var zone = await _db.Zones.Include(item => item.Location).FirstOrDefaultAsync(item => item.ZoneId == zoneId);
+            var destination = await _db.Locations.FindAsync(destinationId);
+            if (zone?.Location == null || destination == null) return (null, destination?.LocationName, zone?.ZoneName);
+
+            var classification = zone.Location.ProvinceId == destination.ProvinceId ? "IntraProvince" : "InterProvince";
+            return (classification, destination.LocationName, zone.ZoneName);
         }
 
         private Task<Sack?> LoadSackForUpdateAsync(string sackId)
@@ -219,6 +239,9 @@ namespace WMS_.Services.Warehouse
             var sacks = await _db.Sacks.Where(s => sackIds.Contains(s.SackId)).ToListAsync();
             if (sacks.Count != sackIds.Count)
                 throw new InvalidOperationException("Một số mã bao hàng vừa quét không tồn tại trong kho.");
+
+            if (sacks.Any(sack => sack.SDestination != order.OutboundDestination))
+                throw new InvalidOperationException("Bao hàng không đúng điểm đến của đơn xuất.");
 
             // 3. Lấy danh sách các bao hàng ĐÃ ĐƯỢC GÁN vào đơn xuất này từ trước (nếu có)
             var existingItems = await _db.OutboundOrderItems

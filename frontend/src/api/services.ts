@@ -51,6 +51,9 @@ export type PalletAssignmentResult = {
   palletId?: string
   zoneId?: string
   assignedSackCount: number
+  classification?: 'IntraProvince' | 'InterProvince'
+  destinationName?: string | null
+  zoneName?: string | null
 }
 
 export const accountsApi = {
@@ -96,7 +99,6 @@ export const palletsApi = {
     api.get<Pallet[]>(`/Pallets${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Pallet>(`/Pallets/${id}`),
   create: (data: Pick<Pallet, 'zoneId'>) => api.post<Pallet>('/Pallets', data),
-  update: (id: string, data: Pallet) => api.put<void>(`/Pallets/${id}`, data),
   delete: (id: string) => api.delete(`/Pallets/${id}`),
   assignSack: (palletId: string, sackId: string) =>
     api.post<PalletAssignmentResult>(`/Pallets/${palletId}/assign-sack/${sackId}`, {}),
@@ -149,6 +151,14 @@ export type CreateTripRequest = {
   type: 'Inbound' | 'Outbound'
   sackIds: string[]
 }
+export type TripCheckInResult = {
+  tripId: string
+  carId: string
+  status: string
+  sackCount: number
+  zoneId?: string | null
+  zoneName?: string | null
+}
 export const tripsApi = {
   all: (status?: string) =>
     api.get<Trip[]>(`/Trips${status ? `?status=${encodeURIComponent(status)}` : ''}`),
@@ -162,6 +172,7 @@ export const tripsApi = {
   mySacks: (id: string) => api.get<Sack[]>(`/Trips/my/${id}/sacks`),
   updateMyStatus: (id: string, status: 'InProgress' | 'Completed') =>
     api.patch(`/Trips/my/${id}/status`, status),
+  checkIn: (id: string) => api.post<TripCheckInResult>(`/Trips/${id}/check-in`, {}),
 }
 
 export const routingRulesApi = {
@@ -202,8 +213,7 @@ export const sacksApi = {
   get: (id: string) => api.get<Sack>(`/Sacks/${id}`),
   create: (data: Pick<Sack, 'sDestination'> & Partial<Pick<Sack, 'zoneId' | 'palletId'>>) =>
     api.post<Sack>('/Sacks', data),
-  update: (id: string, data: Sack) => api.put<void>(`/Sacks/${id}`, data),
-  updateStatus: (id: string, status: string) => api.patch(`/Sacks/${id}/status`, status),
+  confirmReceived: (id: string) => api.post<void>(`/Sacks/${id}/confirm-received`, {}),
   delete: (id: string) => api.delete(`/Sacks/${id}`),
 }
 

@@ -103,25 +103,16 @@ namespace WMS_.Controllers
             return sackId;
         }
 
-        /// <summary>Update sack</summary>
-        [HttpPut("{id}")]
-        public async Task<IActionResult> Update(string id, [FromBody] Sack sack)
-        {
-            if (id != sack.SackId) return BadRequest();
-            _db.Entry(sack).State = EntityState.Modified;
-            try { await _db.SaveChangesAsync(); }
-            catch (DbUpdateConcurrencyException)
-            { if (!_db.Sacks.Any(s => s.SackId == id)) return NotFound(); throw; }
-            return NoContent();
-        }
-
-        /// <summary>Update sack status (e.g. Sorting → Sorted)</summary>
-        [HttpPatch("{id}/status")]
-        public async Task<IActionResult> UpdateStatus(string id, [FromBody] string status)
+        /// <summary>Xác nhận bao đã giao tại điểm đích. Các trạng thái khác do quy trình pallet và chuyến xe quyết định.</summary>
+        [HttpPost("{id}/confirm-received")]
+        public async Task<IActionResult> ConfirmReceived(string id)
         {
             var sack = await _db.Sacks.FindAsync(id);
             if (sack == null) return NotFound();
-            sack.Status = status;
+            if (sack.Status != "InTransit") return Conflict(new { message = "Chỉ bao đang vận chuyển mới được xác nhận đã giao." });
+
+            sack.Status = "Received";
+            sack.EndAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
             return NoContent();
         }

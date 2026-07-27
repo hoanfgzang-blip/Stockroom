@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -48,6 +48,9 @@ namespace WMS_.Data.Entities
 
         [Column("end_at")]
         public DateTime? UpdatedAt { get; set; }
+
+        [NotMapped]
+        public int SackCount { get; set; }
 
         [ForeignKey("EmployeeId")]
         public virtual Employee Employee { get; set; } = null!;

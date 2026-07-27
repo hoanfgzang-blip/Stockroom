@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -7,6 +7,10 @@ using WMS_.Services.Warehouse;
 
 namespace WMS_.Controllers
 {
+    public sealed class CreatePalletRequest
+    {
+        public string ZoneId { get; set; } = string.Empty;
+    }
     [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
     [ApiController]
     [Route("api/[controller]")]
@@ -39,8 +43,17 @@ namespace WMS_.Controllers
 
         /// <summary>Create pallet</summary>
         [HttpPost]
-        public async Task<ActionResult<Pallet>> Create([FromBody] Pallet pallet)
+        public async Task<ActionResult<Pallet>> Create([FromBody] CreatePalletRequest request)
         {
+            if (string.IsNullOrWhiteSpace(request.ZoneId))
+                return BadRequest("Khu vực đặt pallet là bắt buộc.");
+
+            // Ma pallet va trang thai phai do he thong/nghiep vu quet quyet dinh.
+            var pallet = new Pallet
+            {
+                ZoneId = request.ZoneId.Trim(),
+                Status = "Empty"
+            };
             var createdPallet = await _palletService.CreatePalletAsync(pallet);
             return CreatedAtAction(nameof(GetById), new { id = createdPallet.PalletId }, createdPallet);
         }

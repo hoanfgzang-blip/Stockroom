@@ -60,13 +60,23 @@ namespace WMS_.Services
             if (string.IsNullOrWhiteSpace(order.OutboundOrderId))
                 order.OutboundOrderId = GenerateId("OUP");
 
-            // Xử lý chuẩn hóa Outbound: Nếu không truyền tên khách hàng lẻ, tự gán là điều phối nội bộ Hub
+            if (string.IsNullOrWhiteSpace(order.OutboundOrderNumber))
+                order.OutboundOrderNumber = $"ORD-{DateTime.Now:yyyyMMddHHmmss}";
+
             if (string.IsNullOrWhiteSpace(order.OutboundCustomerName))
             {
                 order.OutboundCustomerName = "Dieu phoi noi bo Hub";
             }
 
-
+            order.CreateAt = DateTime.Now;
+            if (string.IsNullOrWhiteSpace(order.Status))
+            {
+                order.Status = "Pending";
+            }
+            if (string.IsNullOrWhiteSpace(order.OutboundDestination))
+            {
+                throw new ArgumentException("Thiếu thông tin điểm đến (OutboundDestination).");
+            }
             _db.OutboundOrders.Add(order);
             await _db.SaveChangesAsync();
             return order;

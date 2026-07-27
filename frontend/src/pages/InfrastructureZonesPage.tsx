@@ -79,7 +79,7 @@ export default function InfrastructureZonesPage() {
               {selectedZoneData?.zoneName ?? 'Pallets'} — Pallet Grid
             </CardTitle>
             <CardDescription>
-              Click zone cards to explore pallet occupancy and utilization
+              Click zone cards to explore pallet locations and statuses
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -88,29 +88,13 @@ export default function InfrastructureZonesPage() {
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {zonePallets.map((pallet) => {
-                  const utilization = pallet.status === 'Occupied' ? 75 : pallet.status === 'Full' ? 100 : 15
                   return (
                     <div key={pallet.palletId} className="rounded-xl border bg-white p-4 shadow-sm">
                       <div className="flex items-center justify-between">
                         <p className="font-mono text-sm font-semibold">{pallet.palletId}</p>
                         <Badge status={pallet.status}>{pallet.status}</Badge>
                       </div>
-                      <p className="mt-1 text-xs text-slate-500">Capacity: {pallet.capacity} kg</p>
-                      <div className="mt-3">
-                        <div className="mb-1 flex justify-between text-xs text-slate-500">
-                          <span>Utilization</span>
-                          <span>{utilization}%</span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className={cn(
-                              'h-full rounded-full transition-all',
-                              utilization >= 90 ? 'bg-red-500' : utilization >= 50 ? 'bg-amber-500' : 'bg-emerald-500',
-                            )}
-                            style={{ width: `${utilization}%` }}
-                          />
-                        </div>
-                      </div>
+                      <p className="mt-3 text-xs text-slate-500">Trang thai duoc cap nhat theo thao tac quet cua nhan vien.</p>
                     </div>
                   )
                 })}

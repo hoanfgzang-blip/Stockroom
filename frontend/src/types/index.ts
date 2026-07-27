@@ -63,6 +63,7 @@ export interface Trip {
   status: string
   createdAt: string
   updatedAt?: string | null
+  sackCount?: number
   employee?: Employee
   car?: Car
 }

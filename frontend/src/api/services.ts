@@ -95,7 +95,7 @@ export const palletsApi = {
   all: (status?: string) =>
     api.get<Pallet[]>(`/Pallets${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Pallet>(`/Pallets/${id}`),
-  create: (data: Pallet) => api.post<Pallet>('/Pallets', data),
+  create: (data: Pick<Pallet, 'zoneId'>) => api.post<Pallet>('/Pallets', data),
   update: (id: string, data: Pallet) => api.put<void>(`/Pallets/${id}`, data),
   delete: (id: string) => api.delete(`/Pallets/${id}`),
   assignSack: (palletId: string, sackId: string) =>
@@ -104,6 +104,10 @@ export const palletsApi = {
     api.post<PalletAssignmentResult>(`/Pallets/${palletId}/reassign-sack/${sackId}`, {}),
   removeSack: (palletId: string, sackId: string) =>
     api.delete<PalletAssignmentResult>(`/Pallets/${palletId}/sacks/${sackId}`),
+  moveToZone: (palletId: string, zoneId: string) =>
+    api.post<{ message: string }>(`/Pallets/${palletId}/move-to-zone/${zoneId}`, {}),
+  finalize: (palletId: string) =>
+    api.post<{ message: string }>(`/Pallets/${palletId}/finalize`, {}),
 }
 
 export const employeesApi = {
@@ -137,12 +141,20 @@ export const carsApi = {
   delete: (id: string) => api.delete(`/Cars/${id}`),
 }
 
+export type CreateTripRequest = {
+  employeeId: string
+  carId: string
+  origin: string
+  destination: string
+  type: 'Inbound' | 'Outbound'
+  sackIds: string[]
+}
 export const tripsApi = {
   all: (status?: string) =>
     api.get<Trip[]>(`/Trips${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Trip>(`/Trips/${id}`),
   sacks: (id: string) => api.get<Sack[]>(`/Trips/${id}/sacks`),
-  create: (data: Trip) => api.post<Trip>('/Trips', data),
+  create: (data: CreateTripRequest) => api.post<Trip>('/Trips', data),
   update: (id: string, data: Trip) => api.put<void>(`/Trips/${id}`, data),
   updateStatus: (id: string, status: string) => api.patch(`/Trips/${id}/status`, status),
   delete: (id: string) => api.delete(`/Trips/${id}`),
@@ -218,3 +230,4 @@ export const auditLogsApi = {
   },
   get: (id: number) => api.get<AuditLog>(`/AuditLogs/${id}`),
 }
+

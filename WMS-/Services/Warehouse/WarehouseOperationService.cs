@@ -203,5 +203,66 @@ namespace WMS_.Services.Warehouse
             await _db.SaveChangesAsync();
             return true;
         }
+
+        public async Task<bool> PackSacksForOutboundAsync(string outboundOrderId, System.Collections.Generic.List<string> sackIds, string userId)
+        {
+            if (string.IsNullOrWhiteSpace(outboundOrderId) || sackIds == null || !sackIds.Any())
+                return false;
+
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+
+            // 1. Kiểm tra đơn hàng có tồn tại không
+            var order = await _db.OutboundOrders.FindAsync(outboundOrderId);
+            if (order == null) throw new InvalidOperationException("Không tìm thấy đơn xuất kho.");
+
+            // 2. Lấy danh sách bao hàng được quét
+            var sacks = await _db.Sacks.Where(s => sackIds.Contains(s.SackId)).ToListAsync();
+            if (sacks.Count != sackIds.Count)
+                throw new InvalidOperationException("Một số mã bao hàng vừa quét không tồn tại trong kho.");
+
+            // 3. Lấy danh sách các bao hàng ĐÃ ĐƯỢC GÁN vào đơn xuất này từ trước (nếu có)
+            var existingItems = await _db.OutboundOrderItems
+                .Where(i => i.OutboundOrderId == outboundOrderId)
+                .Select(i => i.SackId)
+                .ToListAsync();
+
+            // 4. Xử lý từng bao hàng
+            foreach (var sack in sacks)
+            {
+                if (sack.Status == "InTransit" || sack.Status == "Received")
+                    throw new InvalidOperationException($"Bao hàng {sack.SackId} đang trên xe hoặc đã giao, không thể đóng gói.");
+
+                var oldValues = new { sack.Status };
+
+                // Cập nhật trạng thái thành ReadyForOutbound
+                sack.Status = "ReadyForOutbound";
+
+                // Nếu bao hàng chưa được link vào đơn xuất, tự động tạo OrderItem luôn
+                if (!existingItems.Contains(sack.SackId))
+                {
+                    var newItemId = $"OOI-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}".Substring(0, 50);
+                    _db.OutboundOrderItems.Add(new OutboundOrderItem
+                    {
+                        OutboundOrderItemId = newItemId,
+                        OutboundOrderId = outboundOrderId,
+                        SackId = sack.SackId
+                    });
+                }
+
+                // Lưu vết lịch sử quét mã vạch
+                AddAuditLog(userId, "PackSackForOutbound", sack.SackId, oldValues, new { sack.Status });
+            }
+
+            // 5. Cập nhật trạng thái tổng của đơn hàng
+            if (order.Status == "Pending" || order.Status == "Reserved")
+            {
+                order.Status = "Packing";
+            }
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return true;
+        }
     }
 }

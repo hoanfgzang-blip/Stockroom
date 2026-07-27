@@ -15,13 +15,25 @@ namespace WMS_.Controllers
         private readonly WmsDbContext _db;
         public SacksController(WmsDbContext db) => _db = db;
 
-        /// <summary>Get all sacks with optional status filter</summary>
+        /// <summary>Get all sacks with optional status filter and sorting</summary>
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Sack>>> GetAll([FromQuery] string? status = null)
+        public async Task<ActionResult<IEnumerable<Sack>>> GetAll(
+            [FromQuery] string? status = null,
+            [FromQuery] bool sortByTrip = false)
         {
             var query = _db.Sacks.AsQueryable();
+
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(s => s.Status == status);
+            if (sortByTrip)
+            {
+                query = query.OrderBy(s => s.TripId).ThenByDescending(s => s.CreatedAt);
+            }
+            else
+            {
+                query = query.OrderByDescending(s => s.CreatedAt);
+            }
+
             return await query.ToListAsync();
         }
 

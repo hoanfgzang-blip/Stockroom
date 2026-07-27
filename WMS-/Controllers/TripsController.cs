@@ -37,6 +37,30 @@ namespace WMS_.Controllers
             return await query.OrderByDescending(t => t.CreatedAt).ToListAsync();
         }
 
+        /// <summary> Xem danh sách chuyến xe ĐANG TỚI Hub của mình (Hàng Inbound dự kiến từ kho khác)</summary>
+        [HttpGet("incoming")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
+        public async Task<ActionResult<IEnumerable<Trip>>> GetIncomingTrips([FromQuery] string? status = "InProgress")
+        {
+            // 1. Lấy mã Hub của user đang đăng nhập từ Token
+            var myLocationId = User.FindFirstValue("location_id");
+            if (string.IsNullOrEmpty(myLocationId)) return Forbid();
+
+            var query = _db.Trips.AsQueryable();
+
+            // 2. Lọc các chuyến xe có điểm ĐẾN là Hub hiện tại 
+            // (Khải check lại entity Trip xem trường này tên là Destination hay TDestination để sửa cho khớp nhé)
+            query = query.Where(t => t.Destination == myLocationId);
+
+            // 3. Lọc theo trạng thái (Mặc định là InProgress - Xe đang chạy)
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                query = query.Where(t => t.Status == status);
+            }
+
+            return await query.OrderBy(t => t.CreatedAt).ToListAsync();
+        }
+
         /// <summary>Get trip by ID</summary>
         [HttpGet("{id}")]
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]

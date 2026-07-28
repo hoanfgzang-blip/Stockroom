@@ -31,18 +31,18 @@ export default function FleetPage() {
 
   return (
     <div>
-      <PageHeader title="Fleet Management" description="Vehicle registry and capacity tracking." />
+      <PageHeader title="Quản lý phương tiện" description="Danh mục phương tiện và sức chở." />
       <Card>
         <CardHeader>
-          <CardTitle>Vehicles ({cars.length})</CardTitle>
+          <CardTitle>Phương tiện ({cars.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Plate / ID</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Capacity (kg)</TableHead>
+                <TableHead>Biển số / mã xe</TableHead>
+                <TableHead>Loại</TableHead>
+                <TableHead>Sức chở (kg)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

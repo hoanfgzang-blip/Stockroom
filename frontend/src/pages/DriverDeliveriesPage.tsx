@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
-import { formatDateTime, tripColumnLabel } from '@/lib/utils'
+import { formatDateTime, statusLabel, tripColumnLabel } from '@/lib/utils'
 import type { Sack, Trip } from '@/types'
 
 export default function DriverDeliveriesPage() {
@@ -96,7 +96,7 @@ export default function DriverDeliveriesPage() {
             </CardContent></Card>
 
             <Card><CardHeader><div className="flex items-center justify-between gap-3"><CardTitle className="flex items-center gap-2 text-base"><PackageCheck className="h-5 w-5 text-primary" />Bao hàng trên chuyến</CardTitle><span className="text-sm text-slate-500">{deliveredCount}/{sacks.length} đã giao</span></div></CardHeader><CardContent>
-              {loadingSacks ? <p className="py-8 text-center text-sm text-slate-500">Đang tải bao hàng...</p> : sacks.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">Chuyến này chưa có bao hàng.</p> : <ul className="divide-y divide-slate-100">{sacks.map((sack) => <li key={sack.sackId} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"><div className="min-w-0"><p className="font-mono text-sm font-semibold text-slate-800">{sack.sackId}</p><p className="mt-1 text-xs text-slate-500">Điểm đến: {sack.sDestination}</p></div><div className="flex shrink-0 items-center gap-2"><Circle className={`h-3 w-3 ${sack.status === 'Received' ? 'fill-emerald-500 text-emerald-500' : 'text-slate-300'}`} /><Badge status={sack.status}>{sack.status === 'Received' ? 'Đã giao' : sack.status}</Badge></div></li>)}</ul>}
+              {loadingSacks ? <p className="py-8 text-center text-sm text-slate-500">Đang tải bao hàng...</p> : sacks.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">Chuyến này chưa có bao hàng.</p> : <ul className="divide-y divide-slate-100">{sacks.map((sack) => <li key={sack.sackId} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"><div className="min-w-0"><p className="font-mono text-sm font-semibold text-slate-800">{sack.sackId}</p><p className="mt-1 text-xs text-slate-500">Điểm đến: {sack.sDestination}</p></div><div className="flex shrink-0 items-center gap-2"><Circle className={`h-3 w-3 ${sack.status === 'Received' ? 'fill-emerald-500 text-emerald-500' : 'text-slate-300'}`} /><Badge status={sack.status}>{statusLabel(sack.status)}</Badge></div></li>)}</ul>}
             </CardContent></Card>
           </section>}
         </div>

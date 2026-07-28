@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, statusLabel } from '@/lib/utils'
 import type { Location, Sack } from '@/types'
 
 export default function SacksPage() {
@@ -38,25 +38,25 @@ export default function SacksPage() {
   return (
     <div>
       <PageHeader
-        title="Sack / Bundle Inventory"
-        description="Trace sacks across pallets, zones, trips, and destinations."
+        title="Quản lý bao hàng"
+        description="Theo dõi bao hàng theo pallet, khu vực, chuyến xe và điểm đến."
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>Sacks ({sacks.length})</CardTitle>
+          <CardTitle>Bao hàng ({sacks.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Sack ID</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Pallet</TableHead>
-                <TableHead>Zone</TableHead>
-                <TableHead>Trip</TableHead>
-                <TableHead>Destination</TableHead>
-                <TableHead>Created</TableHead>
+                <TableHead>Mã bao</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead>Pallet chứa</TableHead>
+                <TableHead>Khu vực</TableHead>
+                <TableHead>Chuyến xe</TableHead>
+                <TableHead>Điểm đến</TableHead>
+                <TableHead>Thời điểm tạo</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -64,7 +64,7 @@ export default function SacksPage() {
                 <TableRow key={sack.sackId}>
                   <TableCell className="font-mono text-xs font-medium">{sack.sackId}</TableCell>
                   <TableCell>
-                    <Badge status={sack.status}>{sack.status}</Badge>
+                    <Badge status={sack.status}>{statusLabel(sack.status)}</Badge>
                   </TableCell>
                   <TableCell>{sack.palletId ?? '—'}</TableCell>
                   <TableCell>{sack.zoneId ?? '—'}</TableCell>

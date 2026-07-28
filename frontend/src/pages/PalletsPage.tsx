@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
+import { statusLabel } from '@/lib/utils'
 import type { Pallet, Zone } from '@/types'
 
 const statusOptions = ['Empty', 'Occupied', 'In Transit to Zone', 'Finalized', 'Locked']
@@ -159,32 +160,32 @@ export default function PalletsPage() {
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card><CardContent className="p-4"><p className="text-xs text-slate-500">Total</p><p className="mt-1 text-2xl font-semibold">{stats.total}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-slate-500">Empty</p><p className="mt-1 text-2xl font-semibold">{stats.empty}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-slate-500">Occupied</p><p className="mt-1 text-2xl font-semibold">{stats.occupied}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-slate-500">Finalized</p><p className="mt-1 text-2xl font-semibold">{stats.finalized}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-slate-500">Tổng số</p><p className="mt-1 text-2xl font-semibold">{stats.total}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-slate-500">Trống</p><p className="mt-1 text-2xl font-semibold">{stats.empty}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-slate-500">Đang chứa hàng</p><p className="mt-1 text-2xl font-semibold">{stats.occupied}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-slate-500">Đã chốt</p><p className="mt-1 text-2xl font-semibold">{stats.finalized}</p></CardContent></Card>
       </div>
 
       <Card className="mb-6">
         <CardContent className="grid gap-4 p-4 lg:grid-cols-[1fr_220px_220px_auto]">
           <div>
-            <Label>Search</Label>
+            <Label>Tìm kiếm</Label>
             <div className="relative mt-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pallet ID or zone" />
             </div>
           </div>
           <div>
-            <Label>Status</Label>
+            <Label>Trạng thái</Label>
             <Select className="mt-1" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="">All statuses</option>
-              {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
+              <option value="">Tất cả trạng thái</option>
+              {statusOptions.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}
             </Select>
           </div>
           <div>
-            <Label>Zone</Label>
+            <Label>Khu vực</Label>
             <Select className="mt-1" value={zoneFilter} onChange={(event) => setZoneFilter(event.target.value)}>
-              <option value="">All zones</option>
+              <option value="">Tất cả khu vực</option>
               {zones.map((zone) => <option key={zone.zoneId} value={zone.zoneId}>{zone.zoneName}</option>)}
             </Select>
           </div>
@@ -211,11 +212,11 @@ export default function PalletsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Pallet ID</TableHead>
-                <TableHead>Zone</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Move Zone</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Mã pallet</TableHead>
+                <TableHead>Khu vực</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead>Chuyển khu vực</TableHead>
+                <TableHead className="text-right">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -223,7 +224,7 @@ export default function PalletsPage() {
                 <TableRow key={pallet.palletId}>
                   <TableCell className="font-mono font-medium">{pallet.palletId}</TableCell>
                   <TableCell>{zoneName(pallet.zoneId)}</TableCell>
-                  <TableCell><Badge status={pallet.status}>{pallet.status}</Badge></TableCell>
+                  <TableCell><Badge status={pallet.status}>{statusLabel(pallet.status)}</Badge></TableCell>
                   <TableCell>
                     <Select value={pallet.zoneId} onChange={(event) => void movePallet(pallet, event.target.value)} disabled={saving || pallet.status === 'Finalized' || pallet.status === 'Locked'}>
                       {zones.map((zone) => <option key={zone.zoneId} value={zone.zoneId}>{zone.zoneName}</option>)}
@@ -259,9 +260,9 @@ export default function PalletsPage() {
       >
         <form className="space-y-4" onSubmit={handleSave}>
           <div>
-            <Label>Zone</Label>
+            <Label>Khu vực</Label>
             <Select value={form.zoneId} onChange={(event) => setForm({ ...form, zoneId: event.target.value })}>
-              <option value="">Select zone</option>
+              <option value="">Chọn khu vực</option>
               {zones.map((zone) => <option key={zone.zoneId} value={zone.zoneId}>{zone.zoneName}</option>)}
             </Select>
           </div>
@@ -269,8 +270,8 @@ export default function PalletsPage() {
             Ma pallet do he thong tu sinh. Trang thai ban dau la Empty va se duoc cap nhat khi nhan vien quet pallet.
           </p>
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Create Pallet'}</Button>
+            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Hủy</Button>
+            <Button type="submit" disabled={saving}>{saving ? 'Đang lưu...' : 'Tạo pallet'}</Button>
           </div>
         </form>
       </Dialog>

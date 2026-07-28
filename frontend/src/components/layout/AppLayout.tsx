@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
+import { roleLabel } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
 type NavItem = { to: string; label: string; icon: LucideIcon; roles?: string[] }
@@ -29,52 +30,52 @@ type NavGroup = { label: string; items: NavItem[] }
 
 const navGroups: NavGroup[] = [
   {
-    label: 'Overview',
-    items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] }],
+    label: 'Tổng quan',
+    items: [{ to: '/', label: 'Bảng điều khiển', icon: LayoutDashboard, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] }],
   },
   {
     label: 'Công việc',
-    items: [{ to: '/driver/deliveries', label: 'Giao hàng của tôi', icon: Truck, roles: ['Driver'] }],
+    items: [{ to: '/driver/deliveries', label: 'Giao hàng của tôi', icon: Truck, roles: ['Tài xế'] }],
   },
   {
-    label: 'Infrastructure',
+    label: 'Hạ tầng',
     items: [
-      { to: '/infrastructure/provinces', label: 'Provinces', icon: MapPin, roles: ['Manager'] },
-      { to: '/infrastructure/locations', label: 'Locations / Hubs', icon: Building2, roles: ['Manager'] },
-      { to: '/infrastructure/zones', label: 'Warehouse Zones', icon: Warehouse, roles: ['Manager'] },
-      { to: '/infrastructure/pallets', label: 'Pallet Management', icon: Package, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
+      { to: '/infrastructure/provinces', label: 'Tỉnh, thành phố', icon: MapPin, roles: ['Manager'] },
+      { to: '/infrastructure/locations', label: 'Địa điểm / Hub', icon: Building2, roles: ['Manager'] },
+      { to: '/infrastructure/zones', label: 'Khu vực kho', icon: Warehouse, roles: ['Manager'] },
+      { to: '/infrastructure/pallets', label: 'Quản lý pallet', icon: Package, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
     ],
   },
   {
-    label: 'Inventory & Orders',
+    label: 'Hàng hóa và đơn hàng',
     items: [
       { to: '/operations/barcode-scanner', label: 'Quét mã vạch', icon: ScanLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
-      { to: '/inventory/inbound', label: 'Inbound Orders', icon: ArrowDownToLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
-      { to: '/inventory/outbound', label: 'Outbound Orders', icon: ArrowUpFromLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
-      { to: '/inventory/sacks', label: 'Sack / Bundle', icon: Package, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
-      { to: '/inventory/reservations', label: 'Inventory Reservations', icon: Timer, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
+      { to: '/inventory/inbound', label: 'Đơn nhập kho', icon: ArrowDownToLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
+      { to: '/inventory/outbound', label: 'Đơn xuất kho', icon: ArrowUpFromLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
+      { to: '/inventory/sacks', label: 'Bao hàng', icon: Package, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
+      { to: '/inventory/reservations', label: 'Giữ hàng', icon: Timer, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
     ],
   },
   {
-    label: 'Logistics & Dispatch',
+    label: 'Vận tải và điều phối',
     items: [
-      { to: '/logistics/fleet', label: 'Fleet Management', icon: Truck, roles: ['Manager', 'Supervisor'] },
-      { to: '/logistics/trips', label: 'Trip Scheduling', icon: Route, roles: ['Manager', 'Supervisor'] },
-      { to: '/logistics/routing', label: 'Routing Rules', icon: Route, roles: ['Manager', 'Supervisor'] },
+      { to: '/logistics/fleet', label: 'Quản lý phương tiện', icon: Truck, roles: ['Manager', 'Supervisor'] },
+      { to: '/logistics/trips', label: 'Điều phối chuyến xe', icon: Route, roles: ['Manager', 'Supervisor'] },
+      { to: '/logistics/routing', label: 'Quy tắc định tuyến', icon: Route, roles: ['Manager', 'Supervisor'] },
     ],
   },
   {
-    label: 'Human Resources',
+    label: 'Nhân sự',
     items: [
-      { to: '/hr/employees', label: 'Employee Directory', icon: Users, roles: ['Manager'] },
-      { to: '/hr/shifts', label: 'Shift Planning', icon: Calendar, roles: ['Manager'] },
+      { to: '/hr/employees', label: 'Danh sách nhân viên', icon: Users, roles: ['Manager'] },
+      { to: '/hr/shifts', label: 'Quản lý ca làm việc', icon: Calendar, roles: ['Manager'] },
     ],
   },
   {
-    label: 'System Security',
+    label: 'Bảo mật hệ thống',
     items: [
       { to: '/system/accounts', label: 'Quản lý tài khoản', icon: UserCog, roles: ['Manager'] },
-      { to: '/audit-logs', label: 'Audit Logs', icon: Shield, roles: ['Manager'] },
+      { to: '/audit-logs', label: 'Nhật ký hệ thống', icon: Shield, roles: ['Manager'] },
     ],
   },
 ]
@@ -93,7 +94,7 @@ export function Sidebar() {
         </div>
         <div>
           <p className="text-sm font-bold">WMS Console</p>
-          <p className="text-xs text-slate-400">Logistics Dashboard</p>
+          <p className="text-xs text-slate-400">Bảng điều khiển logistics</p>
         </div>
       </div>
 
@@ -132,7 +133,7 @@ export function Sidebar() {
       <div className="border-t border-sidebar-border p-4">
         <div className="flex items-center gap-2 rounded-lg bg-sidebar-accent px-3 py-2 text-xs text-slate-300">
           <ClipboardList className="h-4 w-4" />
-          <span>Enterprise WMS v1.0</span>
+          <span>WMS Doanh nghiệp v1.0</span>
         </div>
       </div>
     </aside>
@@ -145,25 +146,25 @@ export function Topbar() {
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b bg-white/95 px-6 backdrop-blur">
       <div>
-        <p className="text-sm text-slate-500">Operations Center</p>
-        <p className="text-sm font-semibold">Cross-docking Network</p>
+        <p className="text-sm text-slate-500">Trung tâm vận hành</p>
+        <p className="text-sm font-semibold">Mạng lưới trung chuyển</p>
       </div>
 
       <div className="flex items-center gap-4">
         <div className="hidden items-center gap-2 rounded-lg border px-3 py-1.5 text-sm md:flex">
           <Calendar className="h-4 w-4 text-slate-400" />
-          <span className="text-slate-600">Shift:</span>
+          <span className="text-slate-600">Ca làm việc:</span>
           <select className="bg-transparent text-sm font-medium outline-none">
-            <option>Morning (06:00–14:00)</option>
-            <option>Afternoon (14:00–22:00)</option>
-            <option>Night (22:00–06:00)</option>
+            <option>Ca sáng (06:00–14:00)</option>
+            <option>Ca chiều (14:00–22:00)</option>
+            <option>Ca đêm (22:00–06:00)</option>
           </select>
         </div>
 
         <button
           type="button"
           className="relative rounded-lg border p-2 text-slate-500 hover:bg-slate-50"
-          aria-label="Notifications"
+          aria-label="Thông báo"
         >
           <Bell className="h-5 w-5" />
           <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />
@@ -175,7 +176,7 @@ export function Topbar() {
           </div>
           <div className="hidden text-sm sm:block">
             <p className="font-medium">{user?.employeeName}</p>
-            <p className="text-xs text-slate-500">{user?.roleName}</p>
+            <p className="text-xs text-slate-500">{user?.roleName ? roleLabel(user.roleName) : null}</p>
           </div>
           <button type="button" onClick={() => void logout()} className="rounded p-1 text-slate-500 hover:bg-slate-100" title="Đăng xuất" aria-label="Đăng xuất">
             <LogOut className="h-4 w-4" />

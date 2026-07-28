@@ -25,7 +25,7 @@ export function CountdownTimer({
           expired ? 'text-red-600' : remaining.total < 3600000 ? 'text-amber-600' : 'text-emerald-600',
         )}
       >
-        {expired ? 'EXPIRED' : formatCountdown(remaining)}
+        {expired ? 'ĐÃ HẾT HẠN' : formatCountdown(remaining)}
       </div>
       <div className="text-xs text-slate-500">Expires {formatDateTime(expiresAt)}</div>
     </div>

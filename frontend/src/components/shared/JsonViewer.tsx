@@ -41,7 +41,7 @@ export function JsonViewer({
           'text-sm font-medium text-primary hover:underline',
         )}
       >
-        {expanded ? 'Hide payload diff' : 'View payload diff'}
+        {expanded ? 'Ẩn phần dữ liệu thay đổi' : 'Xem phần dữ liệu thay đổi'}
       </button>
       {expanded && (
         <div className="mt-3 flex flex-col gap-4 lg:flex-row">

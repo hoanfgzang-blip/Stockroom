@@ -37,21 +37,21 @@ export default function RoutingRulesPage() {
   return (
     <div>
       <PageHeader
-        title="Routing Rules"
-        description="Network rule builder for hub-to-destination routing logic."
+        title="Quy tắc định tuyến"
+        description="Thiết lập quy tắc điều phối từ hub đến điểm đến."
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>Route Network ({rules.length})</CardTitle>
+          <CardTitle>Mạng lưới tuyến ({rules.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Rule ID</TableHead>
-                <TableHead>Routing Path</TableHead>
-                <TableHead>Next Hop</TableHead>
+                <TableHead>Mã quy tắc</TableHead>
+                <TableHead>Tuyến điều phối</TableHead>
+                <TableHead>Điểm tiếp theo</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

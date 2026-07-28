@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table'
 import { Combobox } from '@/components/shared/Combobox'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
-import { formatTimeSpan } from '@/lib/utils'
+import { formatTimeSpan, roleLabel } from '@/lib/utils'
 import type { Employee, Location, Shift, Zone } from '@/types'
 
 const emptyForm = (): Employee => ({
@@ -122,9 +122,9 @@ export default function EmployeesPage() {
       <Card className="mb-6">
         <CardContent className="flex flex-wrap gap-4 p-4">
           <div className="min-w-[200px]">
-            <Label>Filter by Shift</Label>
+            <Label>Lọc theo ca</Label>
             <Select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)}>
-              <option value="">All shifts</option>
+              <option value="">Tất cả ca</option>
               {shifts.map((s) => (
                 <option key={s.shiftId} value={s.shiftId}>
                   {s.shiftName}
@@ -133,9 +133,9 @@ export default function EmployeesPage() {
             </Select>
           </div>
           <div className="min-w-[200px]">
-            <Label>Filter by Location</Label>
+            <Label>Lọc theo địa điểm</Label>
             <Select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)}>
-              <option value="">All locations</option>
+              <option value="">Tất cả địa điểm</option>
               {locations.map((l) => (
                 <option key={l.locationId} value={l.locationId}>
                   {l.locationName}
@@ -154,11 +154,11 @@ export default function EmployeesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Shift</TableHead>
-                <TableHead>Hub</TableHead>
-                <TableHead>Zone</TableHead>
+                <TableHead>Tên</TableHead>
+                <TableHead>Vai trò</TableHead>
+                <TableHead>Ca làm việc</TableHead>
+                <TableHead>Trung tâm</TableHead>
+                <TableHead>Khu vực</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -166,7 +166,7 @@ export default function EmployeesPage() {
                 <TableRow key={emp.employeeId}>
                   <TableCell className="font-medium">{emp.employeeName}</TableCell>
                   <TableCell>
-                    <Badge status={emp.roleName}>{emp.roleName}</Badge>
+                    <Badge status={emp.roleName}>{roleLabel(emp.roleName)}</Badge>
                   </TableCell>
                   <TableCell>{getShiftName(emp.shiftId)}</TableCell>
                   <TableCell>{getLocationName(emp.locationId)}</TableCell>
@@ -186,33 +186,33 @@ export default function EmployeesPage() {
       >
         <div className="space-y-4">
           <div>
-            <Label>Employee ID</Label>
+            <Label>Mã nhân viên</Label>
             <Input
               value={form.employeeId}
               onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
             />
           </div>
           <div>
-            <Label>Employee Name</Label>
+            <Label>Tên nhân viên</Label>
             <Input
               value={form.employeeName}
               onChange={(e) => setForm({ ...form, employeeName: e.target.value })}
             />
           </div>
           <div>
-            <Label>Role</Label>
+            <Label>Vai trò</Label>
             <Select
               value={form.roleName}
               onChange={(e) => setForm({ ...form, roleName: e.target.value })}
             >
-              <option value="Operator">Operator</option>
-              <option value="Driver">Driver</option>
-              <option value="Supervisor">Supervisor</option>
-              <option value="Manager">Manager</option>
+              <option value="Operator">Nhân viên vận hành</option>
+              <option value="Driver">Tài xế</option>
+              <option value="Supervisor">Giám sát</option>
+              <option value="Manager">Quản lý</option>
             </Select>
           </div>
           <div>
-            <Label>Warehouse Location</Label>
+            <Label>Địa điểm kho</Label>
             <Combobox
               options={locationOptions}
               value={form.locationId}
@@ -221,16 +221,16 @@ export default function EmployeesPage() {
             />
           </div>
           <div>
-            <Label>Warehouse Zone</Label>
+            <Label>Khu vực kho</Label>
             <Combobox
               options={zoneOptions}
               value={form.zoneId ?? ''}
               onChange={(zoneId) => setForm({ ...form, zoneId })}
-              placeholder={form.locationId ? 'Search zones...' : 'Select location first'}
+              placeholder={form.locationId ? 'Tìm khu vực...' : 'Chọn địa điểm trước'}
             />
           </div>
           <div>
-            <Label>Shift</Label>
+            <Label>Ca làm việc</Label>
             <Combobox
               options={shiftOptions}
               value={form.shiftId}
@@ -243,7 +243,7 @@ export default function EmployeesPage() {
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Create Employee'}
+              {saving ? 'Đang lưu...' : 'Tạo nhân viên'}
             </Button>
           </div>
         </div>

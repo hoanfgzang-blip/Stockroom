@@ -44,8 +44,8 @@ export default function InfrastructureZonesPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>Zone Map</CardTitle>
-            <CardDescription>Select a zone to view pallets</CardDescription>
+            <CardTitle>Sơ đồ khu vực</CardTitle>
+            <CardDescription>Chọn khu vực để xem các pallet</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
             {zones.map((zone) => (

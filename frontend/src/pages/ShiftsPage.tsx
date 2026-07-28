@@ -31,18 +31,18 @@ export default function ShiftsPage() {
 
   return (
     <div>
-      <PageHeader title="Shift Planning" description="Working shift schedules and hours." />
+      <PageHeader title="Quản lý ca làm việc" description="Lịch và thời gian làm việc theo ca." />
       <Card>
         <CardHeader>
-          <CardTitle>Shifts ({shifts.length})</CardTitle>
+          <CardTitle>Ca làm việc ({shifts.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Shift Name</TableHead>
-                <TableHead>Start</TableHead>
-                <TableHead>End</TableHead>
+                <TableHead>Tên ca</TableHead>
+                <TableHead>Bắt đầu</TableHead>
+                <TableHead>Kết thúc</TableHead>
                 <TableHead>ID</TableHead>
               </TableRow>
             </TableHeader>

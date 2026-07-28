@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
-import { cn, formatDateTime } from '@/lib/utils'
+import { cn, formatDateTime, statusLabel } from '@/lib/utils'
 import type { OutboundOrder, OutboundOrderItem } from '@/types'
 
 export default function OutboundOrdersPage() {
@@ -59,10 +59,10 @@ export default function OutboundOrdersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Order #</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Destination</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
+                <TableHead>Khách hàng</TableHead>
+                <TableHead>Điểm đến</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead>Thời điểm tạo</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -76,7 +76,7 @@ export default function OutboundOrdersPage() {
                   <TableCell>{order.outboundCustomerName}</TableCell>
                   <TableCell>{order.outboundDestination}</TableCell>
                   <TableCell>
-                    <Badge status={order.status}>{order.status}</Badge>
+                    <Badge status={order.status}>{statusLabel(order.status)}</Badge>
                   </TableCell>
                   <TableCell>{formatDateTime(order.createAt)}</TableCell>
                 </TableRow>
@@ -89,22 +89,22 @@ export default function OutboundOrdersPage() {
       <Drawer
         open={!!selected}
         onClose={() => setSelected(null)}
-        title={selected ? `Outbound ${selected.outboundOrderNumber}` : 'Order Detail'}
+        title={selected ? `Outbound ${selected.outboundOrderNumber}` : 'Chi tiết đơn hàng'}
       >
         {selected && (
           <div className="space-y-6">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <p className="text-xs text-slate-500">Customer</p>
+                <p className="text-xs text-slate-500">Khách hàng</p>
                 <p className="font-medium">{selected.outboundCustomerName}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">Destination</p>
+                <p className="text-xs text-slate-500">Điểm đến</p>
                 <p className="font-medium">{selected.outboundDestination}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">Status</p>
-                <Badge status={selected.status}>{selected.status}</Badge>
+                <p className="text-xs text-slate-500">Trạng thái</p>
+                <Badge status={selected.status}>{statusLabel(selected.status)}</Badge>
               </div>
             </div>
             <div>
@@ -115,8 +115,8 @@ export default function OutboundOrdersPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Item ID</TableHead>
-                      <TableHead>Sack ID</TableHead>
+                      <TableHead>Mã hàng</TableHead>
+                      <TableHead>Mã bao</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

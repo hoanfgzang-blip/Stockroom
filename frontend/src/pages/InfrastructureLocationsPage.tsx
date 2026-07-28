@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
+import { statusLabel } from '@/lib/utils'
 import type { Location, Province } from '@/types'
 
 export default function InfrastructureLocationsPage() {
@@ -44,8 +45,8 @@ export default function InfrastructureLocationsPage() {
   return (
     <div>
       <PageHeader
-        title="Infrastructure Management"
-        description="Provinces, warehouse hubs, and location hierarchy."
+        title="Quản lý hạ tầng"
+        description="Tỉnh, hub kho và cấu trúc địa điểm."
       />
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -61,11 +62,11 @@ export default function InfrastructureLocationsPage() {
         <TabsContent active={tab === 'locations'}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Locations & Hubs</CardTitle>
+              <CardTitle>Địa điểm và hub</CardTitle>
               <div className="w-56">
-                <Label className="sr-only">Filter by province</Label>
+                <Label className="sr-only">Lọc theo tỉnh</Label>
                 <Select value={provinceFilter} onChange={(e) => setProvinceFilter(e.target.value)}>
-                  <option value="">All provinces</option>
+                  <option value="">Tất cả tỉnh</option>
                   {provinces.map((p) => (
                     <option key={p.provinceId} value={p.provinceId}>
                       {p.provinceName}
@@ -78,9 +79,9 @@ export default function InfrastructureLocationsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Location Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Province</TableHead>
+                    <TableHead>Tên địa điểm</TableHead>
+                    <TableHead>Loại</TableHead>
+                    <TableHead>Tỉnh</TableHead>
                     <TableHead>ID</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -89,7 +90,7 @@ export default function InfrastructureLocationsPage() {
                     <TableRow key={loc.locationId}>
                       <TableCell className="font-medium">{loc.locationName}</TableCell>
                       <TableCell>
-                        <Badge status={loc.locationType}>{loc.locationType}</Badge>
+                        <Badge status={loc.locationType}>{statusLabel(loc.locationType)}</Badge>
                       </TableCell>
                       <TableCell>{loc.province?.provinceName ?? loc.provinceId}</TableCell>
                       <TableCell className="font-mono text-xs">{loc.locationId}</TableCell>
@@ -104,15 +105,15 @@ export default function InfrastructureLocationsPage() {
         <TabsContent active={tab === 'provinces'}>
           <Card>
             <CardHeader>
-              <CardTitle>Provinces</CardTitle>
+              <CardTitle>Tỉnh</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Province Name</TableHead>
-                    <TableHead>Province ID</TableHead>
-                    <TableHead>Hub Count</TableHead>
+                    <TableHead>Tên tỉnh</TableHead>
+                    <TableHead>Mã tỉnh</TableHead>
+                    <TableHead>Số hub</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

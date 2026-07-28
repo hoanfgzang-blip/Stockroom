@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table'
 import { CountdownTimer } from '@/components/shared/CountdownTimer'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
-import { cn, formatDateTime } from '@/lib/utils'
+import { cn, formatDateTime, statusLabel } from '@/lib/utils'
 import type { InventoryReservation } from '@/types'
 
 export default function ReservationsPage() {
@@ -55,25 +55,25 @@ export default function ReservationsPage() {
   return (
     <div>
       <PageHeader
-        title="Inventory Reservations"
-        description="Monitor pallet reservations with live expiration countdown."
+        title="Giữ hàng xuất kho"
+        description="Theo dõi hàng giữ chỗ với thời gian hết hạn."
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>Reservation Queue ({reservations.length})</CardTitle>
+          <CardTitle>Danh sách giữ hàng ({reservations.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Reservation</TableHead>
-                <TableHead>Outbound Order</TableHead>
-                <TableHead>Sack</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Countdown</TableHead>
-                <TableHead>Reserved At</TableHead>
-                <TableHead>Action</TableHead>
+                <TableHead>Mã giữ hàng</TableHead>
+                <TableHead>Đơn xuất kho</TableHead>
+                <TableHead>Bao hàng</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead>Thời gian còn lại</TableHead>
+                <TableHead>Thời điểm giữ</TableHead>
+                <TableHead>Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -88,8 +88,8 @@ export default function ReservationsPage() {
                     <TableCell>{r.outboundOrderId}</TableCell>
                     <TableCell>{r.sackId}</TableCell>
                     <TableCell>
-                      <Badge status={expired ? 'Expired' : r.status}>
-                        {expired ? 'Expired' : r.status}
+                      <Badge status={statusLabel(expired ? 'Expired' : r.status)}>
+                        {statusLabel(expired ? 'Expired' : r.status)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -104,7 +104,7 @@ export default function ReservationsPage() {
                           disabled={releasing === r.reservationId}
                           onClick={() => handleRelease(r.reservationId)}
                         >
-                          {releasing === r.reservationId ? 'Releasing...' : 'Release Capacity'}
+                          {releasing === r.reservationId ? 'Đang giải phóng...' : 'Giải phóng giữ hàng'}
                         </Button>
                       )}
                     </TableCell>

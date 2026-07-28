@@ -149,8 +149,8 @@ export default function DashboardPage() {
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader>
-            <CardTitle>Shipment Volume</CardTitle>
-            <CardDescription>Hourly inbound vs outbound order activity</CardDescription>
+            <CardTitle>Sản lượng hàng hóa</CardTitle>
+            <CardDescription>Hoạt động đơn nhập và xuất theo giờ</CardDescription>
           </CardHeader>
           <CardContent className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -159,8 +159,8 @@ export default function DashboardPage() {
                 <XAxis dataKey="hour" />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
-                <Bar dataKey="inbound" fill="#2563eb" name="Inbound" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="outbound" fill="#8b5cf6" name="Outbound" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="inbound" fill="#2563eb" name="Nhập hàng" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="outbound" fill="#8b5cf6" name="Xuất hàng" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -168,7 +168,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Sack Status Breakdown</CardTitle>
+            <CardTitle>Phân bố trạng thái bao hàng</CardTitle>
             <CardDescription>{summary.totalSacks} total sacks in network</CardDescription>
           </CardHeader>
           <CardContent className="h-72">
@@ -196,12 +196,12 @@ export default function DashboardPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Reservation Alerts</CardTitle>
-            <CardDescription>Reservations approaching expiration</CardDescription>
+            <CardTitle>Cảnh báo giữ hàng</CardTitle>
+            <CardDescription>Các lượt giữ hàng sắp hết hạn</CardDescription>
           </CardHeader>
           <CardContent>
             {expiring.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-500">No urgent reservation alerts.</p>
+              <p className="py-8 text-center text-sm text-slate-500">Không có cảnh báo giữ hàng khẩn cấp.</p>
             ) : (
               <ul className="space-y-3">
                 {expiring.map((r) => (
@@ -227,8 +227,8 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest audit log entries</CardDescription>
+            <CardTitle>Hoạt động gần đây</CardTitle>
+            <CardDescription>Các bản ghi nhật ký mới nhất</CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="space-y-3">

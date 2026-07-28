@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
-import { cn, formatDateTime } from '@/lib/utils'
+import { cn, formatDateTime, statusLabel } from '@/lib/utils'
 import type { InboundOrder, InboundOrderItem } from '@/types'
 
 export default function InboundOrdersPage() {
@@ -59,9 +59,9 @@ export default function InboundOrdersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Order #</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
+                <TableHead>Nhà cung cấp</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead>Thời điểm tạo</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -74,7 +74,7 @@ export default function InboundOrdersPage() {
                   <TableCell className="font-medium">{order.inboundOrderNumber}</TableCell>
                   <TableCell>{order.inboundSuplierName}</TableCell>
                   <TableCell>
-                    <Badge status={order.status}>{order.status}</Badge>
+                    <Badge status={order.status}>{statusLabel(order.status)}</Badge>
                   </TableCell>
                   <TableCell>{formatDateTime(order.createAt)}</TableCell>
                 </TableRow>
@@ -87,18 +87,18 @@ export default function InboundOrdersPage() {
       <Drawer
         open={!!selected}
         onClose={() => setSelected(null)}
-        title={selected ? `Inbound ${selected.inboundOrderNumber}` : 'Order Detail'}
+        title={selected ? `Inbound ${selected.inboundOrderNumber}` : 'Chi tiết đơn hàng'}
       >
         {selected && (
           <div className="space-y-6">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <p className="text-xs text-slate-500">Supplier</p>
+                <p className="text-xs text-slate-500">Nhà cung cấp</p>
                 <p className="font-medium">{selected.inboundSuplierName}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">Status</p>
-                <Badge status={selected.status}>{selected.status}</Badge>
+                <p className="text-xs text-slate-500">Trạng thái</p>
+                <Badge status={selected.status}>{statusLabel(selected.status)}</Badge>
               </div>
             </div>
             <div>
@@ -109,8 +109,8 @@ export default function InboundOrdersPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Item ID</TableHead>
-                      <TableHead>Sack ID</TableHead>
+                      <TableHead>Mã hàng</TableHead>
+                      <TableHead>Mã bao</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

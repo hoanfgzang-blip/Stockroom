@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table'
 import { JsonViewer } from '@/components/shared/JsonViewer'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, statusLabel } from '@/lib/utils'
 import type { AuditLog } from '@/types'
 
 export default function AuditLogsPage() {
@@ -41,27 +41,27 @@ export default function AuditLogsPage() {
   return (
     <div>
       <PageHeader
-        title="System Audit Trail"
-        description="Secure, read-only compliance log with payload diff viewer."
+        title="Nhật ký hệ thống"
+        description="Nhật ký chỉ đọc để theo dõi thao tác trong hệ thống."
       />
 
       <Card className="mb-6">
         <CardContent className="flex flex-wrap gap-4 p-4">
           <div className="min-w-[180px]">
-            <Label>Table Name</Label>
+            <Label>Tên bảng dữ liệu</Label>
             <Input
-              placeholder="e.g. sack"
+              placeholder="Ví dụ: sack"
               value={tableFilter}
               onChange={(e) => setTableFilter(e.target.value)}
             />
           </div>
           <div className="min-w-[180px]">
-            <Label>Action Type</Label>
+            <Label>Loại thao tác</Label>
             <Select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}>
-              <option value="">All actions</option>
-              <option value="Create">Create</option>
-              <option value="Update">Update</option>
-              <option value="Delete">Delete</option>
+              <option value="">Tất cả thao tác</option>
+              <option value="Create">Tạo mới</option>
+              <option value="Update">Cập nhật</option>
+              <option value="Delete">Xóa</option>
             </Select>
           </div>
         </CardContent>
@@ -69,18 +69,18 @@ export default function AuditLogsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Audit Logs ({logs.length})</CardTitle>
+          <CardTitle>Nhật ký thao tác ({logs.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Operator</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Entity</TableHead>
-                <TableHead>Record</TableHead>
-                <TableHead>Timestamp</TableHead>
-                <TableHead>Payload</TableHead>
+                <TableHead>Nhân viên vận hành</TableHead>
+                <TableHead>Thao tác</TableHead>
+                <TableHead>Đối tượng</TableHead>
+                <TableHead>Bản ghi</TableHead>
+                <TableHead>Thời gian</TableHead>
+                <TableHead>Dữ liệu</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -88,7 +88,7 @@ export default function AuditLogsPage() {
                 <TableRow key={log.auditLogId}>
                   <TableCell className="font-medium">{log.userName}</TableCell>
                   <TableCell>
-                    <Badge status={log.actionType}>{log.actionType}</Badge>
+                    <Badge status={log.actionType}>{statusLabel(log.actionType)}</Badge>
                   </TableCell>
                   <TableCell>{log.tableName}</TableCell>
                   <TableCell className="font-mono text-xs">{log.recordId}</TableCell>

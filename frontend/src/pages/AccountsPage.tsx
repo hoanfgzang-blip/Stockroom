@@ -9,6 +9,7 @@ import { Input, Label, Select } from '@/components/ui/input'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { Employee } from '@/types'
+import { roleLabel } from '@/lib/utils'
 
 type AccountForm = SaveAccountRequest & { userId?: string }
 
@@ -112,7 +113,7 @@ export default function AccountsPage() {
                 <TableRow key={account.userId}>
                   <TableCell><p className="font-medium">{account.employeeName}</p><p className="font-mono text-xs text-slate-500">{account.employeeId}</p></TableCell>
                   <TableCell className="font-mono">{account.username}</TableCell>
-                  <TableCell><Badge status={account.roleName}>{account.roleName}</Badge></TableCell>
+                  <TableCell><Badge status={account.roleName}>{roleLabel(account.roleName)}</Badge></TableCell>
                   <TableCell><Badge status={account.isActive ? 'Active' : 'Inactive'}>{account.isActive ? 'Đang hoạt động' : 'Đã vô hiệu hóa'}</Badge></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -141,7 +142,7 @@ export default function AccountsPage() {
           <div>
             <Label htmlFor="account-role">Vai trò</Label>
             <Select id="account-role" value={form.roleName} onChange={(event) => setForm({ ...form, roleName: event.target.value })} className="mt-1">
-              {roles.map((role) => <option key={role} value={role}>{role}</option>)}
+              {roles.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}
             </Select>
           </div>
           <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />Đang hoạt động</label>

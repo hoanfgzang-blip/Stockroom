@@ -128,7 +128,7 @@ function statusLabel(status: string) {
 
 export default function BarcodeScannerPage() {
   const { user } = useAuth()
-  const isDriver = user?.roleName === 'Driver'
+  const isDriver = user?.roleName === 'Tài xế'
   const inputRef = useRef<HTMLInputElement>(null)
   const palletInputRef = useRef<HTMLInputElement>(null)
   const [mode, setMode] = useState<ScanMode>(isDriver ? 'received' : 'inbound')
@@ -473,7 +473,7 @@ export default function BarcodeScannerPage() {
                 <div><p className="text-xs text-slate-500">Mã bao</p><p className="mt-1 font-mono font-semibold">{lastSack.sackId}</p></div>
                 <div><p className="text-xs text-slate-500">Trạng thái</p><div className="mt-1"><Badge status={lastSack.status}>{statusLabel(lastSack.status)}</Badge></div></div>
                 <div><p className="text-xs text-slate-500">Điểm đến</p><p className="mt-1 text-sm font-medium">{lastSack.sDestination}</p></div>
-                <div><p className="text-xs text-slate-500">Pallet</p><p className="mt-1 font-mono text-sm font-semibold">{lastSack.palletId ?? 'Chưa gán'}</p></div><div><p className="text-xs text-slate-500">Zone</p><p className="mt-1 font-mono text-sm font-semibold">{lastSack.zoneId ?? 'Chưa gán'}</p></div>
+                <div><p className="text-xs text-slate-500">Pallet chứa</p><p className="mt-1 font-mono text-sm font-semibold">{lastSack.palletId ?? 'Chưa gán'}</p></div><div><p className="text-xs text-slate-500">Khu vực</p><p className="mt-1 font-mono text-sm font-semibold">{lastSack.zoneId ?? 'Chưa gán'}</p></div>
                 </div>
                 {mode === 'sorting' && lastSack.palletId && (
                   <div className="mt-5 flex flex-wrap gap-3 border-t border-slate-100 pt-4">

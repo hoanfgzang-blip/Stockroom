@@ -128,7 +128,7 @@ function statusLabel(status: string) {
 
 export default function BarcodeScannerPage() {
   const { user } = useAuth()
-  const isDriver = user?.roleName === 'Tài xế'
+  const isDriver = user?.roleName === 'Driver'
   const inputRef = useRef<HTMLInputElement>(null)
   const palletInputRef = useRef<HTMLInputElement>(null)
   const [mode, setMode] = useState<ScanMode>(isDriver ? 'received' : 'inbound')

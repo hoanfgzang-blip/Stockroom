@@ -80,6 +80,7 @@ public class AuthController : ControllerBase
     {
         var accounts = await _db.UserAccounts
             .Include(account => account.Employee)
+            .Where(account => account.IsActive)
             .AsNoTracking()
             .OrderBy(account => account.Username)
             .ToListAsync();

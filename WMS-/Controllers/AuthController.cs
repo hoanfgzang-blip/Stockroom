@@ -42,6 +42,10 @@ public class AuthController : ControllerBase
             new(ClaimTypes.Role, response.RoleName),
             new("employee_id", account.EmployeeId)
         };
+        if (!string.IsNullOrEmpty(account.Employee.LocationId))
+        {
+            claims.Add(new("location_id", account.Employee.LocationId));
+        }
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -67,23 +67,8 @@ namespace WMS_.Migrations
                 table: "employee",
                 newName: "IX_employee_location_id");
 
-            migrationBuilder.AlterColumn<string>(
-                name: "old_values",
-                table: "audit_log",
-                type: "jsonb",
-                nullable: true,
-                oldClrType: typeof(string),
-                oldType: "text",
-                oldNullable: true);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "new_values",
-                table: "audit_log",
-                type: "jsonb",
-                nullable: true,
-                oldClrType: typeof(string),
-                oldType: "text",
-                oldNullable: true);
+            migrationBuilder.Sql("ALTER TABLE audit_log ALTER COLUMN old_values TYPE jsonb USING old_values::jsonb;");
+            migrationBuilder.Sql("ALTER TABLE audit_log ALTER COLUMN new_values TYPE jsonb USING new_values::jsonb;");
 
             migrationBuilder.AddColumn<string>(
                 name: "user_id",
@@ -276,23 +261,8 @@ namespace WMS_.Migrations
                 table: "Employees",
                 newName: "IX_Employees_location_id");
 
-            migrationBuilder.AlterColumn<string>(
-                name: "old_values",
-                table: "audit_log",
-                type: "text",
-                nullable: true,
-                oldClrType: typeof(string),
-                oldType: "jsonb",
-                oldNullable: true);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "new_values",
-                table: "audit_log",
-                type: "text",
-                nullable: true,
-                oldClrType: typeof(string),
-                oldType: "jsonb",
-                oldNullable: true);
+            migrationBuilder.Sql("ALTER TABLE audit_log ALTER COLUMN old_values TYPE text USING old_values::text;");
+            migrationBuilder.Sql("ALTER TABLE audit_log ALTER COLUMN new_values TYPE text USING new_values::text;");
 
             migrationBuilder.AddColumn<string>(
                 name: "user_name",

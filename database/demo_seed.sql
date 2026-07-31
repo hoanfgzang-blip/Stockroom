@@ -124,14 +124,14 @@ INSERT INTO sack (sack_id, trip_id, pallet_id, status, created_at, end_at, zone_
 ON CONFLICT (sack_id) DO NOTHING;
 
 INSERT INTO routing_rule (rule_id, current_location, c_destination, next_hop) VALUES
-  ('DEMO-ROUTE-001', 'DEMO-HUB-HN', 'DEMO-HCM', 'DEMO-HUB-DN'),
-  ('DEMO-ROUTE-002', 'DEMO-HUB-HN', 'DEMO-HP', 'DEMO-HUB-HP'),
-  ('DEMO-ROUTE-003', 'DEMO-HUB-HN', 'DEMO-DN', 'DEMO-HUB-DN'),
-  ('DEMO-ROUTE-004', 'DEMO-HUB-HCM', 'DEMO-HN', 'DEMO-HUB-DN'),
-  ('DEMO-ROUTE-005', 'DEMO-HUB-HCM', 'DEMO-BD', 'DEMO-HUB-BD'),
-  ('DEMO-ROUTE-006', 'DEMO-HUB-HCM', 'DEMO-CT', 'DEMO-HUB-CT'),
-  ('DEMO-ROUTE-007', 'DEMO-HUB-DN', 'DEMO-HN', 'DEMO-HUB-HN'),
-  ('DEMO-ROUTE-008', 'DEMO-HUB-DN', 'DEMO-HCM', 'DEMO-HUB-HCM')
+  ('DEMO-ROUTE-001', 'DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN'),
+  ('DEMO-ROUTE-002', 'DEMO-HUB-HN', 'DEMO-HUB-HP', 'DEMO-HUB-HP'),
+  ('DEMO-ROUTE-003', 'DEMO-HUB-HN', 'DEMO-HUB-DN', 'DEMO-HUB-DN'),
+  ('DEMO-ROUTE-004', 'DEMO-HUB-HCM', 'DEMO-HUB-HN', 'DEMO-HUB-DN'),
+  ('DEMO-ROUTE-005', 'DEMO-HUB-HCM', 'DEMO-HUB-BD', 'DEMO-HUB-BD'),
+  ('DEMO-ROUTE-006', 'DEMO-HUB-HCM', 'DEMO-HUB-CT', 'DEMO-HUB-CT'),
+  ('DEMO-ROUTE-007', 'DEMO-HUB-DN', 'DEMO-HUB-HN', 'DEMO-HUB-HN'),
+  ('DEMO-ROUTE-008', 'DEMO-HUB-DN', 'DEMO-HUB-HCM', 'DEMO-HUB-HCM')
 ON CONFLICT (rule_id) DO NOTHING;
 
 INSERT INTO inbound_order (inbound_order_id, order_number, supplier_name, status, created_at) VALUES

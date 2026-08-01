@@ -45,6 +45,10 @@ public class AuthController : ControllerBase
             new(ClaimTypes.Role, response.RoleName),
             new("employee_id", account.EmployeeId)
         };
+        if (!string.IsNullOrEmpty(account.Employee.LocationId))
+        {
+            claims.Add(new("location_id", account.Employee.LocationId));
+        }
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
@@ -83,6 +87,7 @@ public class AuthController : ControllerBase
     {
         var accounts = await _db.UserAccounts
             .Include(account => account.Employee)
+            .Where(account => account.IsActive)
             .AsNoTracking()
             .OrderBy(account => account.Username)
             .ToListAsync();

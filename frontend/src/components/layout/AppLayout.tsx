@@ -10,7 +10,6 @@ import {
   ClipboardList,
   LayoutDashboard,
   LogOut,
-  MapPin,
   Menu,
   Package,
   ScanLine,

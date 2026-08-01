@@ -9,7 +9,6 @@ import {
   ClipboardList,
   LayoutDashboard,
   LogOut,
-  MapPin,
   Package,
   ScanLine,
   Route,
@@ -40,7 +39,6 @@ const navGroups: NavGroup[] = [
   {
     label: 'Hạ tầng',
     items: [
-      { to: '/infrastructure/provinces', label: 'Tỉnh, thành phố', icon: MapPin, roles: ['Manager'] },
       { to: '/infrastructure/locations', label: 'Địa điểm / Hub', icon: Building2, roles: ['Manager'] },
       { to: '/infrastructure/zones', label: 'Khu vực kho', icon: Warehouse, roles: ['Manager'] },
       { to: '/infrastructure/pallets', label: 'Quản lý pallet', icon: Package, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },

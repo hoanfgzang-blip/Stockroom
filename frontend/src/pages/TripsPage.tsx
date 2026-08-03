@@ -9,18 +9,21 @@ import { Dialog } from '@/components/ui/dialog'
 import { Label, Select } from '@/components/ui/input'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
 import { TRIP_COLUMNS, formatDateTime, statusLabel, tripColumnLabel } from '@/lib/utils'
-import type { Car, Employee, Location, Sack, Trip } from '@/types'
+import type { Car, Employee, Location, Sack, Trip, TripQrManifest } from '@/types'
 
 const emptyForm = (): CreateTripRequest => ({ employeeId: '', carId: '', origin: '', destination: '', type: 'Inbound', sackIds: [] })
 
-function printTripCode(trip: Trip) {
-  const printWindow = window.open('', '_blank', 'width=480,height=560')
+function printTripManifest(manifest: TripQrManifest) {
+  const printWindow = window.open('', '_blank', 'width=760,height=900')
   if (!printWindow) return
 
-  const qrSvg = new BrowserQRCodeSvgWriter().write(trip.tripId, 240, 240).outerHTML
-  printWindow.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Tem xe ${trip.tripId}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}main{width:82mm;border:1px solid #ddd;padding:8mm;text-align:center}h1{font-size:16pt;margin:0 0 4mm}.code{font:700 12pt monospace;word-break:break-all}.hint{font-size:9pt;color:#555}@page{size:auto;margin:10mm}</style></head><body><main><h1>WMS - Tem xe inbound</h1><p class="code">${trip.tripId}</p><div>${qrSvg}</div><p class="hint">Quét mã tại màn hình Xe inbound khi xe đến kho.</p></main><script>window.onload=()=>window.print();</script></body></html>`)
+  const payload = JSON.stringify(manifest)
+  const qrSvg = new BrowserQRCodeSvgWriter().write(payload, 320, 320).outerHTML
+  const sackRows = manifest.sacks.map((sack, index) => `<tr><td>${index + 1}</td><td>${sack.sackId}</td><td>${sack.destination}</td><td>${sack.status}</td></tr>`).join('')
+  printWindow.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>QR trip ${manifest.tripId}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}main{max-width:190mm;border:1px solid #ddd;padding:8mm}header{display:grid;grid-template-columns:1fr 86mm;gap:8mm;align-items:start}h1{font-size:18pt;margin:0 0 4mm}.code{font:700 12pt monospace;word-break:break-all}.meta{display:grid;grid-template-columns:28mm 1fr;gap:2mm 4mm;font-size:10pt}.label{color:#555}.qr{text-align:center}.qr svg{width:82mm;height:82mm}.hint{font-size:9pt;color:#555;margin-top:2mm}table{width:100%;border-collapse:collapse;margin-top:7mm;font-size:9pt}th,td{border:1px solid #ddd;padding:2mm;text-align:left}th{background:#f3f4f6}@page{size:auto;margin:10mm}</style></head><body><main><header><section><h1>WMS - QR chuyen xe</h1><p class="code">${manifest.tripId}</p><div class="meta"><span class="label">Loai</span><strong>${manifest.type}</strong><span class="label">Tai xe</span><strong>${manifest.driver.name} (${manifest.driver.id})</strong><span class="label">Xe</span><strong>${manifest.vehicle.id} - ${manifest.vehicle.type}</strong><span class="label">Tu</span><strong>${manifest.origin.name}</strong><span class="label">Den</span><strong>${manifest.destination.name}</strong><span class="label">So bao</span><strong>${manifest.sacks.length}</strong></div></section><section class="qr">${qrSvg}<p class="hint">Quet QR nay khi xe den diem dich de nhap/nhan hang va doi chieu bao den du.</p></section></header><table><thead><tr><th>#</th><th>Ma bao</th><th>Diem den</th><th>Trang thai khi xuat</th></tr></thead><tbody>${sackRows}</tbody></table></main><script>window.onload=()=>window.print();</script></body></html>`)
   printWindow.document.close()
 }
+
 export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -81,6 +84,16 @@ export default function TripsPage() {
     try { setTripSacks(await tripsApi.sacks(trip.tripId)) } catch (err) { setError((err as Error).message) }
   }
 
+  const printTripQr = async (trip: Trip) => {
+    try {
+      setError(null)
+      const manifest = await tripsApi.qrManifest(trip.tripId)
+      printTripManifest(manifest)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Khong the tao QR cho chuyen xe.')
+    }
+  }
+
   if (loading) return <LoadingState />
   if (error && trips.length === 0) return <ErrorState message={error} />
 
@@ -90,7 +103,7 @@ export default function TripsPage() {
       {(error || notice) && <div className={`mb-5 rounded-lg border px-4 py-3 text-sm ${error ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>{error ?? notice}</div>}
       <div className="grid gap-4 xl:grid-cols-4">
         {TRIP_COLUMNS.map((status) => <Card key={status} className="flex flex-col"><CardHeader className="pb-3"><div className="flex items-center justify-between"><CardTitle className="text-base">{tripColumnLabel(status)}</CardTitle><Badge status={status}>{grouped[status]?.length ?? 0}</Badge></div><CardDescription>{tripColumnLabel(status)}</CardDescription></CardHeader><CardContent className="flex flex-1 flex-col gap-3">
-          {(grouped[status] ?? []).map((trip) => <div key={trip.tripId} className="rounded-lg border bg-slate-50 p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><p className="font-mono text-xs font-semibold text-primary">{trip.tripId}</p><Badge status={trip.type}>{trip.type === 'Inbound' ? 'Nhập hàng' : 'Xuất hàng'}</Badge></div><p className="mt-2 text-sm font-medium">{getDriver(trip.employeeId)}</p><p className="text-xs text-slate-500">{getCar(trip.carId)}</p><div className="mt-3 flex items-center gap-1 text-xs text-slate-600"><span className="truncate">{getLocation(trip.origin)}</span><ArrowRight className="h-3 w-3 shrink-0" /><span className="truncate">{getLocation(trip.destination)}</span></div><p className="mt-3 flex items-center gap-1 text-xs font-medium text-slate-700"><PackageCheck className="h-4 w-4 text-primary" />{trip.sackCount ?? 0} bao hàng trong chuyến</p><div className="mt-3 grid gap-2"><Button size="sm" variant="outline" onClick={() => void showTripSacks(trip)}>Xem danh sách sack</Button>{trip.type === 'Inbound' && <Button size="sm" onClick={() => printTripCode(trip)}><Printer className="h-4 w-4" />In mã xe</Button>}</div><p className="mt-2 text-[11px] text-slate-400">Tạo {formatDateTime(trip.createdAt)}</p></div>)}
+          {(grouped[status] ?? []).map((trip) => <div key={trip.tripId} className="rounded-lg border bg-slate-50 p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><p className="font-mono text-xs font-semibold text-primary">{trip.tripId}</p><Badge status={trip.type}>{trip.type === 'Inbound' ? 'Nhập hàng' : 'Xuất hàng'}</Badge></div><p className="mt-2 text-sm font-medium">{getDriver(trip.employeeId)}</p><p className="text-xs text-slate-500">{getCar(trip.carId)}</p><div className="mt-3 flex items-center gap-1 text-xs text-slate-600"><span className="truncate">{getLocation(trip.origin)}</span><ArrowRight className="h-3 w-3 shrink-0" /><span className="truncate">{getLocation(trip.destination)}</span></div><p className="mt-3 flex items-center gap-1 text-xs font-medium text-slate-700"><PackageCheck className="h-4 w-4 text-primary" />{trip.sackCount ?? 0} bao hàng trong chuyến</p><div className="mt-3 grid gap-2"><Button size="sm" variant="outline" onClick={() => void showTripSacks(trip)}>Xem danh sách sack</Button><Button size="sm" onClick={() => void printTripQr(trip)}><Printer className="h-4 w-4" />In QR chuyến</Button></div><p className="mt-2 text-[11px] text-slate-400">Tạo {formatDateTime(trip.createdAt)}</p></div>)}
           {(grouped[status] ?? []).length === 0 && <p className="py-8 text-center text-xs text-slate-400">Chưa có chuyến</p>}
         </CardContent></Card>)}
       </div>

@@ -160,7 +160,7 @@ export default function DashboardPage() {
       {
         title: 'Tỉ lệ lấp đầy kho',
         value: `${util}%`,
-        sub: `${summary.totalPallets} pallet / ${summary.totalZones} khu vực`,
+        sub: `${summary.totalPallets} pallet / ${summary.totalZones} zone`,
         icon: Warehouse,
         color: 'text-amber-600 bg-amber-50',
       },

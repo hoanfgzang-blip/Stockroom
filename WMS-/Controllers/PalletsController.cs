@@ -46,7 +46,7 @@ namespace WMS_.Controllers
         public async Task<ActionResult<Pallet>> Create([FromBody] CreatePalletRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.ZoneId))
-                return BadRequest("Khu vực đặt pallet là bắt buộc.");
+                return BadRequest("Zone đặt pallet là bắt buộc.");
 
             // Ma pallet va trang thai phai do he thong/nghiep vu quet quyet dinh.
             var pallet = new Pallet

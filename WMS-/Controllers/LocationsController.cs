@@ -1,7 +1,15 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WMS_.Data;
 using WMS_.Data.Entities;
+
+public sealed class CreateLocationRequest
+{
+    [Required] public string LocationId { get; set; } = string.Empty;
+    [Required] public string ProvinceId { get; set; } = string.Empty;
+    [Required] public string LocationType { get; set; } = string.Empty;
+    [Required] public string LocationName { get; set; } = string.Empty;
+}
 
 namespace WMS_.Controllers
 {
@@ -32,10 +40,27 @@ namespace WMS_.Controllers
 
         /// <summary>Create location</summary>
         [HttpPost]
-        public async Task<ActionResult<Location>> Create([FromBody] Location location)
+        public async Task<ActionResult<Location>> Create([FromBody] CreateLocationRequest request)
         {
+            // ID checking: ensure the LocationId is unique
+            if (await _db.Locations.AnyAsync(l => l.LocationId == request.LocationId))
+                return Conflict(new { message = "Mã địa điểm/Hub này đã tồn tại trong hệ thống." });
+
+            // provinceId checking: ensure the ProvinceId exists in the Provinces table
+            if (!await _db.Provinces.AnyAsync(p => p.ProvinceId == request.ProvinceId))
+                return BadRequest(new { message = "Mã tỉnh thành không hợp lệ." });
+
+            var location = new Location
+            {
+                LocationId = request.LocationId,
+                ProvinceId = request.ProvinceId,
+                LocationType = request.LocationType,
+                LocationName = request.LocationName
+            };
+
             _db.Locations.Add(location);
             await _db.SaveChangesAsync();
+
             return CreatedAtAction(nameof(GetById), new { id = location.LocationId }, location);
         }
 

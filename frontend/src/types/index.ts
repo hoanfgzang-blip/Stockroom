@@ -68,6 +68,40 @@ export interface Trip {
   car?: Car
 }
 
+export interface TripQrParty {
+  id: string
+  name: string
+}
+
+export interface TripQrVehicle {
+  id: string
+  type: string
+  capacity: number
+}
+
+export interface TripQrSack {
+  sackId: string
+  status: string
+  destination: string
+  palletId?: string | null
+  zoneId?: string | null
+}
+
+export interface TripQrManifest {
+  kind: 'WMS_TRIP_MANIFEST'
+  version: 1
+  tripId: string
+  type: string
+  status: string
+  driver: TripQrParty
+  vehicle: TripQrVehicle
+  origin: TripQrParty
+  destination: TripQrParty
+  createdAt: string
+  issuedAt: string
+  sacks: TripQrSack[]
+}
+
 export interface RoutingRule {
   ruleId: string
   currentLocationID: string

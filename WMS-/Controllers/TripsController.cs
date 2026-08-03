@@ -71,9 +71,10 @@ namespace WMS_.Controllers
         public async Task<ActionResult<IEnumerable<Trip>>> GetAll([FromQuery] string? status = null)
         {
             var locationId = User.FindFirstValue("location_id");
+            if (string.IsNullOrWhiteSpace(locationId)) return Forbid();
             var query = _db.Trips.AsQueryable();
+            query = query.Where(trip => trip.Origin == locationId || trip.Destination == locationId);
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(trip => trip.Status == status);
-            if (!string.IsNullOrWhiteSpace(locationId)) query = query.Where(trip => trip.Origin == locationId);
             var trips = await query.OrderByDescending(trip => trip.CreatedAt).ToListAsync();
             await PopulateSackCountsAsync(trips);
             return Ok(trips);
@@ -96,8 +97,11 @@ namespace WMS_.Controllers
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
         public async Task<ActionResult<Trip>> GetById(string id)
         {
+            var locationId = User.FindFirstValue("location_id");
             var trip = await _db.Trips.FindAsync(id);
             if (trip == null) return NotFound();
+            if (!string.IsNullOrWhiteSpace(locationId) && trip.Origin != locationId && trip.Destination != locationId)
+                return Forbid();
             trip.SackCount = await _db.Sacks.CountAsync(sack => sack.TripId == id);
             return Ok(trip);
         }
@@ -151,9 +155,16 @@ namespace WMS_.Controllers
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
         public async Task<ActionResult<TripCheckInResponse>> CheckIn(string id)
         {
+            var myLocationId = User.FindFirstValue("location_id");
+            if (string.IsNullOrWhiteSpace(myLocationId)) return Forbid();
+
             await using var transaction = await _db.Database.BeginTransactionAsync();
             var trip = await _db.Trips.FindAsync(id);
             if (trip == null) return NotFound(new { message = "Khong tim thay ma chuyen xe." });
+
+            if (trip.Destination != myLocationId)
+                return BadRequest(new { message = "Chuyen xe nay khong co diem den la hub cua ban. Khong the check-in!" });
+
             if (trip.Type != "Inbound") return BadRequest(new { message = "Chi chuyen Inbound moi duoc xac nhan xe den." });
             if (trip.Status == "Completed") return Conflict(new { message = "Chuyen xe nay da duoc xac nhan den kho." });
 
@@ -177,6 +188,9 @@ namespace WMS_.Controllers
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
         public async Task<ActionResult<TripQrCheckInResponse>> CheckInByQr([FromBody] TripQrCheckInRequest request)
         {
+            var myLocationId = User.FindFirstValue("location_id");
+            if (string.IsNullOrWhiteSpace(myLocationId)) return Forbid();
+
             if (request.Manifest.Kind != "WMS_TRIP_MANIFEST" || request.Manifest.Version != 1)
                 return BadRequest(new { message = "QR khong dung dinh dang manifest chuyen xe WMS." });
 
@@ -186,6 +200,10 @@ namespace WMS_.Controllers
             await using var transaction = await _db.Database.BeginTransactionAsync();
             var trip = await _db.Trips.FindAsync(tripId);
             if (trip == null) return NotFound(new { message = "Khong tim thay ma chuyen xe trong QR." });
+
+            if (trip.Type == "Inbound" && trip.Destination != myLocationId)
+                return BadRequest(new { message = "Chuyen xe khong co diem den la hub cua ban. Khong the check-in bang QR!" });
+
             if (trip.Type is not ("Inbound" or "Outbound")) return BadRequest(new { message = "Loai chuyen xe khong hop le." });
             if (trip.Status == "Completed") return Conflict(new { message = "Chuyen xe nay da duoc xac nhan den kho." });
 

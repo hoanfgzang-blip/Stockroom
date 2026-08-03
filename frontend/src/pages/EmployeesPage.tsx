@@ -158,7 +158,7 @@ export default function EmployeesPage() {
                 <TableHead>Vai trò</TableHead>
                 <TableHead>Ca làm việc</TableHead>
                 <TableHead>Trung tâm</TableHead>
-                <TableHead>Khu vực</TableHead>
+                <TableHead>Zone</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -221,12 +221,12 @@ export default function EmployeesPage() {
             />
           </div>
           <div>
-            <Label>Khu vực kho</Label>
+            <Label>Zone kho</Label>
             <Combobox
               options={zoneOptions}
               value={form.zoneId ?? ''}
               onChange={(zoneId) => setForm({ ...form, zoneId })}
-              placeholder={form.locationId ? 'Tìm khu vực...' : 'Chọn địa điểm trước'}
+              placeholder={form.locationId ? 'Tìm Zone...' : 'Chọn địa điểm trước'}
             />
           </div>
           <div>

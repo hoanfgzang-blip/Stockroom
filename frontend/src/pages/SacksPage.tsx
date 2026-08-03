@@ -12,7 +12,7 @@ const statusFilters = [
   {
     value: 'Sorting',
     label: 'Đang phân loại',
-    description: 'Bao hàng đang ở khu vực nhập/chia chọn và chưa lên chuyến.',
+    description: 'Bao hàng đang ở zone nhập/chia chọn và chưa lên chuyến.',
     tone: 'border-amber-200 bg-amber-50 text-amber-800',
   },
   {
@@ -66,7 +66,7 @@ export default function SacksPage() {
     <div>
       <PageHeader
         title="Quản lý bao hàng"
-        description="Theo dõi bao hàng theo pallet, khu vực, chuyến xe và điểm đến."
+        description="Theo dõi bao hàng theo pallet, zone, chuyến xe và điểm đến."
       />
 
       <div className="mb-6 grid gap-4 md:grid-cols-3">
@@ -100,7 +100,7 @@ export default function SacksPage() {
                 <TableHead>Mã bao</TableHead>
                 <TableHead>Trạng thái</TableHead>
                 <TableHead>Pallet chứa</TableHead>
-                <TableHead>Khu vực</TableHead>
+                <TableHead>Zone</TableHead>
                 <TableHead>Chuyến xe</TableHead>
                 <TableHead>Điểm đến</TableHead>
                 <TableHead>Thời điểm tạo</TableHead>

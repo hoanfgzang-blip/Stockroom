@@ -183,9 +183,9 @@ export default function PalletsPage() {
             </Select>
           </div>
           <div>
-            <Label>Khu vực</Label>
+            <Label>Zone</Label>
             <Select className="mt-1" value={zoneFilter} onChange={(event) => setZoneFilter(event.target.value)}>
-              <option value="">Tất cả khu vực</option>
+              <option value="">Tất cả zone</option>
               {zones.map((zone) => <option key={zone.zoneId} value={zone.zoneId}>{zone.zoneName}</option>)}
             </Select>
           </div>
@@ -213,9 +213,9 @@ export default function PalletsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Mã pallet</TableHead>
-                <TableHead>Khu vực</TableHead>
+                <TableHead>Zone</TableHead>
                 <TableHead>Trạng thái</TableHead>
-                <TableHead>Chuyển khu vực</TableHead>
+                <TableHead>Chuyển zone</TableHead>
                 <TableHead className="text-right">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
@@ -260,9 +260,9 @@ export default function PalletsPage() {
       >
         <form className="space-y-4" onSubmit={handleSave}>
           <div>
-            <Label>Khu vực</Label>
+            <Label>Zone</Label>
             <Select value={form.zoneId} onChange={(event) => setForm({ ...form, zoneId: event.target.value })}>
-              <option value="">Chọn khu vực</option>
+              <option value="">Chọn zone</option>
               {zones.map((zone) => <option key={zone.zoneId} value={zone.zoneId}>{zone.zoneName}</option>)}
             </Select>
           </div>

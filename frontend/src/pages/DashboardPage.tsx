@@ -46,7 +46,7 @@ export default function DashboardPage() {
   const [endDate, setEndDate] = useState<string>('')
 
   useEffect(() => {
-    Promise.all([
+    Promise.allSettled([
       dashboardApi.summary(),
       sacksApi.all(),
       inboundOrdersApi.all(),
@@ -54,16 +54,27 @@ export default function DashboardPage() {
       tripsApi.all(),
       reservationsApi.all('Active'),
     ])
-      .then(([sum, sackList, inOrders, outOrders, tripList, reservations]) => {
-        setSummary(sum)
-        setSacks(sackList)
-        setInbound(inOrders)
-        setOutbound(outOrders)
-        setTrips(tripList)
-        const soon = reservations
-          .filter((r) => new Date(r.expiresAt).getTime() - Date.now() < 4 * 3600000)
-          .slice(0, 5)
-        setExpiring(soon)
+      .then((results) => {
+        if (results[0].status === 'fulfilled') {
+          setSummary(results[0].value)
+        } else {
+          setError(results[0].reason?.message || 'Không thể tải dữ liệu tổng quan')
+          return
+        }
+
+        setSacks(results[1].status === 'fulfilled' ? results[1].value : [])
+        setInbound(results[2].status === 'fulfilled' ? results[2].value : [])
+        setOutbound(results[3].status === 'fulfilled' ? results[3].value : [])
+        setTrips(results[4].status === 'fulfilled' ? results[4].value : [])
+        
+        if (results[5].status === 'fulfilled') {
+          const soon = results[5].value
+            .filter((r) => new Date(r.expiresAt).getTime() - Date.now() < 4 * 3600000)
+            .slice(0, 5)
+          setExpiring(soon)
+        } else {
+          setExpiring([])
+        }
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))

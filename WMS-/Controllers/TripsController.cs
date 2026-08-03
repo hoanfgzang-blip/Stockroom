@@ -20,6 +20,44 @@ namespace WMS_.Controllers
 
     public sealed record TripCheckInResponse(string TripId, string CarId, string Status, int SackCount, string? ZoneId, string? ZoneName);
 
+    public sealed record TripQrParty(string Id, string Name);
+    public sealed record TripQrVehicle(string Id, string Type, decimal Capacity);
+    public sealed record TripQrSack(string SackId, string Status, string Destination, string? PalletId, string? ZoneId);
+
+    public sealed class TripQrManifest
+    {
+        public string Kind { get; set; } = "WMS_TRIP_MANIFEST";
+        public int Version { get; set; } = 1;
+        public string TripId { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public TripQrParty Driver { get; set; } = new(string.Empty, string.Empty);
+        public TripQrVehicle Vehicle { get; set; } = new(string.Empty, string.Empty, 0);
+        public TripQrParty Origin { get; set; } = new(string.Empty, string.Empty);
+        public TripQrParty Destination { get; set; } = new(string.Empty, string.Empty);
+        public DateTime CreatedAt { get; set; }
+        public DateTime IssuedAt { get; set; } = DateTime.UtcNow;
+        public List<TripQrSack> Sacks { get; set; } = [];
+    }
+
+    public sealed class TripQrCheckInRequest
+    {
+        [Required] public TripQrManifest Manifest { get; set; } = new();
+        public List<string> ArrivedSackIds { get; set; } = [];
+    }
+
+    public sealed record TripQrCheckInResponse(
+        string TripId,
+        string CarId,
+        string Status,
+        int ExpectedCount,
+        int ArrivedCount,
+        int ReceivedCount,
+        List<string> MissingSackIds,
+        List<string> UnexpectedSackIds,
+        string? ZoneId,
+        string? ZoneName);
+
     [Microsoft.AspNetCore.Authorization.Authorize]
     [ApiController]
     [Route("api/[controller]")]
@@ -68,6 +106,14 @@ namespace WMS_.Controllers
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
         public async Task<ActionResult<IEnumerable<Sack>>> GetSacks(string id)
             => Ok(await _db.Sacks.Where(sack => sack.TripId == id).OrderBy(sack => sack.SackId).ToListAsync());
+
+        [HttpGet("{id}/qr-manifest")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
+        public async Task<ActionResult<TripQrManifest>> GetQrManifest(string id)
+        {
+            var manifest = await BuildQrManifestAsync(id);
+            return manifest == null ? NotFound() : Ok(manifest);
+        }
 
         [HttpPost]
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
@@ -125,6 +171,73 @@ namespace WMS_.Controllers
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
             return Ok(new TripCheckInResponse(trip.TripId, trip.CarId, trip.Status, sacks.Count, inboundZone.ZoneId, inboundZone.ZoneName));
+        }
+
+        [HttpPost("check-in-by-qr")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
+        public async Task<ActionResult<TripQrCheckInResponse>> CheckInByQr([FromBody] TripQrCheckInRequest request)
+        {
+            if (request.Manifest.Kind != "WMS_TRIP_MANIFEST" || request.Manifest.Version != 1)
+                return BadRequest(new { message = "QR khong dung dinh dang manifest chuyen xe WMS." });
+
+            var tripId = request.Manifest.TripId.Trim();
+            if (string.IsNullOrWhiteSpace(tripId)) return BadRequest(new { message = "QR thieu ma chuyen xe." });
+
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+            var trip = await _db.Trips.FindAsync(tripId);
+            if (trip == null) return NotFound(new { message = "Khong tim thay ma chuyen xe trong QR." });
+            if (trip.Type is not ("Inbound" or "Outbound")) return BadRequest(new { message = "Loai chuyen xe khong hop le." });
+            if (trip.Status == "Completed") return Conflict(new { message = "Chuyen xe nay da duoc xac nhan den kho." });
+
+            Zone? inboundZone = null;
+            if (trip.Type == "Inbound")
+            {
+                inboundZone = await _db.Zones.FirstOrDefaultAsync(zone => zone.LocationId == trip.Destination && zone.ZoneType == "Inbound");
+                if (inboundZone == null) return BadRequest(new { message = "Hub dich chua co zone Inbound." });
+            }
+
+            var dbSacks = await _db.Sacks.Where(sack => sack.TripId == tripId).ToListAsync();
+            var expectedIds = dbSacks.Select(sack => sack.SackId).OrderBy(id => id).ToList();
+            var manifestIds = request.Manifest.Sacks.Select(sack => sack.SackId.Trim()).Where(id => id.Length > 0).Distinct().OrderBy(id => id).ToList();
+            var arrivedIds = (request.ArrivedSackIds.Count > 0 ? request.ArrivedSackIds : manifestIds)
+                .Select(id => id.Trim()).Where(id => id.Length > 0).Distinct().ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var missingIds = expectedIds.Where(id => !arrivedIds.Contains(id)).ToList();
+            var unexpectedIds = arrivedIds.Where(id => !expectedIds.Contains(id, StringComparer.OrdinalIgnoreCase)).OrderBy(id => id).ToList();
+            if (unexpectedIds.Count > 0)
+                return Conflict(new TripQrCheckInResponse(trip.TripId, trip.CarId, trip.Status, expectedIds.Count, arrivedIds.Count, 0, missingIds, unexpectedIds, inboundZone?.ZoneId, inboundZone?.ZoneName));
+
+            var received = 0;
+            foreach (var sack in dbSacks.Where(sack => arrivedIds.Contains(sack.SackId)))
+            {
+                if (trip.Type == "Inbound")
+                {
+                    sack.Status = "Sorting";
+                    sack.ZoneId = inboundZone!.ZoneId;
+                    sack.PalletId = null;
+                }
+                else
+                {
+                    sack.Status = "Received";
+                    sack.EndAt = DateTime.UtcNow;
+                }
+                received++;
+            }
+
+            if (missingIds.Count == 0)
+            {
+                trip.Status = "Completed";
+                trip.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                trip.Status = "InProgress";
+            }
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Ok(new TripQrCheckInResponse(trip.TripId, trip.CarId, trip.Status, expectedIds.Count, arrivedIds.Count, received, missingIds, unexpectedIds, inboundZone?.ZoneId, inboundZone?.ZoneName));
         }
 
         [HttpPatch("{id}/status")]
@@ -208,6 +321,31 @@ namespace WMS_.Controllers
             do { id = $"{prefix}-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{RandomNumberGenerator.GetHexString(2)}"; }
             while (await _db.Trips.AnyAsync(trip => trip.TripId == id));
             return id;
+        }
+
+        private async Task<TripQrManifest?> BuildQrManifestAsync(string id)
+        {
+            var trip = await _db.Trips
+                .Include(item => item.Employee)
+                .Include(item => item.Car)
+                .Include(item => item.OriginLocation)
+                .Include(item => item.DestinationLocation)
+                .FirstOrDefaultAsync(item => item.TripId == id);
+            if (trip == null) return null;
+
+            var sacks = await _db.Sacks.Where(sack => sack.TripId == id).OrderBy(sack => sack.SackId).ToListAsync();
+            return new TripQrManifest
+            {
+                TripId = trip.TripId,
+                Type = trip.Type,
+                Status = trip.Status,
+                Driver = new TripQrParty(trip.EmployeeId, trip.Employee.EmployeeName),
+                Vehicle = new TripQrVehicle(trip.CarId, trip.Car.CarType, trip.Car.Capacity),
+                Origin = new TripQrParty(trip.Origin, trip.OriginLocation.LocationName),
+                Destination = new TripQrParty(trip.Destination, trip.DestinationLocation.LocationName),
+                CreatedAt = trip.CreatedAt,
+                Sacks = sacks.Select(sack => new TripQrSack(sack.SackId, sack.Status, sack.SDestination, sack.PalletId, sack.ZoneId)).ToList()
+            };
         }
     }
 }

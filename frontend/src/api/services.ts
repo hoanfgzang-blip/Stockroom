@@ -16,6 +16,7 @@ import type {
   Sack,
   Shift,
   Trip,
+  TripQrManifest,
   Zone,
 } from '@/types'
 import type { AuthUser } from '@/auth/AuthContext'
@@ -159,11 +160,24 @@ export type TripCheckInResult = {
   zoneId?: string | null
   zoneName?: string | null
 }
+export type TripQrCheckInResult = {
+  tripId: string
+  carId: string
+  status: string
+  expectedCount: number
+  arrivedCount: number
+  receivedCount: number
+  missingSackIds: string[]
+  unexpectedSackIds: string[]
+  zoneId?: string | null
+  zoneName?: string | null
+}
 export const tripsApi = {
   all: (status?: string) =>
     api.get<Trip[]>(`/Trips${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Trip>(`/Trips/${id}`),
   sacks: (id: string) => api.get<Sack[]>(`/Trips/${id}/sacks`),
+  qrManifest: (id: string) => api.get<TripQrManifest>(`/Trips/${id}/qr-manifest`),
   create: (data: CreateTripRequest) => api.post<Trip>('/Trips', data),
   update: (id: string, data: Trip) => api.put<void>(`/Trips/${id}`, data),
   updateStatus: (id: string, status: string) => api.patch(`/Trips/${id}/status`, status),
@@ -173,6 +187,11 @@ export const tripsApi = {
   updateMyStatus: (id: string, status: 'InProgress' | 'Completed') =>
     api.patch(`/Trips/my/${id}/status`, status),
   checkIn: (id: string) => api.post<TripCheckInResult>(`/Trips/${id}/check-in`, {}),
+  checkInByQr: (manifest: TripQrManifest, arrivedSackIds?: string[]) =>
+    api.post<TripQrCheckInResult>('/Trips/check-in-by-qr', {
+      manifest,
+      arrivedSackIds: arrivedSackIds ?? manifest.sacks.map((sack) => sack.sackId),
+    }),
 }
 
 export const routingRulesApi = {

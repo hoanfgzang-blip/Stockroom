@@ -2,14 +2,14 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { Barcode, Camera, CheckCircle2, CircleAlert, ClipboardCheck, PackageCheck, Plus, Printer, ScanLine, Send, Truck, Undo2 } from 'lucide-react'
 import { BrowserMultiFormatReader, BrowserQRCodeSvgWriter, type IScannerControls } from '@zxing/browser'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
-import { locationsApi, outboundOrdersApi, palletsApi, sacksApi, tripsApi, type TripCheckInResult } from '@/api/services'
+import { locationsApi, outboundOrdersApi, palletsApi, sacksApi, tripsApi, type TripCheckInResult, type TripQrCheckInResult } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog } from '@/components/ui/dialog'
 import { Label, Select } from '@/components/ui/input'
 import { PageHeader } from '@/components/shared/PageHeader'
-import type { Location, OutboundOrder, Sack } from '@/types'
+import type { Location, OutboundOrder, Sack, TripQrManifest } from '@/types'
 import { useAuth } from '@/auth/AuthContext'
 
 type ScanMode = 'inbound' | 'sorting' | 'outbound' | 'received'
@@ -19,6 +19,12 @@ type ScanResult = {
   message: string
   success: boolean
   at: Date
+}
+
+type InboundCheckInResult = Partial<TripCheckInResult> & Partial<TripQrCheckInResult> & {
+  tripId: string
+  carId: string
+  status: string
 }
 
 const code39Patterns: Record<string, string> = {
@@ -126,6 +132,26 @@ function statusLabel(status: string) {
   return labels[status] ?? status
 }
 
+function parseTripManifest(value: string): TripQrManifest | null {
+  try {
+    const parsed = JSON.parse(value) as Partial<TripQrManifest>
+    if (parsed.kind !== 'WMS_TRIP_MANIFEST' || parsed.version !== 1 || !parsed.tripId || !Array.isArray(parsed.sacks)) return null
+    return parsed as TripQrManifest
+  } catch {
+    return null
+  }
+}
+
+function formatTripQrResult(trip: InboundCheckInResult, manifest?: TripQrManifest | null) {
+  const count = trip.sackCount ?? trip.receivedCount ?? 0
+  const missingCount = trip.missingSackIds?.length ?? 0
+  const action = manifest?.type === 'Outbound'
+    ? `${count} bao da duoc xac nhan nhan tai diem den`
+    : `${count} bao duoc dua vao ${trip.zoneName ?? trip.zoneId ?? 'zone nhap'}`
+  const suffix = missingCount > 0 ? ` Con thieu ${missingCount} bao: ${trip.missingSackIds?.join(', ')}.` : ' Da den du hang.'
+  return `Xe ${trip.carId} da den. ${action}.${suffix}`
+}
+
 export default function BarcodeScannerPage() {
   const { user } = useAuth()
   const isDriver = user?.roleName === 'Driver'
@@ -138,7 +164,7 @@ export default function BarcodeScannerPage() {
   const [locations, setLocations] = useState<Location[]>([])
   const [outboundOrderId, setOutboundOrderId] = useState('')
   const [lastSack, setLastSack] = useState<Sack | null>(null)
-  const [lastTrip, setLastTrip] = useState<TripCheckInResult | null>(null)
+  const [lastTrip, setLastTrip] = useState<InboundCheckInResult | null>(null)
   const [classification, setClassification] = useState<{ label: string; destinationName?: string | null; zoneName?: string | null } | null>(null)
   const [results, setResults] = useState<ScanResult[]>([])
   const [processing, setProcessing] = useState(false)
@@ -191,11 +217,23 @@ export default function BarcodeScannerPage() {
     setProcessing(true)
     try {
       if (mode === 'inbound') {
-        const trip = await tripsApi.checkIn(scannedCode)
+        const manifest = parseTripManifest(scannedCode)
+        const trip: InboundCheckInResult = manifest ? await tripsApi.checkInByQr(manifest) : await tripsApi.checkIn(scannedCode)
         setLastTrip(trip)
         setLastSack(null)
-        addResult(trip.tripId, `Xe ${trip.carId} đã đến kho. ${trip.sackCount} bao được đưa vào ${trip.zoneName ?? trip.zoneId ?? 'zone nhập'}.`, true)
+        addResult(trip.tripId, formatTripQrResult(trip, manifest), (trip.missingSackIds?.length ?? 0) === 0)
         return
+      }
+
+      if (mode === 'received') {
+        const manifest = parseTripManifest(scannedCode)
+        if (manifest) {
+          const trip: InboundCheckInResult = await tripsApi.checkInByQr(manifest)
+          setLastTrip(trip)
+          setLastSack(null)
+          addResult(trip.tripId, formatTripQrResult(trip, manifest), (trip.missingSackIds?.length ?? 0) === 0)
+          return
+        }
       }
 
       const sack = await sacksApi.get(scannedCode)
@@ -458,7 +496,7 @@ export default function BarcodeScannerPage() {
               <CardContent><div className="grid gap-4 sm:grid-cols-4">
                 <div><p className="text-xs text-slate-500">Mã chuyến</p><p className="mt-1 font-mono font-semibold">{lastTrip.tripId}</p></div>
                 <div><p className="text-xs text-slate-500">Xe</p><p className="mt-1 font-medium">{lastTrip.carId}</p></div>
-                <div><p className="text-xs text-slate-500">Bao đã nhận</p><p className="mt-1 font-semibold">{lastTrip.sackCount} bao</p></div>
+                <div><p className="text-xs text-slate-500">Bao đã nhận</p><p className="mt-1 font-semibold">{lastTrip.sackCount ?? lastTrip.receivedCount ?? 0} bao</p></div>
                 <div><p className="text-xs text-slate-500">Zone hiện tại</p><p className="mt-1 font-medium">{lastTrip.zoneName ?? lastTrip.zoneId ?? 'Chưa xác định'}</p></div>
               </div></CardContent>
             </Card>

@@ -71,9 +71,12 @@ namespace WMS_.Controllers
         public async Task<ActionResult<IEnumerable<Trip>>> GetAll([FromQuery] string? status = null)
         {
             var locationId = User.FindFirstValue("location_id");
+            if (string.IsNullOrWhiteSpace(locationId)) return Forbid();
             var query = _db.Trips.AsQueryable();
+            query = query.Where(trip => trip.Origin == locationId || trip.Destination == locationId);
+
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(trip => trip.Status == status);
-            if (!string.IsNullOrWhiteSpace(locationId)) query = query.Where(trip => trip.Origin == locationId);
+
             var trips = await query.OrderByDescending(trip => trip.CreatedAt).ToListAsync();
             await PopulateSackCountsAsync(trips);
             return Ok(trips);

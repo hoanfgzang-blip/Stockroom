@@ -37,9 +37,9 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
                     .SingleOrDefaultAsync(item => item.UserId == userId);
             var currentRole = context.Principal?.FindFirstValue(ClaimTypes.Role);
             var currentHub = context.Principal?.FindFirstValue("location_id");
-            if (account?.IsActive != true || account.Employee == null ||
-                !string.Equals(currentRole, account.RoleName, StringComparison.Ordinal) ||
-                !string.Equals(currentHub, account.Employee.LocationId, StringComparison.Ordinal))
+            if (account?.IsActive != true || account?.Employee == null ||
+                !string.Equals(currentRole, account.Employee?.RoleName, StringComparison.Ordinal) ||
+                !string.Equals(currentHub, account.Employee?.LocationId, StringComparison.Ordinal))
             {
                 context.RejectPrincipal();
                 await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);

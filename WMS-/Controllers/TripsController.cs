@@ -201,7 +201,7 @@ namespace WMS_.Controllers
             var trip = await _db.Trips.FindAsync(tripId);
             if (trip == null) return NotFound(new { message = "Khong tim thay ma chuyen xe trong QR." });
 
-            if (trip.Type == "Inbound" && trip.Destination != myLocationId)
+            if (trip.Destination != myLocationId)
                 return BadRequest(new { message = "Chuyen xe khong co diem den la hub cua ban. Khong the check-in bang QR!" });
 
             if (trip.Type is not ("Inbound" or "Outbound")) return BadRequest(new { message = "Loai chuyen xe khong hop le." });

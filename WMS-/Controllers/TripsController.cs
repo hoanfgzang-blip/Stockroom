@@ -136,6 +136,27 @@ namespace WMS_.Controllers
             return Ok(await _db.Sacks.Where(sack => sack.TripId == id).OrderBy(sack => sack.SackId).ToListAsync());
         }
 
+        [HttpGet("{id}/pallets")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
+        public async Task<ActionResult<object>> GetPallets(string id)
+        {
+            var locationId = User.FindFirstValue("location_id");
+            var trip = await _db.Trips.FindAsync(id);
+            if (trip == null) return NotFound();
+            if (string.IsNullOrWhiteSpace(locationId) || (trip.Origin != locationId && trip.Destination != locationId))
+                return Forbid();
+
+            var pallets = await _db.Pallets
+                .Where(p => _db.Sacks.Any(s => s.TripId == id && s.PalletId == p.PalletId))
+                .ToListAsync();
+
+            return Ok(new
+            {
+                PalletCount = pallets.Count,
+                Pallets = pallets
+            });
+        }
+
         [HttpGet("{id}/qr-manifest")]
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
         public async Task<ActionResult<TripQrManifest>> GetQrManifest(string id)

@@ -22,12 +22,10 @@ namespace WMS_.Services.Warehouse
 
         public async Task<IEnumerable<Zone>> GetAllZonesAsync()
         {
-            // L?y mã Hub c?a nhân viên ?ang ??ng nh?p t? Token
             var myLocationId = _httpContextAccessor.HttpContext?.User.FindFirstValue("location_id");
 
             var query = _db.Zones.Include(z => z.Location).AsQueryable();
 
-            // L?c ??c quy?n theo Hub: Ch? tr? v? các khu v?c (Zone) thu?c ?úng Hub c?a nhân viên ?ó
             if (!string.IsNullOrEmpty(myLocationId))
             {
                 query = query.Where(z => z.LocationId == myLocationId);

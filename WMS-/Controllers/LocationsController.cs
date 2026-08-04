@@ -4,6 +4,7 @@ using WMS_.Data;
 using WMS_.Data.Entities;
 using WMS_.Configuration;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 
 public sealed class CreateLocationRequest
 {
@@ -15,7 +16,7 @@ public sealed class CreateLocationRequest
 
 namespace WMS_.Controllers
 {
-    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOnly")]
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
     [ApiController]
     [Route("api/[controller]")]
     public class LocationsController : ControllerBase
@@ -25,24 +26,39 @@ namespace WMS_.Controllers
 
         /// <summary>Get all warehouse locations (WarehouseLocationMap page)</summary>
         [HttpGet]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOnly")]
         public async Task<ActionResult<IEnumerable<Location>>> GetAll()
             => await _db.Locations
                 .Where(l => OperationalHubScope.HubIds.Contains(l.LocationId))
                 .Include(l => l.Province)
                 .ToListAsync();
 
-        /// <summary>Get hub and configured local dispatch destinations for outbound operations.</summary>
+        /// <summary>Get local dispatch destinations and reachable transit hubs for the current hub.</summary>
         [HttpGet("dispatch-destinations")]
         public async Task<ActionResult<IEnumerable<Location>>> GetDispatchDestinations()
-            => await _db.Locations
-                .Where(location => OperationalHubScope.OutboundDestinationIds.Contains(location.LocationId))
+        {
+            var currentHubId = User.FindFirstValue("location_id");
+            if (!OperationalHubScope.IsHub(currentHubId)) return Forbid();
+
+            var currentProvinceId = await _db.Locations
+                .Where(location => location.LocationId == currentHubId)
+                .Select(location => location.ProvinceId)
+                .SingleOrDefaultAsync();
+            if (string.IsNullOrWhiteSpace(currentProvinceId)) return Forbid();
+
+            return await _db.Locations
+                .Where(location =>
+                    (OperationalHubScope.HubIds.Contains(location.LocationId) && location.LocationId != currentHubId) ||
+                    (OperationalHubScope.LocalDispatchLocationIds.Contains(location.LocationId) && location.ProvinceId == currentProvinceId))
                 .Include(location => location.Province)
                 .OrderBy(location => location.ProvinceId)
                 .ThenBy(location => location.LocationName)
                 .ToListAsync();
+        }
 
         /// <summary>Get location by ID</summary>
         [HttpGet("{id}")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOnly")]
         public async Task<ActionResult<Location>> GetById(string id)
         {
             if (!OperationalHubScope.IsHub(id)) return NotFound();
@@ -52,6 +68,7 @@ namespace WMS_.Controllers
 
         /// <summary>Get locations by province</summary>
         [HttpGet("by-province/{provinceId}")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOnly")]
         public async Task<ActionResult<IEnumerable<Location>>> GetByProvince(string provinceId)
             => await _db.Locations
                 .Where(l => l.ProvinceId == provinceId && OperationalHubScope.HubIds.Contains(l.LocationId))
@@ -59,6 +76,7 @@ namespace WMS_.Controllers
 
         /// <summary>Create location</summary>
         [HttpPost]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOnly")]
         public async Task<ActionResult<Location>> Create([FromBody] CreateLocationRequest request)
         {
             if (!OperationalHubScope.IsHub(request.LocationId) || request.LocationType != "Hub")
@@ -89,6 +107,7 @@ namespace WMS_.Controllers
 
         /// <summary>Update location</summary>
         [HttpPut("{id}")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOnly")]
         public async Task<IActionResult> Update(string id, [FromBody] Location location)
         {
             if (id != location.LocationId) return BadRequest();
@@ -103,6 +122,7 @@ namespace WMS_.Controllers
 
         /// <summary>Delete location</summary>
         [HttpDelete("{id}")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOnly")]
         public async Task<IActionResult> Delete(string id)
         {
             if (OperationalHubScope.IsHub(id))

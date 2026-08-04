@@ -35,7 +35,11 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
                 ? null
                 : await db.UserAccounts.Include(item => item.Employee)
                     .SingleOrDefaultAsync(item => item.UserId == userId);
-            if (account?.IsActive != true || account.Employee == null)
+            var currentRole = context.Principal?.FindFirstValue(ClaimTypes.Role);
+            var currentHub = context.Principal?.FindFirstValue("location_id");
+            if (account?.IsActive != true || account.Employee == null ||
+                !string.Equals(currentRole, account.RoleName, StringComparison.Ordinal) ||
+                !string.Equals(currentHub, account.Employee.LocationId, StringComparison.Ordinal))
             {
                 context.RejectPrincipal();
                 await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);

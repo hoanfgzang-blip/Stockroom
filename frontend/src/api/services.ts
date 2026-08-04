@@ -215,8 +215,8 @@ export const tripsApi = {
   create: (data: CreateTripRequest) => api.post<Trip>('/Trips', data),
   loadSack: (tripId: string, sackId: string) =>
     api.post<LoadTripSackResult>(`/Trips/${tripId}/load-sack/${sackId}`, {}),
-  departByQr: (qrValue: string) =>
-    api.post<DispatchTripByQrResult>('/Trips/depart-by-qr', { qrValue }),
+  departByQr: (tripId: string, qrValue: string) =>
+    api.post<DispatchTripByQrResult>('/Trips/depart-by-qr', { tripId, qrValue }),
   scanSeal: (tripId: string, sealCode: string) =>
     api.post<ScanTripSealResult>(`/Trips/${tripId}/scan-seal`, { sealCode }),
   update: (id: string, data: Trip) => api.put<void>(`/Trips/${id}`, data),

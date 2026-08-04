@@ -87,31 +87,41 @@ namespace WMS_.Controllers
             if (string.IsNullOrWhiteSpace(hubId))
                 return Forbid();
 
-            var zoneId = request.ZoneId;
-            if (!string.IsNullOrWhiteSpace(zoneId) &&
-                !await _db.Zones.AnyAsync(zone => zone.ZoneId == zoneId && zone.LocationId == hubId))
-                return BadRequest("Zone của bao phải thuộc hub của tài khoản.");
-
             if (!string.IsNullOrWhiteSpace(request.PalletId))
-            {
-                var pallet = await _db.Pallets
-                    .Include(item => item.Zone)
-                    .FirstOrDefaultAsync(item => item.PalletId == request.PalletId && item.Zone.LocationId == hubId);
-                if (pallet == null)
-                    return BadRequest("Pallet của bao phải thuộc hub của tài khoản.");
-                if (zoneId != null && zoneId != pallet.ZoneId)
-                    return BadRequest("Zone của bao phải trùng zone của pallet.");
-                zoneId = pallet.ZoneId;
-            }
+                return BadRequest("Tạo bao không hỗ trợ gán sẵn pallet. Hãy quét bao vào pallet để phân loại.");
 
+            var currentHub = await _db.Locations.FindAsync(hubId);
+            var destination = await _db.Locations.FindAsync(request.SDestination);
+            if (currentHub == null || destination == null)
+                return BadRequest("Không tìm thấy hub hiện tại hoặc điểm đến của bao.");
+
+            var expectedRole = currentHub.ProvinceId == destination.ProvinceId
+                ? ZoneProcessRoles.LocalSortBuffer
+                : ZoneProcessRoles.InterprovinceOutbound;
+            var zoneId = request.ZoneId?.Trim();
+            Zone? zone;
             if (string.IsNullOrWhiteSpace(zoneId))
             {
-                zoneId = await _db.Zones
-                    .Where(zone => zone.LocationId == hubId && zone.ZoneType == "Sorting")
-                    .Select(zone => zone.ZoneId)
-                    .FirstOrDefaultAsync();
-                if (zoneId == null)
-                    return BadRequest("Hub chưa có zone Sorting để tạo bao hàng.");
+                zone = await _db.Zones
+                    .FirstOrDefaultAsync(item => item.LocationId == hubId && item.ProcessRole == expectedRole);
+                if (zone == null)
+                    return BadRequest(expectedRole == ZoneProcessRoles.LocalSortBuffer
+                        ? "Hub chưa có Zone A cho bao nội tỉnh."
+                        : "Hub chưa có Zone C cho bao ngoại tỉnh.");
+                zoneId = zone.ZoneId;
+            }
+            else
+            {
+                zone = await _db.Zones.FirstOrDefaultAsync(item => item.ZoneId == zoneId && item.LocationId == hubId);
+                if (zone == null)
+                    return BadRequest("Zone của bao phải thuộc hub của tài khoản.");
+            }
+
+            if (zone.ProcessRole != expectedRole)
+            {
+                return BadRequest(expectedRole == ZoneProcessRoles.LocalSortBuffer
+                    ? "Bao nội tỉnh phải bắt đầu tại Zone A."
+                    : "Bao ngoại tỉnh phải bắt đầu tại Zone C.");
             }
 
             var sack = new Sack
@@ -120,8 +130,7 @@ namespace WMS_.Controllers
                 Status = "Sorting",
                 CreatedAt = DateTime.UtcNow,
                 SDestination = request.SDestination,
-                ZoneId = zoneId,
-                PalletId = request.PalletId
+                ZoneId = zoneId
             };
 
             _db.Sacks.Add(sack);

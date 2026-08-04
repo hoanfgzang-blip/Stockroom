@@ -37,7 +37,10 @@ function printTripQr(token: TripQrTokenIssueResponse) {
   const destinationName = escapeHtml(token.destinationName)
   const sackCount = escapeHtml(token.sackCount)
   const expiresAt = escapeHtml(formatDateTime(token.expiresAt))
- printWindow.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>QR trip ${tripId}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}main{max-width:190mm;border:1px solid #ddd;padding:8mm}header{display:grid;grid-template-columns:1fr 86mm;gap:8mm;align-items:start}h1{font-size:18pt;margin:0 0 4mm}.code{font:700 12pt monospace;word-break:break-all}.meta{display:grid;grid-template-columns:28mm 1fr;gap:2mm 4mm;font-size:10pt}.label{color:#555}.qr{text-align:center}.qr svg{width:36mm;height:36mm}.hint{font-size:9pt;color:#555;margin-top:2mm}@page{size:auto;margin:10mm}</style></head><body><main><header><section><h1>WMS - QR chuyen xe</h1><p class="code">${tripId}</p><div class="meta"><span class="label">Tai xe</span><strong>${driverName}</strong><span class="label">Xe</span><strong>${carInfo}</strong><span class="label">Tu</span><strong>${originName}</strong><span class="label">Den</span><strong>${destinationName}</strong><span class="label">So bao</span><strong>${sackCount}</strong><span class="label">Het han</span><strong>${expiresAt}</strong></div></section><section class="qr">${qrSvg}<p class="hint">Quet QR nay de mo phien chat hang tai hub xuat phat va doi chieu hang tai diem den.</p></section></header></main><script>window.onload=()=>window.print();</script></body></html>`)
+  const outboundOrderInfo = token.outboundOrderNumber
+    ? `<span class="label">Don outbound</span><strong>${escapeHtml(token.outboundOrderNumber)} (${escapeHtml(token.outboundOrderId ?? '')})</strong>`
+    : ''
+  printWindow.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>QR trip ${tripId}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}main{max-width:190mm;border:1px solid #ddd;padding:8mm}header{display:grid;grid-template-columns:1fr 86mm;gap:8mm;align-items:start}h1{font-size:18pt;margin:0 0 4mm}.code{font:700 12pt monospace;word-break:break-all}.meta{display:grid;grid-template-columns:28mm 1fr;gap:2mm 4mm;font-size:10pt}.label{color:#555}.qr{text-align:center}.qr svg{width:36mm;height:36mm}.hint{font-size:9pt;color:#555;margin-top:2mm}@page{size:auto;margin:10mm}</style></head><body><main><header><section><h1>WMS - QR chuyen xe</h1><p class="code">${tripId}</p><div class="meta"><span class="label">Tai xe</span><strong>${driverName}</strong><span class="label">Xe</span><strong>${carInfo}</strong>${outboundOrderInfo}<span class="label">Tu</span><strong>${originName}</strong><span class="label">Den</span><strong>${destinationName}</strong><span class="label">So bao</span><strong>${sackCount}</strong><span class="label">Het han</span><strong>${expiresAt}</strong></div></section><section class="qr">${qrSvg}<p class="hint">Quet QR nay de mo phien chat hang tai hub xuat phat va doi chieu hang tai diem den.</p></section></header></main><script>window.onload=()=>window.print();</script></body></html>`)
   printWindow.document.close()
 }
 
@@ -259,7 +262,7 @@ export default function TripsPage() {
           setActiveVehicleQr(code)
           setScanModalNotice('Đã mở QR xe. Hãy quét từng sack để chất lên xe.')
         } else {
-          const res = await tripsApi.departByQr(code)
+          const res = await tripsApi.departByQr(activeLoadTrip.tripId, code)
           setNotice(`Đã quét QR xe lần hai. Xuất kho hoàn tất với ${res.loadedCount} sack; xe đang vận chuyển.`)
           setLoadScanOpen(false)
           setActiveVehicleQr(null)
@@ -371,9 +374,11 @@ export default function TripsPage() {
           <div className="space-y-4">
             <div className="rounded-lg border bg-slate-50 p-3 text-xs space-y-1">
               <p><strong>Mã chuyến:</strong> <span className="font-mono text-primary font-semibold">{resultQrToken.tripId}</span></p>
-              <p><strong>Tài xế:</strong> {resultQrToken.driverName}</p>
-              <p><strong>Phương tiện:</strong> {resultQrToken.carInfo}</p>
-              <p><strong>Điểm đi:</strong> {resultQrToken.originName}</p>
+               <p><strong>Tài xế:</strong> {resultQrToken.driverName}</p>
+               <p><strong>Phương tiện:</strong> {resultQrToken.carInfo}</p>
+               {resultQrToken.outboundOrderNumber && <p><strong>Đơn outbound:</strong> {resultQrToken.outboundOrderNumber} · {resultQrToken.outboundOrderId}</p>}
+               {resultQrToken.outboundCustomerName && <p><strong>Khách hàng:</strong> {resultQrToken.outboundCustomerName}</p>}
+               <p><strong>Điểm đi:</strong> {resultQrToken.originName}</p>
               <p><strong>Điểm đến:</strong> {resultQrToken.destinationName}</p>
               <p><strong>Tổng số bao:</strong> {resultQrToken.sackCount}</p>
               <p><strong>QR hết hạn:</strong> {formatDateTime(resultQrToken.expiresAt)}</p>

@@ -95,6 +95,12 @@ export interface TripQrSack {
 export interface TripQrManifest {
   tripId: string
   sacks: string[]
+  outboundOrderId?: string | null
+  outboundOrderNumber?: string | null
+  outboundCustomerName?: string | null
+  outboundDestination?: string | null
+  outboundOrderStatus?: string | null
+  outboundSackIds?: string[]
 }
 
 export interface TripQrCheckInRequest {
@@ -127,6 +133,11 @@ export interface TripQrTokenIssueResponse {
   originName: string
   destinationName: string
   sackCount: number
+  outboundOrderId?: string | null
+  outboundOrderNumber?: string | null
+  outboundCustomerName?: string | null
+  outboundDestination?: string | null
+  outboundOrderStatus?: string | null
 }
 
 export interface InboundOrder {

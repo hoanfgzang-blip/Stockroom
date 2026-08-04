@@ -39,6 +39,11 @@ type OutboundLoadSession = {
   tripId: string
   qrValue: string
   loadedSackIds: string[]
+  expectedSackIds: string[]
+  outboundOrderId?: string | null
+  outboundOrderNumber?: string | null
+  outboundCustomerName?: string | null
+  outboundDestination?: string | null
 }
 
 const TRIP_QR_PREFIX = 'WMS-TRIP-QR:'
@@ -252,7 +257,16 @@ export default function BarcodeScannerPage() {
     const loadedSackIds = (manifest.sacks ?? [])
       .map((sack) => typeof sack === 'string' ? sack : sack.sackId)
       .filter(Boolean)
-    setOutboundLoadSession({ tripId: manifest.tripId, qrValue: scannedValue, loadedSackIds })
+    setOutboundLoadSession({
+      tripId: manifest.tripId,
+      qrValue: scannedValue,
+      loadedSackIds,
+      expectedSackIds: manifest.outboundSackIds ?? [],
+      outboundOrderId: manifest.outboundOrderId,
+      outboundOrderNumber: manifest.outboundOrderNumber,
+      outboundCustomerName: manifest.outboundCustomerName,
+      outboundDestination: manifest.outboundDestination,
+    })
     setTripSession(null)
     setLastTrip(null)
     setLastSack(null)
@@ -272,7 +286,7 @@ export default function BarcodeScannerPage() {
 
   const departOutboundByQr = async (scannedValue: string) => {
     if (!outboundLoadSession) return
-    const result = await tripsApi.departByQr(scannedValue)
+    const result = await tripsApi.departByQr(outboundLoadSession.tripId, scannedValue)
     setLastTrip({ ...result, sackCount: result.loadedCount })
     setLastSack(null)
     setOutboundLoadSession(null)
@@ -519,7 +533,7 @@ export default function BarcodeScannerPage() {
     <div>
       <PageHeader
         title="Quét mã vạch"
-        description="Chọn nghiệp vụ, đặt con trỏ vào ô quét và quét mã bao hàng. Máy quét USB hoặc Bluetooth hoạt động như bàn phím."
+        description="Chọn nghiệp vụ, đặt con trỏ vào ô quét và quét QR xe hoặc mã sack theo quy trình. Máy quét USB hoặc Bluetooth hoạt động như bàn phím."
         action={!isDriver ? (
           <Button onClick={() => setCreateDialogOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -693,6 +707,14 @@ export default function BarcodeScannerPage() {
                   <div><p className="text-xs text-slate-500">Mã chuyến</p><p className="mt-1 font-mono font-semibold">{outboundLoadSession.tripId}</p></div>
                   <div><p className="text-xs text-slate-500">Sack đã chất</p><p className="mt-1 font-semibold">{outboundLoadSession.loadedSackIds.length} sack</p></div>
                 </div>
+                {outboundLoadSession.outboundOrderNumber && (
+                  <div className="grid gap-3 rounded-lg border border-amber-200 bg-white p-3 text-sm sm:grid-cols-2">
+                    <div><p className="text-xs text-slate-500">Đơn outbound</p><p className="mt-1 font-mono font-semibold">{outboundLoadSession.outboundOrderNumber}</p></div>
+                    <div><p className="text-xs text-slate-500">Điểm đến</p><p className="mt-1 font-medium">{outboundLoadSession.outboundDestination ?? 'Chưa xác định'}</p></div>
+                    <div><p className="text-xs text-slate-500">Khách hàng</p><p className="mt-1 font-medium">{outboundLoadSession.outboundCustomerName ?? 'Chưa xác định'}</p></div>
+                    <div><p className="text-xs text-slate-500">Sack theo đơn</p><p className="mt-1 font-semibold">{outboundLoadSession.expectedSackIds.length}</p></div>
+                  </div>
+                )}
                 <p className="rounded-lg border border-amber-200 bg-white p-3 text-sm text-amber-900">
                   Đã mở QR xe. Tiếp tục quét từng sack; khi đủ hàng, quét lại đúng QR xe để hoàn tất xuất kho.
                 </p>

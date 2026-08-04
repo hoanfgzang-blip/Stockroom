@@ -389,6 +389,9 @@ namespace WMS_.Services.Warehouse
                 var sacks = await LoadSacksOnPalletForUpdateAsync(palletId);
                 if (!sacks.Any()) throw new InvalidOperationException("Pallet không chứa bao hàng nào.");
 
+                if (sacks.Any(sack => sack.Status == "Sorting"))
+                    throw new InvalidOperationException("Không thể chốt pallet outbound khi còn bao đang ở trạng thái Sorting.");
+
                 var invalidSacks = sacks.Where(s => s.Status is "InTransit" or "Loaded" or "Received").ToList();
                 if (invalidSacks.Any()) throw new InvalidOperationException("Một số bao hàng đang trên xe hoặc đã giao, không thể đóng gói.");
 

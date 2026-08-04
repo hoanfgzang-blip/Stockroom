@@ -32,6 +32,9 @@ namespace WMS_.Controllers
     {
         [Required]
         public string QrValue { get; set; } = string.Empty;
+
+        [Required]
+        public string TripId { get; set; } = string.Empty;
     }
 
     public sealed record DispatchTripByQrResponse(
@@ -58,6 +61,12 @@ namespace WMS_.Controllers
     {
         public string TripId { get; set; } = string.Empty;
         public List<string> Sacks { get; set; } = [];
+        public string? OutboundOrderId { get; set; }
+        public string? OutboundOrderNumber { get; set; }
+        public string? OutboundCustomerName { get; set; }
+        public string? OutboundDestination { get; set; }
+        public string? OutboundOrderStatus { get; set; }
+        public List<string> OutboundSackIds { get; set; } = [];
     }
 
     public sealed class TripQrCheckInRequest
@@ -89,7 +98,12 @@ namespace WMS_.Controllers
         string CarInfo,
         string OriginName,
         string DestinationName,
-        int SackCount);
+        int SackCount,
+        string? OutboundOrderId,
+        string? OutboundOrderNumber,
+        string? OutboundCustomerName,
+        string? OutboundDestination,
+        string? OutboundOrderStatus);
 
     public sealed class ResolveQrRequest
     {
@@ -203,6 +217,11 @@ namespace WMS_.Controllers
             if (trip == null) return NotFound();
             if (string.IsNullOrWhiteSpace(locationId) || (trip.Origin != locationId && trip.Destination != locationId))
                 return Forbid();
+            if (trip.Type == "Outbound" && (trip.Status == "Loading" || trip.SealedAt == null))
+                return Conflict(new
+                {
+                    message = "Chuyến outbound phải chốt seal xong mới được tạo QR manifest."
+                });
             var manifest = await BuildQrManifestAsync(id);
             return manifest == null ? NotFound() : Ok(manifest);
         }
@@ -228,6 +247,24 @@ namespace WMS_.Controllers
                     ? "Chuyến đã bị hủy, không thể cấp QR token."
                     : "Chuyến đã hoàn thành, không thể cấp QR token.";
                 return Conflict(new { message });
+            }
+
+            OutboundOrder? outboundOrder = null;
+            if (trip.Type == "Outbound")
+            {
+                if (string.IsNullOrWhiteSpace(trip.OutboundOrderId))
+                    return Conflict(new { message = "Chuyến outbound chưa được gắn với đơn outbound." });
+
+                outboundOrder = await _db.OutboundOrders
+                    .FirstOrDefaultAsync(order => order.OutboundOrderId == trip.OutboundOrderId);
+                if (outboundOrder == null)
+                    return Conflict(new { message = "Không tìm thấy đơn outbound của chuyến xe." });
+                if (outboundOrder.OriginLocationId != null && outboundOrder.OriginLocationId != trip.Origin)
+                    return Conflict(new { message = "Đơn outbound không thuộc hub xuất phát của chuyến xe." });
+                if (outboundOrder.OutboundDestination != trip.Destination)
+                    return Conflict(new { message = "Điểm đến của đơn outbound không khớp với chuyến xe." });
+                if (outboundOrder.Status is "Completed" or "Cancelled" or "Fulfilled")
+                    return Conflict(new { message = "Đơn outbound đã hoàn tất hoặc bị hủy." });
             }
 
             var token = RandomNumberGenerator.GetHexString(32);
@@ -262,6 +299,13 @@ namespace WMS_.Controllers
             await transaction.CommitAsync();
 
             var sackIds = await _db.Sacks.Where(s => s.TripId == trip.TripId).Select(s => s.SackId).ToListAsync();
+            List<string> outboundSackIds = outboundOrder == null
+                ? []
+                : await _db.OutboundOrderItems
+                    .Where(item => item.OutboundOrderId == outboundOrder.OutboundOrderId)
+                    .OrderBy(item => item.SackId)
+                    .Select(item => item.SackId)
+                    .ToListAsync();
             return Ok(new TripQrTokenIssueResponse(
                 trip.TripId,
                 $"{QrTokenPrefix}{token}",
@@ -273,7 +317,12 @@ namespace WMS_.Controllers
                 trip.Car == null ? "" : $"{trip.CarId} · {trip.Car.CarType}",
                 trip.OriginLocation?.LocationName ?? "",
                 trip.DestinationLocation?.LocationName ?? "",
-                sackIds.Count));
+                outboundSackIds.Count > 0 ? outboundSackIds.Count : sackIds.Count,
+                outboundOrder?.OutboundOrderId,
+                outboundOrder?.OutboundOrderNumber,
+                outboundOrder?.OutboundCustomerName,
+                outboundOrder?.OutboundDestination,
+                outboundOrder?.Status));
         }
 
         [HttpPost("resolve-qr")]
@@ -362,13 +411,6 @@ namespace WMS_.Controllers
                 await transaction.CommitAsync();
                 return StatusCode(StatusCodes.Status403Forbidden, new { message = "QR không thuộc hub hiện tại." });
             }
-            if (trip.Type == "Outbound" && trip.Destination == locationId && trip.Status != "InProgress")
-            {
-                AddAuditLog("ResolveTripQrFailed", "trip", trip.TripId, new { Status = trip.Status }, new { Reason = "OutboundNotDispatched", CurrentLocation = locationId });
-                await _db.SaveChangesAsync();
-                await transaction.CommitAsync();
-                return Conflict(new { message = "Chuyến outbound chưa hoàn tất xuất kho." });
-            }
             if (trip.Status is "Completed" or "Cancelled")
             {
                 var revokedCount = await RevokeActiveQrTokensAsync(trip.TripId);
@@ -380,6 +422,13 @@ namespace WMS_.Controllers
                     ? "Chuyến đã bị hủy, token QR đã bị thu hồi."
                     : "Chuyến đã hoàn thành, token QR đã bị thu hồi.";
                 return Conflict(new { message });
+            }
+            if (trip.Type == "Outbound" && trip.Destination == locationId && trip.Status != "InProgress")
+            {
+                AddAuditLog("ResolveTripQrFailed", "trip", trip.TripId, new { Status = trip.Status }, new { Reason = "OutboundNotDispatched", CurrentLocation = locationId });
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return Conflict(new { message = "Chuyến outbound chưa hoàn tất xuất kho." });
             }
 
             var manifest = await BuildQrManifestAsync(qrToken.TripId);
@@ -637,6 +686,9 @@ namespace WMS_.Controllers
             if (sack == null)
                 return NotFound(new { message = "Không tìm thấy bao hàng." });
 
+            if (sack.Status == "Sorting")
+                return Conflict(new { message = "Bao hàng đang ở trạng thái Sorting, không được chất lên xe outbound." });
+
             if (string.IsNullOrWhiteSpace(trip.OutboundOrderId))
                 return Conflict(new { message = "Chuyến outbound chưa được gán đơn outbound." });
 
@@ -720,6 +772,10 @@ namespace WMS_.Controllers
             if (string.IsNullOrWhiteSpace(token))
                 return BadRequest(new { message = "QR thiếu token chuyến xe." });
 
+            var requestedTripId = request.TripId?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(requestedTripId))
+                return BadRequest(new { message = "Thiếu mã chuyến xe cần xuất kho." });
+
             var tokenHash = HashQrToken(token);
             await using var transaction = await _db.Database.BeginTransactionAsync();
 
@@ -728,6 +784,8 @@ namespace WMS_.Controllers
                 .SingleOrDefaultAsync();
             if (qrToken == null)
                 return NotFound(new { message = "Token QR không hợp lệ." });
+            if (!string.Equals(qrToken.TripId, requestedTripId, StringComparison.OrdinalIgnoreCase))
+                return Conflict(new { message = "QR xe không khớp với chuyến đang mở." });
             if (qrToken.RevokedAt != null)
                 return Conflict(new { message = "Token QR đã bị thu hồi." });
             if (qrToken.ExpiresAt < DateTime.UtcNow)
@@ -1179,15 +1237,38 @@ namespace WMS_.Controllers
 
         private async Task<TripQrManifest?> BuildQrManifestAsync(string id)
         {
-            var exists = await _db.Trips.AnyAsync(item => item.TripId == id);
-            if (!exists) return null;
+            var trip = await _db.Trips
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.TripId == id);
+            if (trip == null) return null;
 
             var sacks = await _db.Sacks.Where(sack => sack.TripId == id).OrderBy(sack => sack.SackId).Select(sack => sack.SackId).ToListAsync();
-            return new TripQrManifest
+            var manifest = new TripQrManifest
             {
                 TripId = id,
                 Sacks = sacks
             };
+
+            if (trip.Type == "Outbound" && !string.IsNullOrWhiteSpace(trip.OutboundOrderId))
+            {
+                var order = await _db.OutboundOrders
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(item => item.OutboundOrderId == trip.OutboundOrderId);
+                if (order == null) return null;
+
+                manifest.OutboundOrderId = order.OutboundOrderId;
+                manifest.OutboundOrderNumber = order.OutboundOrderNumber;
+                manifest.OutboundCustomerName = order.OutboundCustomerName;
+                manifest.OutboundDestination = order.OutboundDestination;
+                manifest.OutboundOrderStatus = order.Status;
+                manifest.OutboundSackIds = await _db.OutboundOrderItems
+                    .Where(item => item.OutboundOrderId == order.OutboundOrderId)
+                    .OrderBy(item => item.SackId)
+                    .Select(item => item.SackId)
+                    .ToListAsync();
+            }
+
+            return manifest;
         }
     }
 }

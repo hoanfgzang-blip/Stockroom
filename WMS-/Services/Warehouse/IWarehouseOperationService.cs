@@ -8,7 +8,7 @@ namespace WMS_.Services.Warehouse
         Task<PalletAssignmentResult> ReassignSackToPalletAsync(string sackId, string palletId, string userId);
         Task<PalletAssignmentResult> RemoveSackFromPalletAsync(string sackId, string palletId, string userId);
         Task<bool> MovePalletToZoneAsync(string palletId, string newZoneId, string userId);
-        Task<bool> FinalizePalletAsync(string palletId);
+        Task<bool> FinalizePalletAsync(string palletId, string outboundOrderId, string userId);
         Task<bool> PackSacksForOutboundAsync(string outboundOrderId, System.Collections.Generic.List<string> sackIds, string userId);
     }
 }

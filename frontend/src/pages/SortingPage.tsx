@@ -54,7 +54,7 @@ function getSortingStage(processRole?: string | null): SortingStage {
     return {
       round: 'Phân loại lần 1',
       zoneLabel: 'Zone A',
-      description: 'Gom hàng nội tỉnh vào khu chờ chia chọn lần hai.',
+      description: 'Khu gom chung sau inbound cho cả hàng nội tỉnh và liên tỉnh.',
     }
   }
   if (processRole === 'LocalOutbound') {
@@ -66,9 +66,9 @@ function getSortingStage(processRole?: string | null): SortingStage {
   }
   if (processRole === 'InterprovinceOutbound') {
     return {
-      round: 'Phân loại lần 1',
+      round: 'Phân loại lần 2',
       zoneLabel: 'Zone C',
-      description: 'Phân luồng trực tiếp hàng ngoại tỉnh theo hub next hop.',
+      description: 'Nhận hàng liên tỉnh từ Zone A và gom theo hub next hop.',
     }
   }
   return {
@@ -100,7 +100,9 @@ export default function SortingPage() {
   const activeStage = getSortingStage(activeProcessRole)
   const destinationOptions = activeProcessRole === 'InterprovinceOutbound'
     ? destinations.filter((location) => location.locationType === 'Hub')
-    : destinations.filter((location) => location.locationType !== 'Hub')
+    : activeProcessRole === 'LocalOutbound'
+      ? destinations.filter((location) => location.locationType !== 'Hub')
+      : []
 
   const addHistory = (code: string, message: string, success: boolean, stage?: string) => {
     setHistory((current) => [
@@ -149,20 +151,23 @@ export default function SortingPage() {
       if (pallet.zone?.processRole !== activeProcessRole) {
         throw new Error(`${pallet.palletId} thuộc ${stage.zoneLabel}. Hãy chọn trạm ${stage.round} · ${stage.zoneLabel} trước khi kích hoạt pallet.`)
       }
+      const isZoneA = pallet.zone?.processRole === 'LocalSortBuffer'
       const palletDestinationId = pallet.destinationLocationId ?? destinationId
-      if (!palletDestinationId)
+      if (!isZoneA && !palletDestinationId)
         throw new Error('Hãy chọn location đích cho pallet trước khi kích hoạt.')
-      if (!pallet.destinationLocationId)
+      if (!isZoneA && !pallet.destinationLocationId)
         await palletsApi.setDestination(pallet.palletId, palletDestinationId)
 
       setPalletCode(pallet.palletId)
-      setDestinationId(palletDestinationId)
-      setSelectedPallet({ ...pallet, destinationLocationId: palletDestinationId })
+      setDestinationId(isZoneA ? '' : palletDestinationId)
+      setSelectedPallet({ ...pallet, destinationLocationId: isZoneA ? null : palletDestinationId })
       setLastClassification(null)
-      setPalletSelectionNotice(stage.zoneLabel === 'Zone C'
+      setPalletSelectionNotice(isZoneA
+        ? `Mọi sack sau inbound được gom tạm vào pallet ${pallet.palletId}. Từ đây quét lại vào Zone B hoặc Zone C theo tuyến.`
+        : stage.zoneLabel === 'Zone C'
         ? `Sack ngoại tỉnh sẽ vào pallet ${pallet.palletId}. Hệ thống tra Routing Rule và chỉ nhận sack có hub next hop ${palletDestinationId}.`
         : `Sack nội tỉnh sẽ được đưa vào pallet ${pallet.palletId} · điểm phát ${palletDestinationId}.`)
-      addHistory(pallet.palletId, `Đã chọn ${pallet.palletId} · đích ${palletDestinationId} · ${stage.round}.`, true, stage.round)
+      addHistory(pallet.palletId, `Đã chọn ${pallet.palletId}${isZoneA ? ' · khu gom chung' : ` · đích ${palletDestinationId}`} · ${stage.round}.`, true, stage.round)
       setTimeout(() => sackInputRef.current?.focus(), 0)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Không thể kiểm tra pallet.'
@@ -254,7 +259,7 @@ export default function SortingPage() {
           palletId: assignment.palletId ?? palletId,
           zoneId: assignment.zoneId ?? sack.zoneId,
           nextHopId: assignment.nextHopId ?? sack.nextHopId,
-          status: 'Sorted',
+          status: selectedStage.zoneLabel === 'Zone A' ? 'Sorting' : 'Sorted',
         },
         assignment,
       })
@@ -292,7 +297,7 @@ export default function SortingPage() {
     <div>
       <PageHeader
         title="Phân loại hàng"
-        description="Nội tỉnh đi qua hai lần phân loại Zone A → Zone B; hàng ngoại tỉnh đi thẳng Zone C."
+        description="Mọi hàng đi qua Zone A sau inbound, sau đó được phân sang Zone B (nội tỉnh) hoặc Zone C (liên tỉnh)."
         action={
           <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${hasSelectedPallet ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'}`}>
             <span className={`h-2 w-2 rounded-full ${hasSelectedPallet ? 'bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]' : 'bg-slate-300'}`} />
@@ -328,12 +333,12 @@ export default function SortingPage() {
                 <div className="mt-3 grid gap-3 lg:grid-cols-3">
                   <button type="button" aria-pressed={activeProcessRole === 'LocalSortBuffer'} onClick={() => selectWorkflow('LocalSortBuffer')} className={`rounded-2xl border p-4 text-left transition-all ${activeProcessRole === 'LocalSortBuffer' ? 'border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-200' : 'border-blue-200 bg-white/85 text-slate-900 hover:border-blue-400 hover:bg-blue-50'}`}>
                     <div className="flex items-start justify-between gap-3"><span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${activeProcessRole === 'LocalSortBuffer' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'}`}>Trạm 01</span><span className={`text-xs font-semibold ${activeProcessRole === 'LocalSortBuffer' ? 'text-blue-100' : 'text-blue-600'}`}>Lần 1</span></div>
-                    <p className="mt-4 text-base font-bold">Zone A · Nội tỉnh</p><p className={`mt-1 text-xs leading-5 ${activeProcessRole === 'LocalSortBuffer' ? 'text-blue-100' : 'text-slate-600'}`}>Gom hàng nội tỉnh vào khu chờ để chuyển tiếp sang phân loại lần 2.</p>
-                    <p className={`mt-4 flex items-center gap-1.5 text-xs font-semibold ${activeProcessRole === 'LocalSortBuffer' ? 'text-white' : 'text-blue-700'}`}>Zone A <ArrowRight className="h-3.5 w-3.5" /> Zone B</p>
+                    <p className="mt-4 text-base font-bold">Zone A · Gom sau inbound</p><p className={`mt-1 text-xs leading-5 ${activeProcessRole === 'LocalSortBuffer' ? 'text-blue-100' : 'text-slate-600'}`}>Nhận toàn bộ sack sau inbound, không phân biệt nội tỉnh hay liên tỉnh.</p>
+                    <p className={`mt-4 flex items-center gap-1.5 text-xs font-semibold ${activeProcessRole === 'LocalSortBuffer' ? 'text-white' : 'text-blue-700'}`}>Zone A <ArrowRight className="h-3.5 w-3.5" /> Zone B / Zone C</p>
                   </button>
                   <button type="button" aria-pressed={activeProcessRole === 'InterprovinceOutbound'} onClick={() => selectWorkflow('InterprovinceOutbound')} className={`rounded-2xl border p-4 text-left transition-all ${activeProcessRole === 'InterprovinceOutbound' ? 'border-violet-500 bg-violet-600 text-white shadow-lg shadow-violet-200' : 'border-violet-200 bg-white/85 text-slate-900 hover:border-violet-400 hover:bg-violet-50'}`}>
-                    <div className="flex items-start justify-between gap-3"><span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${activeProcessRole === 'InterprovinceOutbound' ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-700'}`}>Trạm 02</span><span className={`text-xs font-semibold ${activeProcessRole === 'InterprovinceOutbound' ? 'text-violet-100' : 'text-violet-600'}`}>Lần 1</span></div>
-                    <p className="mt-4 text-base font-bold">Zone C · Liên tỉnh</p><p className={`mt-1 text-xs leading-5 ${activeProcessRole === 'InterprovinceOutbound' ? 'text-violet-100' : 'text-slate-600'}`}>Quét sack ngoại tỉnh; server tra Routing Rule và đối chiếu hub next hop của pallet.</p>
+                    <div className="flex items-start justify-between gap-3"><span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${activeProcessRole === 'InterprovinceOutbound' ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-700'}`}>Trạm 02</span><span className={`text-xs font-semibold ${activeProcessRole === 'InterprovinceOutbound' ? 'text-violet-100' : 'text-violet-600'}`}>Lần 2</span></div>
+                    <p className="mt-4 text-base font-bold">Zone C · Liên tỉnh</p><p className={`mt-1 text-xs leading-5 ${activeProcessRole === 'InterprovinceOutbound' ? 'text-violet-100' : 'text-slate-600'}`}>Nhận sack ngoại tỉnh từ Zone A; server tra Routing Rule và đối chiếu hub next hop của pallet.</p>
                     <p className={`mt-4 flex items-center gap-1.5 text-xs font-semibold ${activeProcessRole === 'InterprovinceOutbound' ? 'text-white' : 'text-violet-700'}`}>Zone C <ArrowRight className="h-3.5 w-3.5" /> Xuất kho</p>
                   </button>
                   <button type="button" aria-pressed={activeProcessRole === 'LocalOutbound'} onClick={() => selectWorkflow('LocalOutbound')} className={`rounded-2xl border p-4 text-left transition-all ${activeProcessRole === 'LocalOutbound' ? 'border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'border-emerald-200 bg-white/85 text-slate-900 hover:border-emerald-400 hover:bg-emerald-50'}`}>
@@ -390,7 +395,7 @@ export default function SortingPage() {
                     {selectingPallet ? 'Đang kiểm tra...' : hasSelectedPallet ? 'Cập nhật pallet' : 'Xác nhận pallet'}
                   </Button>
                 </div>
-                <div className="mt-3">
+                {activeProcessRole !== 'LocalSortBuffer' && <div className="mt-3">
                   <Label htmlFor="sorting-destination">{activeProcessRole === 'InterprovinceOutbound' ? 'Hub next hop của pallet Zone C' : 'Location đích của pallet nội tỉnh'}</Label>
                   <Select
                     id="sorting-destination"
@@ -407,7 +412,7 @@ export default function SortingPage() {
                     ))}
                   </Select>
                   <p className="mt-1 text-xs text-slate-500">{activeProcessRole === 'InterprovinceOutbound' ? 'Zone C chỉ nhận bao ngoại tỉnh có cùng hub next hop.' : 'Pallet nội tỉnh chỉ nhận bao cùng location đích.'}</p>
-                </div>
+                </div>}
                 {palletSelectionError && <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{palletSelectionError}</p>}
               </form>
 

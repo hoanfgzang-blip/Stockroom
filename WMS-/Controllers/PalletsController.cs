@@ -11,7 +11,7 @@ namespace WMS_.Controllers
     public sealed class CreatePalletRequest
     {
         public string ZoneId { get; set; } = string.Empty;
-        public string DestinationLocationId { get; set; } = string.Empty;
+        public string? DestinationLocationId { get; set; }
         public decimal? Capacity { get; set; }
         public string? PalletId { get; set; }
     }
@@ -59,8 +59,6 @@ namespace WMS_.Controllers
         {
             if (string.IsNullOrWhiteSpace(request.ZoneId))
                 return BadRequest("Zone đặt pallet là bắt buộc.");
-            if (string.IsNullOrWhiteSpace(request.DestinationLocationId))
-                return BadRequest("Điểm đến của pallet là bắt buộc.");
             if (request.Capacity is <= 0)
                 return BadRequest("Sức chứa pallet phải lớn hơn 0.");
 
@@ -69,7 +67,7 @@ namespace WMS_.Controllers
             {
                 PalletId = request.PalletId?.Trim() ?? string.Empty,
                 ZoneId = request.ZoneId.Trim(),
-                DestinationLocationId = request.DestinationLocationId.Trim(),
+                DestinationLocationId = request.DestinationLocationId?.Trim(),
                 Status = "Empty",
                 Capacity = request.Capacity ?? 1000
             };

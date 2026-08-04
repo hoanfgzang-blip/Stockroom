@@ -122,7 +122,7 @@ namespace WMS_.Services.Warehouse
                 return new(false, "Bao hàng đang vận chuyển hoặc đã giao, không thể phân loại lại.");
 
             SackRoute? route = null;
-            if (targetZone.ProcessRole is ZoneProcessRoles.LocalSortBuffer or ZoneProcessRoles.LocalOutbound or ZoneProcessRoles.InterprovinceOutbound)
+            if (ZoneProcessRoles.IsDispatch(targetZone.ProcessRole))
             {
                 try
                 {
@@ -137,12 +137,15 @@ namespace WMS_.Services.Warehouse
                 if (flowError != null) return new(false, flowError);
             }
 
-            if (string.IsNullOrWhiteSpace(targetPallet.DestinationLocationId))
-                return new(false, "Pallet chưa được gán điểm đến. Hãy chọn location cho pallet trước khi quét bao.");
+            if (ZoneProcessRoles.IsDispatch(targetZone.ProcessRole))
+            {
+                if (string.IsNullOrWhiteSpace(targetPallet.DestinationLocationId))
+                    return new(false, "Pallet outbound chưa được gán điểm đến.");
 
-            var sackDispatchDestination = route?.NextHopId ?? sack.NextHopId ?? sack.SDestination;
-            if (!string.Equals(targetPallet.DestinationLocationId, sackDispatchDestination, StringComparison.OrdinalIgnoreCase))
-                return new(false, $"Pallet {targetPallet.PalletId} đã gán cho {targetPallet.DestinationLocationId}, bao này đi {sackDispatchDestination}.");
+                var sackDispatchDestination = route?.NextHopId ?? sack.NextHopId ?? sack.SDestination;
+                if (!string.Equals(targetPallet.DestinationLocationId, sackDispatchDestination, StringComparison.OrdinalIgnoreCase))
+                    return new(false, $"Pallet {targetPallet.PalletId} đã gán cho {targetPallet.DestinationLocationId}, bao này đi {sackDispatchDestination}.");
+            }
 
             var classification = route?.Classification;
             var destinationName = route?.DestinationName;
@@ -176,8 +179,8 @@ namespace WMS_.Services.Warehouse
             var oldValues = new { sack.PalletId, sack.ZoneId, sack.NextHopId, sack.Status };
             sack.PalletId = palletId;
             sack.ZoneId = targetPallet.ZoneId;
-            sack.NextHopId = route?.NextHopId;
-            sack.Status = "Sorted";
+            sack.NextHopId = ZoneProcessRoles.IsDispatch(targetZone.ProcessRole) ? route?.NextHopId : null;
+            sack.Status = targetZone.ProcessRole == ZoneProcessRoles.LocalSortBuffer ? "Sorting" : "Sorted";
             if (targetPallet.Status == "Empty") targetPallet.Status = "Occupied";
 
             if (previousPalletId != null && pallets.TryGetValue(previousPalletId, out var previousPallet))
@@ -249,9 +252,6 @@ namespace WMS_.Services.Warehouse
 
         private async Task<string?> ValidateTargetZoneFlowAsync(Sack sack, Pallet targetPallet, Zone targetZone, SackRoute route)
         {
-            if (targetZone.ProcessRole == ZoneProcessRoles.LocalSortBuffer && route.Classification != "IntraProvince")
-                return "Bao ngoại tỉnh phải được đưa vào Zone C - outbound ngoại tỉnh.";
-
             if (targetZone.ProcessRole == ZoneProcessRoles.LocalOutbound)
             {
                 if (route.Classification != "IntraProvince")
@@ -265,8 +265,18 @@ namespace WMS_.Services.Warehouse
                     return "Bao nội tỉnh phải qua Zone A trước khi vào Zone B.";
             }
 
-            if (targetZone.ProcessRole == ZoneProcessRoles.InterprovinceOutbound && route.Classification != "InterProvince")
-                return "Zone C chỉ nhận bao ngoại tỉnh.";
+            if (targetZone.ProcessRole == ZoneProcessRoles.InterprovinceOutbound)
+            {
+                if (route.Classification != "InterProvince")
+                    return "Zone C chỉ nhận bao ngoại tỉnh.";
+
+                var sourceRole = await _db.Zones
+                    .Where(zone => zone.ZoneId == sack.ZoneId)
+                    .Select(zone => zone.ProcessRole)
+                    .FirstOrDefaultAsync();
+                if (sourceRole is not (ZoneProcessRoles.LocalSortBuffer or ZoneProcessRoles.InterprovinceOutbound))
+                    return "Bao ngoại tỉnh phải qua Zone A trước khi vào Zone C.";
+            }
 
             if (!ZoneProcessRoles.IsDispatch(targetZone.ProcessRole)) return null;
 

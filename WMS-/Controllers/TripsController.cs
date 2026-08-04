@@ -884,15 +884,16 @@ namespace WMS_.Controllers
             if (trip.Type != "Inbound") return BadRequest(new { message = "Chi chuyen Inbound moi duoc xac nhan xe den." });
             if (trip.Status == "Completed") return Conflict(new { message = "Chuyen xe nay da duoc xac nhan den kho." });
 
-            var inboundZone = await _db.Zones.FirstOrDefaultAsync(zone => zone.LocationId == trip.Destination && zone.ZoneType == "Inbound");
-            if (inboundZone == null) return BadRequest(new { message = "Hub dich chua co zone Inbound." });
+            var inboundZone = await _db.Zones.FirstOrDefaultAsync(zone =>
+                zone.LocationId == trip.Destination && zone.ProcessRole == ZoneProcessRoles.LocalSortBuffer);
+            if (inboundZone == null) return BadRequest(new { message = "Hub dich chua co Zone A." });
             var sacks = await _db.Sacks.Where(sack => sack.TripId == id).ToListAsync();
             var palletError = await ValidateInboundPalletsAsync(sacks, myLocationId);
             if (palletError != null) return Conflict(new { message = palletError });
             foreach (var sack in sacks)
             {
-                sack.Status = "Sorted";
-                sack.ZoneId ??= inboundZone.ZoneId;
+                sack.Status = "Sorting";
+                sack.ZoneId = inboundZone.ZoneId;
             }
             var previousStatus = trip.Status;
             trip.Status = "Completed";
@@ -952,8 +953,9 @@ namespace WMS_.Controllers
             Zone? inboundZone = null;
             if (trip.Type == "Inbound")
             {
-                inboundZone = await _db.Zones.FirstOrDefaultAsync(zone => zone.LocationId == trip.Destination && zone.ZoneType == "Inbound");
-                if (inboundZone == null) return BadRequest(new { message = "Hub dich chua co zone Inbound." });
+                inboundZone = await _db.Zones.FirstOrDefaultAsync(zone =>
+                    zone.LocationId == trip.Destination && zone.ProcessRole == ZoneProcessRoles.LocalSortBuffer);
+                if (inboundZone == null) return BadRequest(new { message = "Hub dich chua co Zone A." });
             }
 
             var dbSacks = await _db.Sacks.Where(sack => sack.TripId == tripId).ToListAsync();
@@ -1010,8 +1012,8 @@ namespace WMS_.Controllers
             {
                 if (trip.Type == "Inbound")
                 {
-                    sack.Status = "Sorted";
-                    sack.ZoneId ??= inboundZone!.ZoneId;
+                    sack.Status = "Sorting";
+                    sack.ZoneId = inboundZone!.ZoneId;
                 }
                 else
                 {
@@ -1300,10 +1302,11 @@ namespace WMS_.Controllers
             var invalidPallet = pallets.FirstOrDefault(pallet =>
                 pallet.Zone == null ||
                 pallet.Zone.LocationId != hubId ||
+                pallet.Zone.ProcessRole != ZoneProcessRoles.LocalSortBuffer ||
                 pallet.Status == "Finalized" ||
                 pallet.Status == "Locked");
             if (invalidPallet != null)
-                return "Pallet phải thuộc hub nhận hàng và chưa bị chốt hoặc khóa.";
+                return "Pallet inbound phải thuộc Zone A của hub nhận hàng và chưa bị chốt hoặc khóa.";
 
             return null;
         }

@@ -97,9 +97,8 @@ namespace WMS_.Controllers
             if (currentHub == null || destination == null)
                 return BadRequest("Không tìm thấy hub hiện tại hoặc điểm đến của bao.");
 
-            var expectedRole = currentHub.ProvinceId == destination.ProvinceId
-                ? ZoneProcessRoles.LocalSortBuffer
-                : ZoneProcessRoles.InterprovinceOutbound;
+            // Every new sack enters Zone A first; Zone B/C routing happens during sorting.
+            var expectedRole = ZoneProcessRoles.LocalSortBuffer;
             var zoneId = request.ZoneId?.Trim();
             Zone? zone;
             if (string.IsNullOrWhiteSpace(zoneId))
@@ -107,9 +106,7 @@ namespace WMS_.Controllers
                 zone = await _db.Zones
                     .FirstOrDefaultAsync(item => item.LocationId == hubId && item.ProcessRole == expectedRole);
                 if (zone == null)
-                    return BadRequest(expectedRole == ZoneProcessRoles.LocalSortBuffer
-                        ? "Hub chưa có Zone A cho bao nội tỉnh."
-                        : "Hub chưa có Zone C cho bao ngoại tỉnh.");
+                    return BadRequest("Hub chưa có Zone A để tiếp nhận bao sau inbound.");
                 zoneId = zone.ZoneId;
             }
             else
@@ -120,11 +117,7 @@ namespace WMS_.Controllers
             }
 
             if (zone.ProcessRole != expectedRole)
-            {
-                return BadRequest(expectedRole == ZoneProcessRoles.LocalSortBuffer
-                    ? "Bao nội tỉnh phải bắt đầu tại Zone A."
-                    : "Bao ngoại tỉnh phải bắt đầu tại Zone C.");
-            }
+                return BadRequest("Mọi bao phải bắt đầu tại Zone A sau inbound.");
 
             var sack = new Sack
             {

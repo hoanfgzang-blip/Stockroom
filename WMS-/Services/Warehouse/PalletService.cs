@@ -57,9 +57,19 @@ namespace WMS_.Services.Warehouse
             if (string.IsNullOrWhiteSpace(myLocationId))
                 throw new InvalidOperationException("Tài khoản chưa được gán hub.");
 
-            if (!await _db.Zones.AnyAsync(zone => zone.ZoneId == pallet.ZoneId && zone.LocationId == myLocationId))
+            var zone = await _db.Zones.FirstOrDefaultAsync(zone => zone.ZoneId == pallet.ZoneId && zone.LocationId == myLocationId);
+            if (zone == null)
                 throw new InvalidOperationException("Zone đặt pallet không tồn tại.");
-            await ValidateDestinationAsync(pallet.DestinationLocationId, myLocationId);
+            if (zone.ProcessRole == ZoneProcessRoles.LocalSortBuffer)
+            {
+                pallet.DestinationLocationId = null;
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(pallet.DestinationLocationId))
+                    throw new InvalidOperationException("Pallet Zone B hoặc Zone C phải có điểm đến.");
+                await ValidateDestinationAsync(pallet.DestinationLocationId, myLocationId);
+            }
 
             if (!string.IsNullOrWhiteSpace(pallet.PalletId) && await _db.Pallets.AnyAsync(item => item.PalletId == pallet.PalletId))
                 throw new InvalidOperationException("Mã pallet đã tồn tại.");
@@ -87,6 +97,15 @@ namespace WMS_.Services.Warehouse
                 throw new InvalidOperationException("Không tìm thấy pallet tại hub hiện tại.");
             if (pallet.Status is "Finalized" or "Locked")
                 throw new InvalidOperationException("Pallet đã chốt hoặc đang bị khóa.");
+
+            if (pallet.Zone?.ProcessRole == ZoneProcessRoles.LocalSortBuffer)
+            {
+                if (!string.IsNullOrWhiteSpace(destinationLocationId))
+                    throw new InvalidOperationException("Pallet Zone A là khu gom chung, không gắn điểm đến.");
+                pallet.DestinationLocationId = null;
+                await _db.SaveChangesAsync();
+                return pallet;
+            }
 
             await ValidateDestinationAsync(destinationLocationId, myLocationId);
 

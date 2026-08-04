@@ -41,6 +41,7 @@ export function formatTimeSpan(value?: string | null): string {
 
 export function getStatusVariant(status: string): 'success' | 'warning' | 'danger' | 'neutral' {
   const s = status.toLowerCase().replace(/[\s_-]/g, '')
+  if (['completedwithmissing'].includes(s)) return 'danger'
   if (['completed', 'active', 'available', 'intransit', 'inprogress', 'fulfilled', 'arrived', 'loaded'].includes(s))
     return 'success'
   if (['loading', 'pending', 'processing', 'reserved', 'sorting', 'scheduled'].includes(s)) return 'warning'
@@ -53,13 +54,14 @@ export function tripColumnLabel(status: string): string {
     Loading: 'Đang chất hàng',
     Pending: 'Đã lên lịch',
     InProgress: 'Đang vận chuyển',
+    CompletedWithMissing: 'Đến thiếu hàng',
     Completed: 'Đã đến',
     Cancelled: 'Đã hủy',
   }
   return map[status] ?? status
 }
 
-export const TRIP_COLUMNS = ['Loading', 'Pending', 'InProgress', 'Completed', 'Cancelled'] as const
+export const TRIP_COLUMNS = ['Loading', 'Pending', 'InProgress', 'CompletedWithMissing', 'Completed', 'Cancelled'] as const
 
 
 export function roleLabel(role: string): string {
@@ -75,7 +77,7 @@ export function roleLabel(role: string): string {
 
 export function statusLabel(status: string): string {
   const map: Record<string, string> = {
-    Loading: 'Đang chất hàng', Pending: 'Chờ xử lý', InProgress: 'Đang xử lý', Completed: 'Hoàn thành', Cancelled: 'Đã hủy',
+    Loading: 'Đang chất hàng', Pending: 'Chờ xử lý', InProgress: 'Đang xử lý', CompletedWithMissing: 'Đến thiếu hàng', Completed: 'Hoàn thành', Cancelled: 'Đã hủy',
     Active: 'Đang hoạt động', Inactive: 'Ngừng hoạt động', Available: 'Sẵn sàng', Occupied: 'Đang chứa hàng',
     Reserved: 'Đã giữ hàng', Expired: 'Đã hết hạn', Inbound: 'Nhập hàng', Outbound: 'Xuất hàng',
     Processing: 'Đang xử lý', Sorting: 'Đang phân loại', Arrived: 'Đã đến', Fulfilled: 'Đã hoàn tất',

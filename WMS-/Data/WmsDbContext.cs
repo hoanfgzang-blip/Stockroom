@@ -26,6 +26,7 @@ namespace WMS_.Data
         public DbSet<InventoryReservation> InventoryReservations { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<UserAccount> UserAccounts { get; set; }
+        public DbSet<TripQrToken> TripQrTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -135,6 +136,17 @@ namespace WMS_.Data
                 .IsUnique();
             modelBuilder.Entity<OutboundOrder>()
                 .HasIndex(e => e.OutboundOrderNumber)
+                .IsUnique();
+
+            modelBuilder.Entity<TripQrToken>()
+                .HasKey(t => t.TokenHash);
+            modelBuilder.Entity<TripQrToken>()
+                .HasOne(t => t.Trip)
+                .WithMany()
+                .HasForeignKey(t => t.TripId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<TripQrToken>()
+                .HasIndex(t => t.TokenHash)
                 .IsUnique();
         }
     }

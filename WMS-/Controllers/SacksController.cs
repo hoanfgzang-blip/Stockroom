@@ -77,7 +77,9 @@ namespace WMS_.Controllers
         }
 
         /// <summary>Create new sack</summary>
-        [HttpPost]
+        // Sack creation is intentionally disabled in the operational UI/API.
+        // Sacks must arrive from the inbound process and be scanned from Zone A.
+        [NonAction]
         public async Task<ActionResult<Sack>> Create([FromBody] CreateSackRequest request)
         {
             if (!OperationalHubScope.IsOutboundDestination(request.SDestination))

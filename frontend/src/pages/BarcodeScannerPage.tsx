@@ -1,16 +1,16 @@
 // @ts-nocheck
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
-import { Barcode, Camera, CheckCircle2, CircleAlert, ClipboardCheck, PackageCheck, Plus, Printer, ScanLine, Send, Truck, Undo2 } from 'lucide-react'
+import { Barcode, Camera, CheckCircle2, CircleAlert, ClipboardCheck, PackageCheck, Printer, ScanLine, Send, Truck, Undo2 } from 'lucide-react'
 import { BrowserMultiFormatReader, BrowserQRCodeSvgWriter, type IScannerControls } from '@zxing/browser'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
-import { locationsApi, palletsApi, sacksApi, tripsApi, type TripCheckInResult, type TripQrCheckInResult } from '@/api/services'
+import { palletsApi, sacksApi, tripsApi, type TripCheckInResult, type TripQrCheckInResult } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog } from '@/components/ui/dialog'
-import { Label, Select } from '@/components/ui/input'
+import { Label } from '@/components/ui/input'
 import { PageHeader } from '@/components/shared/PageHeader'
-import type { Location, Sack, TripQrManifest } from '@/types'
+import type { Sack, TripQrManifest } from '@/types'
 import { useAuth } from '@/auth/AuthContext'
 import { zoneProcessRoleLabel } from '@/lib/zoneFlow'
 
@@ -182,7 +182,6 @@ export default function BarcodeScannerPage() {
   const [mode, setMode] = useState<ScanMode>(isDriver ? 'received' : 'inbound')
   const [barcode, setBarcode] = useState('')
   const [sortingPalletId, setSortingPalletId] = useState('')
-  const [locations, setLocations] = useState<Location[]>([])
   const [lastSack, setLastSack] = useState<Sack | null>(null)
   const [lastTrip, setLastTrip] = useState<InboundCheckInResult | null>(null)
   const [tripSession, setTripSession] = useState<TripCheckInSession | null>(null)
@@ -197,9 +196,6 @@ export default function BarcodeScannerPage() {
   } | null>(null)
   const [results, setResults] = useState<ScanResult[]>([])
   const [processing, setProcessing] = useState(false)
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
-  const [destinationId, setDestinationId] = useState('')
-  const [creating, setCreating] = useState(false)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraError, setCameraError] = useState('')
   const cameraVideoRef = useRef<HTMLVideoElement>(null)
@@ -210,21 +206,6 @@ export default function BarcodeScannerPage() {
     scannerControlsRef.current = null
     setCameraOpen(false)
   }, [])
-
-  useEffect(() => {
-    if (isDriver) {
-      setLocations([])
-      return
-    }
-    Promise.allSettled([locationsApi.dispatchDestinations()])
-      .then(([warehouseLocationsResult]) => {
-        const warehouseLocations = warehouseLocationsResult.status === 'fulfilled' ? warehouseLocationsResult.value : []
-        setLocations(warehouseLocations)
-      })
-      .catch(() => {
-        setLocations([])
-      })
-  }, [isDriver])
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -428,25 +409,6 @@ export default function BarcodeScannerPage() {
   const sessionArrivedSet = new Set(sessionArrivedSackIds.map((id) => id.toLowerCase()))
   const sessionMissingSackIds = sessionExpectedSackIds.filter((id) => !sessionArrivedSet.has(id.toLowerCase()))
 
-  const createSack = async () => {
-    if (!destinationId || creating) return
-
-    setCreating(true)
-    try {
-      const sack = await sacksApi.create({
-        sDestination: destinationId,
-      })
-      setLastSack(sack)
-      setCreateDialogOpen(false)
-      setDestinationId('')
-      addResult(sack.sackId, 'Đã tạo bao hàng mới. Dùng mã này để in tem và quét.', true)
-    } catch (error) {
-      addResult('TẠO-BAO', error instanceof Error ? error.message : 'Không thể tạo bao hàng.', false)
-    } finally {
-      setCreating(false)
-    }
-  }
-
   const reassignLastSack = async () => {
     const palletId = sortingPalletId.trim()
     if (!lastSack || !palletId || processing) return
@@ -535,12 +497,6 @@ export default function BarcodeScannerPage() {
       <PageHeader
         title="Quét mã vạch"
         description="Chọn nghiệp vụ, đặt con trỏ vào ô quét và quét QR xe hoặc mã sack theo quy trình. Máy quét USB hoặc Bluetooth hoạt động như bàn phím."
-        action={!isDriver ? (
-          <Button onClick={() => setCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Tạo bao hàng
-          </Button>
-        ) : undefined}
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
@@ -809,42 +765,6 @@ export default function BarcodeScannerPage() {
           </CardContent>
         </Card>
       </div>
-
-      <Dialog
-        open={createDialogOpen}
-        onClose={() => setCreateDialogOpen(false)}
-        title="Tạo bao hàng mới"
-        description="Hệ thống tự sinh mã bao hàng. Người dùng chỉ chọn điểm đến."
-      >
-        <div className="space-y-5">
-          <div>
-            <Label htmlFor="destination">Điểm đến</Label>
-            <Select
-              id="destination"
-              value={destinationId}
-              onChange={(event) => setDestinationId(event.target.value)}
-              className="mt-1"
-            >
-              <option value="">Chọn điểm đến</option>
-              {locations.map((location) => (
-                <option key={location.locationId} value={location.locationId}>
-                  {location.locationName}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
-            Sau khi tạo, server trả về mã duy nhất dạng <span className="font-mono font-semibold">SACK-...</span> để in thành tem mã vạch.
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={creating}>Hủy</Button>
-            <Button onClick={createSack} disabled={!destinationId || creating}>
-              {creating ? 'Đang tạo' : 'Tạo mã tự động'}
-            </Button>
-          </div>
-        </div>
-      </Dialog>
-
 
       <Dialog open={classification !== null} onClose={() => setClassification(null)} title={classification?.label ?? 'Kết quả phân loại'} description="Server xác định lane theo hub hiện tại, điểm đến cuối và rule next hop.">
         <div className="space-y-3 text-sm text-slate-700"><p><span className="font-semibold">Điểm đến cuối:</span> {classification?.destinationName ?? 'Chưa xác định'}</p><p><span className="font-semibold">Zone hiện tại:</span> {classification?.zoneName ?? 'Chưa xác định'}</p>{classification?.nextHopName && <p><span className="font-semibold">Điểm xuất / next hop:</span> {classification.nextHopName}</p>}<div className="flex justify-end"><Button onClick={() => setClassification(null)}>Tiếp tục quét</Button></div></div>

@@ -266,8 +266,6 @@ export const sacksApi = {
     api.get<Sack[]>(`/Sacks${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Sack>(`/Sacks/${id}`),
   byPallet: (palletId: string) => api.get<Sack[]>(`/Sacks/by-pallet/${palletId}`),
-  create: (data: Pick<Sack, 'sDestination'> & Partial<Pick<Sack, 'zoneId' | 'palletId'>>) =>
-    api.post<Sack>('/Sacks', data),
   confirmReceived: (id: string) => api.post<void>(`/Sacks/${id}/confirm-received`, {}),
   delete: (id: string) => api.delete(`/Sacks/${id}`),
 }

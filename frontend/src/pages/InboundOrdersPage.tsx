@@ -40,17 +40,7 @@ type InboundCheckInResult = Partial<TripCheckInResult> & Partial<TripQrCheckInRe
   status: string
 }
 
-<<<<<<< HEAD
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
-=======
-type TripCheckInSession = {
-  manifest: TripQrManifest
-  arrivedSackIds: string[]
-  unexpectedSackIds: string[]
-}
-
-const TRIP_QR_PREFIX = 'WMS-TRIP-QR:'
->>>>>>> 652fce01594347f00281419fdec7fdd0a1b5f065
 
 function parseTripManifest(value: string): TripQrManifest | null {
   try {
@@ -128,17 +118,6 @@ export default function InboundOrdersPage() {
   /* ── Scan history */
   const [results, setResults] = useState<ScanResult[]>([])
   const [lastCheckIn, setLastCheckIn] = useState<InboundCheckInResult | null>(null)
-<<<<<<< HEAD
-=======
-  const [tripSession, setTripSession] = useState<TripCheckInSession | null>(null)
-  const [tripConfirming, setTripConfirming] = useState(false)
-  
-  // Trip check-in state
-  const [inboundTrips, setInboundTrips] = useState<Trip[]>([])
-  const [selectedTripId, setSelectedTripId] = useState('')
-  const [tripPallets, setTripPallets] = useState<string[]>([])
-  const [tripPalletCount, setTripPalletCount] = useState(0)
->>>>>>> 652fce01594347f00281419fdec7fdd0a1b5f065
 
   /* ── Camera */
   const [cameraOpen, setCameraOpen] = useState(false)
@@ -206,197 +185,6 @@ export default function InboundOrdersPage() {
     if (!qrDialogOpen) { stopCamera(); resetWizard() }
   }, [qrDialogOpen, stopCamera])
 
-<<<<<<< HEAD
-=======
-  const openDetail = async (order: InboundOrder) => {
-    setSelected(order)
-    try {
-      const data = await inboundOrdersApi.withItems(order.inboundOrderId)
-      setItems(data.items)
-    } catch {
-      setItems([])
-    }
-  }
-
-  const handleUpdateStatus = async (orderId: string, newStatus: string) => {
-    setUpdatingStatus(true)
-    try {
-      await inboundOrdersApi.updateStatus(orderId, newStatus)
-      await fetchOrders()
-      if (selected?.inboundOrderId === orderId) {
-        setSelected((prev) => (prev ? { ...prev, status: newStatus } : null))
-      }
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái đơn hàng.')
-    } finally {
-      setUpdatingStatus(false)
-    }
-  }
-
-  const addScanResult = (code: string, message: string, success: boolean) => {
-    setResults((prev) => [{ id: Date.now(), code, message, success, at: new Date() }, ...prev].slice(0, 6))
-  }
-
-  const openTripSession = async (scannedValue: string, legacyManifest?: TripQrManifest) => {
-    const manifest = legacyManifest ?? (await tripsApi.resolveQr(scannedValue)).manifest
-    setTripSession({ manifest, arrivedSackIds: [], unexpectedSackIds: [] })
-    setSelectedTripId('')
-    setLastCheckIn(null)
-    addScanResult(
-      manifest.tripId,
-      legacyManifest
-        ? 'Đã mở phiên từ QR JSON cũ. Hãy quét từng sack thực tế, chưa gọi API nhận hàng.'
-        : `Đã mở phiên đối chiếu xe ${manifest.tripId}. Hãy quét từng sack thực tế.`,
-      true,
-    )
-  }
-
-  const recordTripSack = (scannedSackId: string) => {
-    if (!tripSession) return
-
-    const normalizedId = scannedSackId.trim()
-    const expectedSack = tripSession.manifest.sacks.find((sack) => sack.sackId.toLowerCase() === normalizedId.toLowerCase())
-    if (!expectedSack) {
-      setTripSession((current) => current && current.unexpectedSackIds.some((id) => id.toLowerCase() === normalizedId.toLowerCase())
-        ? current
-        : current ? { ...current, unexpectedSackIds: [...current.unexpectedSackIds, normalizedId] } : current)
-      addScanResult(normalizedId, 'Sack không thuộc chuyến xe này. Không thể chốt phiên.', false)
-      return
-    }
-
-    if (tripSession.arrivedSackIds.some((id) => id.toLowerCase() === expectedSack.sackId.toLowerCase())) {
-      addScanResult(expectedSack.sackId, 'Sack đã được quét trong phiên này.', false)
-      return
-    }
-
-    setTripSession((current) => current ? { ...current, arrivedSackIds: [...current.arrivedSackIds, expectedSack.sackId] } : current)
-    addScanResult(expectedSack.sackId, 'Đã ghi nhận sack trong phiên đối chiếu. Chưa cập nhật server.', true)
-  }
-
-  const confirmTripSession = async () => {
-    if (!tripSession || tripSession.arrivedSackIds.length === 0 || tripSession.unexpectedSackIds.length > 0 || tripConfirming) return
-
-    setTripConfirming(true)
-    try {
-      const trip = await tripsApi.checkInByQr(tripSession.manifest.tripId, tripSession.arrivedSackIds)
-      setLastCheckIn(trip)
-      setSelectedTripId(trip.tripId)
-      setTripSession(null)
-      addScanResult(trip.tripId, formatTripQrResult(trip, tripSession.manifest), true)
-      await fetchOrders()
-      await reloadPallets()
-    } catch (error) {
-      addScanResult(tripSession.manifest.tripId, error instanceof Error ? error.message : 'Không thể xác nhận nhận hàng.', false)
-    } finally {
-      setTripConfirming(false)
-    }
-  }
-
-  const reloadPallets = async () => {
-    try {
-      const loadedPallets = await palletsApi.all()
-      setPallets(loadedPallets)
-      // After reload, select newest pallet
-      if (loadedPallets.length > 0) {
-        const newest = [...loadedPallets].sort((a, b) => b.palletId.localeCompare(a.palletId))[0]
-        setSelectedPalletId(newest.palletId)
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  const handleCreatePallet = async (zoneId: string, palletId: string) => {
-    setPalletCreating(true)
-    try {
-      const newPallet = await palletsApi.create({ zoneId, palletId })
-      await reloadPallets()
-      setSelectedPalletId(newPallet.palletId)
-      addScanResult(newPallet.palletId, `Đã tạo Pallet mới. Mã: ${newPallet.palletId} — Zone: ${newPallet.zoneId}`, true)
-    } catch (err: unknown) {
-      addScanResult('TẠO-PALLET', err instanceof Error ? err.message : 'Không thể tạo Pallet mới.', false)
-    } finally {
-      setPalletCreating(false)
-    }
-  }
-
-  const processCode = async (scannedCode: string) => {
-    if (!scannedCode || processing) return
-    setProcessing(true)
-    try {
-      if (scannedCode.startsWith(TRIP_QR_PREFIX)) {
-        await openTripSession(scannedCode)
-        return
-      }
-
-      const legacyManifest = parseTripManifest(scannedCode)
-      if (legacyManifest) {
-        await openTripSession(scannedCode, legacyManifest)
-        return
-      }
-
-      if (tripSession) {
-        recordTripSack(scannedCode)
-        return
-      }
-
-      if (selectedTripId) {
-        if (tripPallets.includes(scannedCode)) {
-          addScanResult(scannedCode, 'Pallet hợp lệ và thuộc chuyến xe này.', true)
-        } else {
-          addScanResult(scannedCode, 'Pallet không thuộc chuyến xe này.', false)
-        }
-        return
-      }
-
-      // Case 1: Check if code corresponds to an existing Inbound Order ID or Number
-      const matchingOrder = orders.find(
-        (o) => o.inboundOrderId.toLowerCase() === scannedCode.toLowerCase() || o.inboundOrderNumber.toLowerCase() === scannedCode.toLowerCase(),
-      )
-
-      if (matchingOrder) {
-        // Auto update order status if Pending
-        if (matchingOrder.status === 'Pending') {
-          await inboundOrdersApi.updateStatus(matchingOrder.inboundOrderId, 'InProgress')
-          addScanResult(matchingOrder.inboundOrderNumber, `Đã nhận đơn nhập kho ${matchingOrder.inboundOrderNumber} (Chuyển sang Đang xử lý).`, true)
-        } else {
-          addScanResult(matchingOrder.inboundOrderNumber, `Tìm thấy đơn nhập kho ${matchingOrder.inboundOrderNumber} - Trạng thái: ${statusLabel(matchingOrder.status)}.`, true)
-        }
-        openDetail(matchingOrder)
-        fetchOrders()
-        return
-      }
-
-      throw new Error('Hãy quét QR xe để mở phiên đối chiếu trước khi quét sack.')
-    } catch (err: unknown) {
-      const rawMsg = err instanceof Error ? err.message : 'Mã đã quét không đúng định dạng hoặc không tồn tại.'
-      // Try to parse JSON error message from server
-      let msg = rawMsg
-      try {
-        const parsed = JSON.parse(rawMsg) as { message?: string }
-        if (parsed.message) msg = parsed.message
-      } catch {
-        // rawMsg is plain text
-      }
-      addScanResult(scannedCode, msg, false)
-    } finally {
-      setBarcodeInput('')
-      setProcessing(false)
-    }
-  }
-
-  const handleProcessScan = async (e?: FormEvent) => {
-    if (e) e.preventDefault()
-    await processCode(barcodeInput.trim())
-  }
-
-  const sessionExpectedSackIds = tripSession?.manifest.sacks.map((sack) => sack.sackId) ?? []
-  const sessionArrivedSackIds = tripSession?.arrivedSackIds ?? []
-  const sessionUnexpectedSackIds = tripSession?.unexpectedSackIds ?? []
-  const sessionArrivedSet = new Set(sessionArrivedSackIds.map((id) => id.toLowerCase()))
-  const sessionMissingSackIds = sessionExpectedSackIds.filter((id) => !sessionArrivedSet.has(id.toLowerCase()))
-
->>>>>>> 652fce01594347f00281419fdec7fdd0a1b5f065
   const startCamera = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError('Trình duyệt hoặc thiết bị này chưa hỗ trợ camera.')
@@ -742,7 +530,6 @@ export default function InboundOrdersPage() {
         open={qrDialogOpen}
         onClose={() => setQrDialogOpen(false)}
         title="Quét QR Inbound nhập kho"
-<<<<<<< HEAD
         description="Quét xe → quét pallet → quét từng bao để nhập kho."
         className="max-w-xl"
       >
@@ -764,69 +551,6 @@ export default function InboundOrdersPage() {
           </div>
 
           <div className="h-px bg-slate-100" />
-=======
-         description="Quét QR xe để mở phiên đối chiếu, sau đó quét từng sack và xác nhận nhận hàng."
-        className="max-w-xl"
-      >
-        <div className="space-y-4">
-          {/* Chọn chuyến xe Inbound */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <Label htmlFor="inbound-trip" className="text-xs">Chuyến xe Inbound</Label>
-              {selectedTripId && (
-                <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setSelectedTripId('')}>
-                  Đổi chuyến khác
-                </Button>
-              )}
-            </div>
-            <Select
-              id="inbound-trip"
-              value={selectedTripId}
-              onChange={(e) => setSelectedTripId(e.target.value)}
-              className="h-9 text-sm"
-               disabled={processing || tripConfirming}
-            >
-              <option value="">-- Quét mã QR chuyến xe mới hoặc chọn chuyến đã tới --</option>
-              {inboundTrips.map((trip) => (
-                <option key={trip.tripId} value={trip.tripId}>
-                  {trip.tripId} - Xe {trip.carId}
-                </option>
-              ))}
-            </Select>
-            {selectedTripId && (
-              <p className="mt-1.5 text-xs text-slate-500">
-                Chuyến xe đang chọn có <span className="font-medium text-slate-700">{tripPalletCount}</span> pallet.
-                {tripPallets.length > 0 && ` (${tripPallets.join(', ')})`}
-              </p>
-            )}
-          </div>
-
-          {/* Form quét / nhập mã vạch */}
-          <form onSubmit={handleProcessScan} className="flex gap-2">
-            <div className="relative flex-1">
-              <Input
-                ref={inputRef}
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                 placeholder={tripSession ? 'Quét mã sack thực tế...' : selectedTripId ? "Quét mã pallet để kiểm tra..." : "Quét mã QR chuyến xe, mã đơn hoặc mã bao..."}
-                 disabled={processing || tripConfirming}
-                className="font-mono pr-9"
-              />
-              <ScanLine className="absolute right-3 top-2.5 h-5 w-5 text-slate-400" />
-            </div>
-             <Button type="submit" disabled={processing || tripConfirming || !barcodeInput.trim()}>
-              {processing ? 'Đang xử lý...' : 'Xử lý'}
-            </Button>
-            <Button
-              type="button"
-              variant={cameraOpen ? 'default' : 'outline'}
-              onClick={cameraOpen ? stopCamera : startCamera}
-              title="Mở camera quét QR"
-            >
-              <Camera className="h-4 w-4" />
-            </Button>
-          </form>
->>>>>>> 652fce01594347f00281419fdec7fdd0a1b5f065
 
           {/* ── Bước 1: Quét xe ── */}
           {inboundStep === 'idle' && (
@@ -1124,78 +848,11 @@ export default function InboundOrdersPage() {
             </div>
           )}
 
-<<<<<<< HEAD
           {/* ── Last check-in result ── */}
           {lastCheckIn && inboundStep === 'idle' && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 space-y-1">
-=======
-          {tripSession && (
-            <Card className="border-blue-200 bg-blue-50/40">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between gap-3 text-base">
-                  <span>Phiên đối chiếu chuyến xe</span>
-                  <Badge status={tripSession.manifest.status}>{tripSession.manifest.status}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-3 text-sm sm:grid-cols-2">
-                  <div><p className="text-xs text-slate-500">Mã chuyến / xe</p><p className="mt-1 font-mono font-semibold">{tripSession.manifest.tripId} · {tripSession.manifest.vehicle.id}</p></div>
-                  <div><p className="text-xs text-slate-500">Tài xế</p><p className="mt-1 font-medium">{tripSession.manifest.driver.name}</p></div>
-                  <div><p className="text-xs text-slate-500">Tuyến</p><p className="mt-1 font-medium">{tripSession.manifest.origin.name} → {tripSession.manifest.destination.name}</p></div>
-                  <div><p className="text-xs text-slate-500">Số bao dự kiến</p><p className="mt-1 font-semibold">{sessionExpectedSackIds.length}</p></div>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-3">
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                    <p className="text-xs font-semibold text-emerald-800">Đã quét ({sessionArrivedSackIds.length})</p>
-                    <div className="mt-2 max-h-28 space-y-1 overflow-y-auto">
-                      {sessionArrivedSackIds.map((sackId) => <p key={sackId} className="font-mono text-xs text-emerald-900">{sackId}</p>)}
-                      {sessionArrivedSackIds.length === 0 && <p className="text-xs text-emerald-700">Chưa có sack</p>}
-                    </div>
-                  </div>
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                    <p className="text-xs font-semibold text-amber-800">Còn thiếu ({sessionMissingSackIds.length})</p>
-                    <div className="mt-2 max-h-28 space-y-1 overflow-y-auto">
-                      {sessionMissingSackIds.map((sackId) => <p key={sackId} className="font-mono text-xs text-amber-900">{sackId}</p>)}
-                      {sessionMissingSackIds.length === 0 && <p className="text-xs text-amber-700">Đã quét đủ</p>}
-                    </div>
-                  </div>
-                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
-                    <p className="text-xs font-semibold text-rose-800">Không thuộc chuyến ({sessionUnexpectedSackIds.length})</p>
-                    <div className="mt-2 max-h-28 space-y-1 overflow-y-auto">
-                      {sessionUnexpectedSackIds.map((sackId) => <p key={sackId} className="font-mono text-xs text-rose-900">{sackId}</p>)}
-                      {sessionUnexpectedSackIds.length === 0 && <p className="text-xs text-rose-700">Không có</p>}
-                    </div>
-                  </div>
-                </div>
-
-                {sessionUnexpectedSackIds.length > 0 && <p className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">Có sack ngoài chuyến. Hãy đóng phiên và quét lại QR xe; không thể xác nhận phiên này.</p>}
-                <div className="flex flex-wrap justify-end gap-2">
-                  <Button variant="outline" onClick={() => setTripSession(null)} disabled={tripConfirming}>Hủy phiên</Button>
-                  <Button onClick={() => void confirmTripSession()} disabled={tripConfirming || sessionArrivedSackIds.length === 0 || sessionUnexpectedSackIds.length > 0}>
-                    {tripConfirming ? 'Đang xác nhận...' : 'Xác nhận nhập hàng'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Hiển thị kết quả check-in gần nhất */}
-          {lastCheckIn && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-900 space-y-1">
->>>>>>> 652fce01594347f00281419fdec7fdd0a1b5f065
-              <div className="flex items-center justify-between font-semibold text-sm">
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  Nhập kho thành công: Xe {lastCheckIn.carId}
-                </span>
-                <span className="font-mono text-xs bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded">{lastCheckIn.tripId}</span>
-              </div>
-              <p>Zone phân bổ: <strong className="text-slate-900">{lastCheckIn.zoneName ?? lastCheckIn.zoneId ?? 'Zone nhập'}</strong></p>
-              {lastCheckIn.missingSackIds && lastCheckIn.missingSackIds.length > 0 && (
-                <p className="text-amber-800">⚠️ Thiếu {lastCheckIn.missingSackIds.length} bao: {lastCheckIn.missingSackIds.join(', ')}</p>
-              )}
-            </div>
+652fce01594347f00281419fdec7fdd0a1b5f065
+   </div>
           )}
 
           {/* ── Scan history ── */}

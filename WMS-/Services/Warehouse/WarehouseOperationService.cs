@@ -205,23 +205,29 @@ namespace WMS_.Services.Warehouse
             return true;
         }
 
-        public async Task<bool> FinalizePalletAsync(string palletId)
+        public async Task<bool> FinalizePalletAsync(string palletId, string outboundOrderId, string userId)
         {
+            if (string.IsNullOrWhiteSpace(outboundOrderId))
+                throw new InvalidOperationException("Mã đơn xuất kho (OutboundOrderId) là bắt buộc để chốt Pallet.");
+
             var sacks = await _db.Sacks.Where(s => s.PalletId == palletId).ToListAsync();
             if (!sacks.Any()) return false;
-            foreach (var sack in sacks)
+
+            var sackIds = sacks.Select(s => s.SackId).ToList();
+                        
+            var packSuccess = await PackSacksForOutboundAsync(outboundOrderId, sackIds, userId);
+
+            if (packSuccess)
             {
-                sack.Status = "ReadyForOutbound";
+                var pallet = await _db.Pallets.FindAsync(palletId);
+                if (pallet != null)
+                {
+                    pallet.Status = "Finalized";
+                    await _db.SaveChangesAsync();
+                }
             }
 
-            var pallet = await _db.Pallets.FindAsync(palletId);
-            if (pallet != null)
-            {
-                pallet.Status = "Finalized";
-            }
-
-            await _db.SaveChangesAsync();
-            return true;
+            return packSuccess;
         }
 
         public async Task<bool> PackSacksForOutboundAsync(string outboundOrderId, System.Collections.Generic.List<string> sackIds, string userId)

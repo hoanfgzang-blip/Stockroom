@@ -64,6 +64,9 @@ export interface Trip {
   createdAt: string
   updatedAt?: string | null
   sackCount?: number
+  sealCode?: string | null
+  sealedAt?: string | null
+  sealedBy?: string | null
   employee?: Employee
   car?: Car
 }

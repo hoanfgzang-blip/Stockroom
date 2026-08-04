@@ -160,6 +160,18 @@ export type TripCheckInResult = {
   zoneId?: string | null
   zoneName?: string | null
 }
+export type LoadTripSackResult = {
+  tripId: string
+  sackId: string
+  loadedCount: number
+}
+export type ScanTripSealResult = {
+  tripId: string
+  status: string
+  phase: 'LoadingStarted' | 'Sealed'
+  loadedCount: number
+  sealedAt?: string | null
+}
 export type TripQrCheckInResult = {
   tripId: string
   carId: string
@@ -179,6 +191,10 @@ export const tripsApi = {
   sacks: (id: string) => api.get<Sack[]>(`/Trips/${id}/sacks`),
   qrManifest: (id: string) => api.get<TripQrManifest>(`/Trips/${id}/qr-manifest`),
   create: (data: CreateTripRequest) => api.post<Trip>('/Trips', data),
+  loadSack: (tripId: string, sackId: string) =>
+    api.post<LoadTripSackResult>(`/Trips/${tripId}/load-sack/${sackId}`, {}),
+  scanSeal: (tripId: string, sealCode: string) =>
+    api.post<ScanTripSealResult>(`/Trips/${tripId}/scan-seal`, { sealCode }),
   update: (id: string, data: Trip) => api.put<void>(`/Trips/${id}`, data),
   updateStatus: (id: string, status: string) => api.patch(`/Trips/${id}/status`, status),
   delete: (id: string) => api.delete(`/Trips/${id}`),

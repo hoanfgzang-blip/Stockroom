@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { outboundOrdersApi } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,7 +16,7 @@ import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHe
 import { cn, formatDateTime, statusLabel } from '@/lib/utils'
 import type { OutboundOrder, OutboundOrderItem } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Camera, CheckCircle2, CircleAlert, QrCode, ScanLine } from 'lucide-react'
+import { QrCode } from 'lucide-react'
 
 export default function OutboundOrdersPage() {
   const [orders, setOrders] = useState<OutboundOrder[]>([])
@@ -25,11 +25,6 @@ export default function OutboundOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [qrDialogOpen, setQrDialogOpen] = useState(false)
-
-    const [cameraOpen, setCameraOpen] = useState(false)
-    const [cameraError, setCameraError] = useState('')
-    const videoRef = useRef<HTMLVideoElement>(null)
-    const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     outboundOrdersApi

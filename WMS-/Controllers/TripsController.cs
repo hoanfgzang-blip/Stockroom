@@ -871,11 +871,12 @@ namespace WMS_.Controllers
             var inboundZone = await _db.Zones.FirstOrDefaultAsync(zone => zone.LocationId == trip.Destination && zone.ZoneType == "Inbound");
             if (inboundZone == null) return BadRequest(new { message = "Hub dich chua co zone Inbound." });
             var sacks = await _db.Sacks.Where(sack => sack.TripId == id).ToListAsync();
+            var palletError = await ValidateInboundPalletsAsync(sacks, myLocationId);
+            if (palletError != null) return Conflict(new { message = palletError });
             foreach (var sack in sacks)
             {
-                sack.Status = "Sorting";
-                sack.ZoneId = inboundZone.ZoneId;
-                sack.PalletId = null;
+                sack.Status = "Sorted";
+                sack.ZoneId ??= inboundZone.ZoneId;
             }
             var previousStatus = trip.Status;
             trip.Status = "Completed";
@@ -952,6 +953,15 @@ namespace WMS_.Controllers
                 return Conflict(new TripQrCheckInResponse(trip.TripId, trip.CarId, trip.Status, expectedIds.Count, arrivedIds.Count, 0, missingIds, unexpectedIds, inboundZone?.ZoneId, inboundZone?.ZoneName));
             }
 
+            if (trip.Type == "Inbound")
+            {
+                var inboundSacks = dbSacks
+                    .Where(sack => newlyArrivedIds.Contains(sack.SackId))
+                    .ToList();
+                var palletError = await ValidateInboundPalletsAsync(inboundSacks, myLocationId);
+                if (palletError != null) return Conflict(new { message = palletError });
+            }
+
             if (arrivedIds.Count == 0)
             {
                 AddAuditLog("EmptyTripQrCheckIn", "trip", trip.TripId, new { Status = trip.Status }, new
@@ -971,9 +981,8 @@ namespace WMS_.Controllers
             {
                 if (trip.Type == "Inbound")
                 {
-                    sack.Status = "Sorting";
-                    sack.ZoneId = inboundZone!.ZoneId;
-                    sack.PalletId = null;
+                    sack.Status = "Sorted";
+                    sack.ZoneId ??= inboundZone!.ZoneId;
                 }
                 else
                 {
@@ -1216,6 +1225,38 @@ namespace WMS_.Controllers
 
             await _db.SaveChangesAsync();
             return NoContent();
+        }
+
+        private async Task<string?> ValidateInboundPalletsAsync(IEnumerable<Sack> sacks, string hubId)
+        {
+            var sackList = sacks.ToList();
+            var missingPalletSacks = sackList
+                .Where(sack => string.IsNullOrWhiteSpace(sack.PalletId))
+                .Select(sack => sack.SackId)
+                .ToList();
+            if (missingPalletSacks.Count > 0)
+                return $"Phải quét pallet trước khi nhập các bao: {string.Join(", ", missingPalletSacks)}.";
+
+            var palletIds = sackList
+                .Select(sack => sack.PalletId!)
+                .Distinct()
+                .ToList();
+            var pallets = await _db.Pallets
+                .Include(pallet => pallet.Zone)
+                .Where(pallet => palletIds.Contains(pallet.PalletId))
+                .ToListAsync();
+            if (pallets.Count != palletIds.Count)
+                return "Một hoặc nhiều pallet không tồn tại.";
+
+            var invalidPallet = pallets.FirstOrDefault(pallet =>
+                pallet.Zone == null ||
+                pallet.Zone.LocationId != hubId ||
+                pallet.Status == "Finalized" ||
+                pallet.Status == "Locked");
+            if (invalidPallet != null)
+                return "Pallet phải thuộc hub nhận hàng và chưa bị chốt hoặc khóa.";
+
+            return null;
         }
 
         private async Task PopulateSackCountsAsync(IEnumerable<Trip> trips)

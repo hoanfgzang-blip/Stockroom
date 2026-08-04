@@ -545,7 +545,7 @@ export default function BarcodeScannerPage() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {(isDriver ? modes.filter((item) => item.id === 'received') : modes).map((item) => {
+            {(isDriver ? modes.filter((item) => item.id === 'received') : modes.filter((item) => item.id !== 'received')).map((item) => {
               const Icon = item.icon
               const active = mode === item.id
               return (

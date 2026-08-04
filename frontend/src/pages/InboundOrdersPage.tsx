@@ -285,12 +285,26 @@ export default function InboundOrdersPage() {
 
   /* ─── Step 2: quét pallet ────────────────────────────────────────── */
 
-  const handlePalletSubmit = (e: FormEvent) => {
+  const handlePalletSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    if (processing) return
     const palletId = palletInput.trim()
-    setSelectedPalletId(palletId)
-    if (palletId) addResult(palletId, `Pallet ${palletId} đã được chọn.`, true)
-    setInboundStep('scanning')
+    if (!palletId) return
+
+    setProcessing(true)
+    try {
+      const pallet = await palletsApi.get(palletId)
+      if (['Finalized', 'Locked'].includes(pallet.status))
+        throw new Error('Pallet đã chốt hoặc đang bị khóa, không thể nhận thêm bao.')
+
+      setSelectedPalletId(pallet.palletId)
+      addResult(pallet.palletId, `Pallet ${pallet.palletId} đã được chọn.`, true)
+      setInboundStep('scanning')
+    } catch (err: unknown) {
+      addResult(palletId, err instanceof Error ? err.message : 'Không thể xác thực pallet.', false)
+    } finally {
+      setProcessing(false)
+    }
   }
 
   /* ─── Step 3: quét sack ──────────────────────────────────────────── */
@@ -300,6 +314,10 @@ export default function InboundOrdersPage() {
     if (!scannedCode || processing || !tripManifest) return
     setProcessing(true)
     try {
+      if (!selectedPalletId) {
+        addResult(scannedCode, 'Hãy quét pallet trước khi quét bao hàng.', false)
+        return
+      }
       if (scannedSackIds.includes(scannedCode)) {
         addResult(scannedCode, 'Bao này đã được quét rồi.', false)
         return
@@ -337,7 +355,7 @@ export default function InboundOrdersPage() {
   /* ─── Xác nhận nhập kho ───────────────────────────────────────────── */
 
   const handleInboundConfirm = async () => {
-    if (!tripManifest || checkingIn) return
+    if (!tripManifest || !selectedPalletId || checkingIn) return
     setCheckingIn(true)
     try {
       const result = await tripsApi.checkInByQr(tripManifest.tripId, scannedSackIds)
@@ -639,21 +657,11 @@ export default function InboundOrdersPage() {
                     >
                       <Camera className="h-4 w-4" />
                     </Button>
-                    <Button type="submit" disabled={!palletInput.trim()}>
+                    <Button type="submit" disabled={!palletInput.trim() || processing}>
                       <ChevronRight className="h-4 w-4" />
                       Tiếp tục
                     </Button>
                   </div>
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => { setSelectedPalletId(''); setPalletInput(''); setInboundStep('scanning') }}
-                  >
-                    Bỏ qua, không dùng pallet
-                  </Button>
                 </div>
               </form>
             </div>

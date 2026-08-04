@@ -5,6 +5,25 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Sinh ID tạm thời theo đúng format backend: PREFIX-yyyyMMddHHmmssfff-XXXX
+ *  Ví dụ: EMP-20260804182523456-A1B2, PLT-20260804182523456-C3D4
+ *  ID này sẽ được gửi lên server (không phải chỉ để hiển thị).
+ */
+export function generatePreviewId(prefix: string, maxLen = 50): string {
+  const now = new Date()
+  const p = (n: number, d: number) => String(n).padStart(d, '0')
+  const ts =
+    `${now.getFullYear()}` +
+    `${p(now.getMonth() + 1, 2)}` +
+    `${p(now.getDate(), 2)}` +
+    `${p(now.getHours(), 2)}` +
+    `${p(now.getMinutes(), 2)}` +
+    `${p(now.getSeconds(), 2)}` +
+    `${p(now.getMilliseconds(), 3)}`
+  const rand = Math.random().toString(16).slice(2, 6).toUpperCase()
+  return `${prefix}-${ts}-${rand}`.slice(0, maxLen)
+}
+
 export function formatDateTime(value?: string | null): string {
   if (!value) return '—'
   const d = new Date(value)

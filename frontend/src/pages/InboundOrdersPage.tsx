@@ -1,13 +1,13 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
-import { Camera, CheckCircle2, CircleAlert, QrCode, ScanLine } from 'lucide-react'
+import { Camera, CheckCircle2, CircleAlert, PackagePlus, Plus, QrCode, ScanLine, X } from 'lucide-react'
 import { BrowserMultiFormatReader, type IScannerControls } from '@zxing/browser'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
-import { inboundOrdersApi, tripsApi, type TripCheckInResult, type TripQrCheckInResult } from '@/api/services'
+import { inboundOrdersApi, palletsApi, tripsApi, zonesApi, type TripCheckInResult, type TripQrCheckInResult } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, Drawer } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import { Input, Label, Select } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -17,8 +17,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
-import { cn, formatDateTime, statusLabel } from '@/lib/utils'
-import type { InboundOrder, InboundOrderItem, TripQrManifest } from '@/types'
+import { cn, formatDateTime, generatePreviewId, statusLabel } from '@/lib/utils'
+import type { InboundOrder, InboundOrderItem, Pallet, TripQrManifest, Zone } from '@/types'
 
 type ScanResult = {
   id: number
@@ -54,6 +54,148 @@ function formatTripQrResult(trip: InboundCheckInResult, manifest?: TripQrManifes
   return `Xe ${trip.carId} (Mã chuyến: ${trip.tripId}) đã check-in. ${action}.${suffix}`
 }
 
+// --- Pallet Panel Component ---
+type PalletPanelProps = {
+  pallets: Pallet[]
+  zones: Zone[]
+  selectedPalletId: string
+  onSelectPallet: (id: string) => void
+  onCreatePallet: (zoneId: string, palletId: string) => Promise<void>
+  creating: boolean
+}
+
+function PalletPanel({ pallets, zones, selectedPalletId, onSelectPallet, onCreatePallet, creating }: PalletPanelProps) {
+  const [isCreating, setIsCreating] = useState(false)
+  const [newZoneId, setNewZoneId] = useState('')
+  const [previewPalletId, setPreviewPalletId] = useState('')
+
+  const selectedPallet = pallets.find((p) => p.palletId === selectedPalletId)
+
+  const toggleCreating = (v?: boolean) => {
+    const next = v !== undefined ? v : !isCreating
+    setIsCreating(next)
+    if (next) {
+      setPreviewPalletId(generatePreviewId('PLT'))
+    } else {
+      setPreviewPalletId('')
+    }
+  }
+
+  const handleCreate = async () => {
+    if (!newZoneId || !previewPalletId || creating) return
+    await onCreatePallet(newZoneId, previewPalletId)
+    setIsCreating(false)
+    setNewZoneId('')
+    setPreviewPalletId('')
+  }
+
+  return (
+    <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+          <PackagePlus className="h-4 w-4 text-blue-600" />
+          Pallet nhập kho
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          variant={isCreating ? 'destructive' : 'outline'}
+          onClick={() => toggleCreating()}
+          className="h-7 text-xs px-2.5"
+        >
+          {isCreating ? (
+            <><X className="h-3.5 w-3.5 mr-1" />Hủy</>
+          ) : (
+            <><Plus className="h-3.5 w-3.5 mr-1" />Tạo Pallet mới</>
+          )}
+        </Button>
+      </div>
+
+      {/* Tạo pallet mới */}
+      {isCreating && (
+        <div className="rounded-lg border border-blue-300 bg-white p-3 space-y-3">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Mã Pallet</Label>
+              <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                Tự động sinh mã
+              </span>
+            </div>
+            <div className="flex h-9 w-full items-center rounded-lg border border-slate-300 bg-slate-50 px-3">
+              <span className="font-mono text-xs font-semibold text-slate-700">{previewPalletId}</span>
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="new-pallet-zone" className="text-xs">Zone đặt Pallet <span className="text-red-500">*</span></Label>
+            <Select
+              id="new-pallet-zone"
+              value={newZoneId}
+              onChange={(e) => setNewZoneId(e.target.value)}
+              className="mt-1 h-9 text-xs"
+            >
+              <option value="">Chọn zone...</option>
+              {zones.map((z) => (
+                <option key={z.zoneId} value={z.zoneId}>
+                  {z.zoneName} ({z.zoneType})
+                </option>
+              ))}
+            </Select>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            disabled={!newZoneId || creating}
+            onClick={handleCreate}
+            className="w-full"
+          >
+            {creating ? 'Đang tạo...' : '✓ Xác nhận tạo Pallet mới'}
+          </Button>
+        </div>
+      )}
+
+      {/* Chọn pallet hiện có */}
+      {!isCreating && (
+        <div>
+          <Label htmlFor="select-pallet" className="text-xs">Chọn Pallet</Label>
+          <Select
+            id="select-pallet"
+            value={selectedPalletId}
+            onChange={(e) => onSelectPallet(e.target.value)}
+            className="mt-1 h-9 text-xs"
+          >
+            <option value="">-- Không chọn pallet --</option>
+            {pallets.map((p) => (
+              <option key={p.palletId} value={p.palletId}>
+                {p.palletId} — {p.status} — Zone: {p.zoneId}
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
+
+      {/* Thông tin read-only pallet đã chọn */}
+      {selectedPallet && !isCreating && (
+        <div className="grid grid-cols-3 gap-2 rounded-lg border bg-white p-3">
+          <div className="col-span-3">
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Mã Pallet</p>
+            <p className="text-xs font-mono font-semibold text-slate-900 mt-0.5">{selectedPallet.palletId}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Trạng thái</p>
+            <Badge status={selectedPallet.status} className="mt-0.5 text-[10px]">
+              {statusLabel(selectedPallet.status)}
+            </Badge>
+          </div>
+          <div className="col-span-2">
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Zone</p>
+            <p className="text-xs font-medium text-slate-700 mt-0.5 truncate">{selectedPallet.zoneId}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function InboundOrdersPage() {
   const [orders, setOrders] = useState<InboundOrder[]>([])
   const [selected, setSelected] = useState<InboundOrder | null>(null)
@@ -68,13 +210,20 @@ export default function InboundOrdersPage() {
   const [processing, setProcessing] = useState(false)
   const [results, setResults] = useState<ScanResult[]>([])
   const [lastCheckIn, setLastCheckIn] = useState<InboundCheckInResult | null>(null)
-  
+
   // Camera scanner state
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraError, setCameraError] = useState('')
   const videoRef = useRef<HTMLVideoElement>(null)
   const scannerControlsRef = useRef<IScannerControls | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Pallet state
+  const [pallets, setPallets] = useState<Pallet[]>([])
+  const [zones, setZones] = useState<Zone[]>([])
+  const [selectedPalletId, setSelectedPalletId] = useState('')
+  const [palletCreating, setPalletCreating] = useState(false)
+  const [palletLoaded, setPalletLoaded] = useState(false)
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -92,6 +241,29 @@ export default function InboundOrdersPage() {
     fetchOrders()
   }, [fetchOrders])
 
+  // Load pallets and zones when dialog opens
+  useEffect(() => {
+    if (qrDialogOpen && !palletLoaded) {
+      Promise.allSettled([palletsApi.all(), zonesApi.all()])
+        .then(([palletsResult, zonesResult]) => {
+          const loadedPallets = palletsResult.status === 'fulfilled' ? palletsResult.value : []
+          const loadedZones = zonesResult.status === 'fulfilled' ? zonesResult.value : []
+          setPallets(loadedPallets)
+          setZones(loadedZones)
+          setPalletLoaded(true)
+          // Auto-select the most recently created pallet (last in list, sorted by ID which contains timestamp)
+          if (loadedPallets.length > 0) {
+            const newest = [...loadedPallets].sort((a, b) => b.palletId.localeCompare(a.palletId))[0]
+            setSelectedPalletId(newest.palletId)
+          }
+        })
+        .catch(() => {
+          setPallets([])
+          setZones([])
+        })
+    }
+  }, [qrDialogOpen, palletLoaded])
+
   const stopCamera = useCallback(() => {
     scannerControlsRef.current?.stop()
     scannerControlsRef.current = null
@@ -105,6 +277,7 @@ export default function InboundOrdersPage() {
       setTimeout(() => inputRef.current?.focus(), 100)
     } else {
       stopCamera()
+      setPalletLoaded(false)
     }
   }, [qrDialogOpen, stopCamera])
 
@@ -137,11 +310,36 @@ export default function InboundOrdersPage() {
     setResults((prev) => [{ id: Date.now(), code, message, success, at: new Date() }, ...prev].slice(0, 6))
   }
 
-  const handleProcessScan = async (e?: FormEvent) => {
-    if (e) e.preventDefault()
-    const scannedCode = barcodeInput.trim()
-    if (!scannedCode || processing) return
+  const reloadPallets = async () => {
+    try {
+      const loadedPallets = await palletsApi.all()
+      setPallets(loadedPallets)
+      // After reload, select newest pallet
+      if (loadedPallets.length > 0) {
+        const newest = [...loadedPallets].sort((a, b) => b.palletId.localeCompare(a.palletId))[0]
+        setSelectedPalletId(newest.palletId)
+      }
+    } catch {
+      // ignore
+    }
+  }
 
+  const handleCreatePallet = async (zoneId: string, palletId: string) => {
+    setPalletCreating(true)
+    try {
+      const newPallet = await palletsApi.create({ zoneId, palletId })
+      await reloadPallets()
+      setSelectedPalletId(newPallet.palletId)
+      addScanResult(newPallet.palletId, `Đã tạo Pallet mới. Mã: ${newPallet.palletId} — Zone: ${newPallet.zoneId}`, true)
+    } catch (err: unknown) {
+      addScanResult('TẠO-PALLET', err instanceof Error ? err.message : 'Không thể tạo Pallet mới.', false)
+    } finally {
+      setPalletCreating(false)
+    }
+  }
+
+  const processCode = async (scannedCode: string) => {
+    if (!scannedCode || processing) return
     setProcessing(true)
     try {
       // Case 1: Check if scanned value is a JSON Trip QR Manifest
@@ -151,7 +349,8 @@ export default function InboundOrdersPage() {
         setLastCheckIn(tripResult)
         addScanResult(tripResult.tripId, formatTripQrResult(tripResult, manifest), (tripResult.missingSackIds?.length ?? 0) === 0)
         fetchOrders()
-        setBarcodeInput('')
+        // After successful QR check-in, reload pallets and select newest
+        await reloadPallets()
         return
       }
 
@@ -170,7 +369,6 @@ export default function InboundOrdersPage() {
         }
         openDetail(matchingOrder)
         fetchOrders()
-        setBarcodeInput('')
         return
       }
 
@@ -179,13 +377,28 @@ export default function InboundOrdersPage() {
       setLastCheckIn(tripResult)
       addScanResult(tripResult.tripId, formatTripQrResult(tripResult), true)
       fetchOrders()
-      setBarcodeInput('')
+      // After successful check-in, reload pallets and select newest
+      await reloadPallets()
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Mã đã quét không đúng định dạng hoặc không tồn tại.'
+      const rawMsg = err instanceof Error ? err.message : 'Mã đã quét không đúng định dạng hoặc không tồn tại.'
+      // Try to parse JSON error message from server
+      let msg = rawMsg
+      try {
+        const parsed = JSON.parse(rawMsg) as { message?: string }
+        if (parsed.message) msg = parsed.message
+      } catch {
+        // rawMsg is plain text
+      }
       addScanResult(scannedCode, msg, false)
     } finally {
+      setBarcodeInput('')
       setProcessing(false)
     }
+  }
+
+  const handleProcessScan = async (e?: FormEvent) => {
+    if (e) e.preventDefault()
+    await processCode(barcodeInput.trim())
   }
 
   const startCamera = async () => {
@@ -223,56 +436,12 @@ export default function InboundOrdersPage() {
 
           // Auto process scanned code
           setTimeout(() => {
-            handleProcessCode(scannedText)
+            void processCode(scannedText)
           }, 100)
         },
       )
     } catch (err: unknown) {
       setCameraError(err instanceof Error ? err.message : 'Không thể truy cập camera.')
-    }
-  }
-
-  const handleProcessCode = async (scannedCode: string) => {
-    if (!scannedCode || processing) return
-    setProcessing(true)
-    try {
-      const manifest = parseTripManifest(scannedCode)
-      if (manifest) {
-        const tripResult: InboundCheckInResult = await tripsApi.checkInByQr(manifest)
-        setLastCheckIn(tripResult)
-        addScanResult(tripResult.tripId, formatTripQrResult(tripResult, manifest), (tripResult.missingSackIds?.length ?? 0) === 0)
-        fetchOrders()
-        setBarcodeInput('')
-        return
-      }
-
-      const matchingOrder = orders.find(
-        (o) => o.inboundOrderId.toLowerCase() === scannedCode.toLowerCase() || o.inboundOrderNumber.toLowerCase() === scannedCode.toLowerCase(),
-      )
-
-      if (matchingOrder) {
-        if (matchingOrder.status === 'Pending') {
-          await inboundOrdersApi.updateStatus(matchingOrder.inboundOrderId, 'InProgress')
-          addScanResult(matchingOrder.inboundOrderNumber, `Đã nhận đơn nhập kho ${matchingOrder.inboundOrderNumber} (Chuyển sang Đang xử lý).`, true)
-        } else {
-          addScanResult(matchingOrder.inboundOrderNumber, `Tìm thấy đơn nhập kho ${matchingOrder.inboundOrderNumber} - Trạng thái: ${statusLabel(matchingOrder.status)}.`, true)
-        }
-        openDetail(matchingOrder)
-        fetchOrders()
-        setBarcodeInput('')
-        return
-      }
-
-      const tripResult: InboundCheckInResult = await tripsApi.checkIn(scannedCode)
-      setLastCheckIn(tripResult)
-      addScanResult(tripResult.tripId, formatTripQrResult(tripResult), true)
-      fetchOrders()
-      setBarcodeInput('')
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Mã không hợp lệ hoặc xử lý thất bại.'
-      addScanResult(scannedCode, msg, false)
-    } finally {
-      setProcessing(false)
     }
   }
 
@@ -504,6 +673,18 @@ export default function InboundOrdersPage() {
             </div>
           )}
 
+          {/* Panel chọn / tạo Pallet */}
+          {palletLoaded && (
+            <PalletPanel
+              pallets={pallets}
+              zones={zones}
+              selectedPalletId={selectedPalletId}
+              onSelectPallet={setSelectedPalletId}
+              onCreatePallet={handleCreatePallet}
+              creating={palletCreating}
+            />
+          )}
+
           {/* Lịch sử quét trong phiên */}
           <div>
             <p className="text-xs font-semibold text-slate-500 mb-2">Lịch sử quét gần đây</p>
@@ -544,4 +725,3 @@ export default function InboundOrdersPage() {
     </div>
   )
 }
-

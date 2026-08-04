@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -30,11 +30,6 @@ namespace WMS_.Services
 
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(o => o.Status == status);
-
-            if (!string.IsNullOrEmpty(myLocationId))
-            {
-                query = query.Where(o => o.InboundSuplierName == myLocationId);
-            }
 
             return await query.OrderByDescending(o => o.CreateAt).ToListAsync();
         }

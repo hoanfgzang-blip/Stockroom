@@ -39,7 +39,7 @@ export interface Employee {
   employeeId: string
   employeeName: string
   roleName: string
-  locationId: string
+  locationId?: string | null
   zoneId?: string | null
   shiftId: string
   location?: Location

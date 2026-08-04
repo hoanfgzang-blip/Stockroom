@@ -156,7 +156,8 @@ namespace WMS_.Controllers
         public async Task<ActionResult<TripCheckInResponse>> CheckIn(string id)
         {
             var myLocationId = User.FindFirstValue("location_id");
-            if (string.IsNullOrWhiteSpace(myLocationId)) return Forbid();
+            if (string.IsNullOrWhiteSpace(myLocationId))
+                return BadRequest(new { message = "Tài khoản của bạn chưa được gán địa điểm kho. Vui lòng liên hệ quản lý." });
 
             await using var transaction = await _db.Database.BeginTransactionAsync();
             var trip = await _db.Trips.FindAsync(id);
@@ -189,7 +190,11 @@ namespace WMS_.Controllers
         public async Task<ActionResult<TripQrCheckInResponse>> CheckInByQr([FromBody] TripQrCheckInRequest request)
         {
             var myLocationId = User.FindFirstValue("location_id");
-            if (string.IsNullOrWhiteSpace(myLocationId)) return Forbid();
+            // location_id is only required for Inbound trips (to determine which zone to put sacks into)
+            // Outbound trips just need to mark sacks as Received at destination
+            var isInboundManifest = request.Manifest.Type == "Inbound";
+            if (isInboundManifest && string.IsNullOrWhiteSpace(myLocationId))
+                return BadRequest(new { message = "Tài khoản của bạn chưa được gán địa điểm kho. Vui lòng liên hệ quản lý để check-in chuyến Inbound." });
 
             if (request.Manifest.Kind != "WMS_TRIP_MANIFEST" || request.Manifest.Version != 1)
                 return BadRequest(new { message = "QR khong dung dinh dang manifest chuyen xe WMS." });

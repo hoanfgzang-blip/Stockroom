@@ -99,7 +99,7 @@ export const palletsApi = {
   all: (status?: string) =>
     api.get<Pallet[]>(`/Pallets${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Pallet>(`/Pallets/${id}`),
-  create: (data: Pick<Pallet, 'zoneId'>) => api.post<Pallet>('/Pallets', data),
+  create: (data: Pick<Pallet, 'zoneId'> & { capacity?: number; palletId?: string }) => api.post<Pallet>('/Pallets', data),
   delete: (id: string) => api.delete(`/Pallets/${id}`),
   assignSack: (palletId: string, sackId: string) =>
     api.post<PalletAssignmentResult>(`/Pallets/${palletId}/assign-sack/${sackId}`, {}),

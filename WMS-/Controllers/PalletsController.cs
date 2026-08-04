@@ -10,6 +10,8 @@ namespace WMS_.Controllers
     public sealed class CreatePalletRequest
     {
         public string ZoneId { get; set; } = string.Empty;
+        public decimal? Capacity { get; set; }
+        public string? PalletId { get; set; }
     }
     [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
     [ApiController]
@@ -51,8 +53,10 @@ namespace WMS_.Controllers
             // Ma pallet va trang thai phai do he thong/nghiep vu quet quyet dinh.
             var pallet = new Pallet
             {
+                PalletId = request.PalletId?.Trim() ?? string.Empty,
                 ZoneId = request.ZoneId.Trim(),
-                Status = "Empty"
+                Status = "Empty",
+                Capacity = request.Capacity ?? 1000
             };
             var createdPallet = await _palletService.CreatePalletAsync(pallet);
             return CreatedAtAction(nameof(GetById), new { id = createdPallet.PalletId }, createdPallet);

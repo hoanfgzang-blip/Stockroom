@@ -188,8 +188,11 @@ export default function BarcodeScannerPage() {
       setLocations([])
       return
     }
-    Promise.all([outboundOrdersApi.all(), locationsApi.all()])
-      .then(([outboundOrders, warehouseLocations]) => {
+    Promise.allSettled([
+      outboundOrdersApi.all(), locationsApi.all()])
+      .then(([outboundOrdersResult, warehouseLocationsResult]) => {
+        const outboundOrders = outboundOrdersResult.status === 'fulfilled' ? outboundOrdersResult.value : []
+        const warehouseLocations = warehouseLocationsResult.status === 'fulfilled' ? warehouseLocationsResult.value : []
         setOrders(outboundOrders.filter((order) => order.status !== 'Completed'))
         setLocations(warehouseLocations)
       })

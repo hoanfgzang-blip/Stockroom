@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table'
 import { Combobox } from '@/components/shared/Combobox'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
-import { formatTimeSpan, roleLabel } from '@/lib/utils'
+import { formatTimeSpan, generatePreviewId, roleLabel } from '@/lib/utils'
 import type { Employee, Location, Shift, Zone } from '@/types'
 
 const emptyForm = (): Employee => ({
@@ -40,6 +40,7 @@ export default function EmployeesPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<Employee>(emptyForm())
   const [saving, setSaving] = useState(false)
+  const [previewEmpId, setPreviewEmpId] = useState('')
 
   const load = () => {
     setLoading(true)
@@ -89,10 +90,33 @@ export default function EmployeesPage() {
     return s ? `${s.shiftName} (${formatTimeSpan(s.startAt)}–${formatTimeSpan(s.endAt)})` : id
   }
 
+  const openCreate = () => {
+    setError(null)
+    setForm(emptyForm())
+    setPreviewEmpId(generatePreviewId('EMP'))
+    setDialogOpen(true)
+  }
+
   const handleSave = async () => {
+    if (!form.employeeName.trim()) {
+      setError('Vui lòng nhập tên nhân viên')
+      return
+    }
+    if (!form.shiftId) {
+      setError('Vui lòng chọn ca làm việc')
+      return
+    }
+
     setSaving(true)
+    setError(null)
     try {
-      await employeesApi.create(form)
+      const payload: Employee = {
+        ...form,
+        employeeId: previewEmpId,
+        locationId: form.locationId || null,
+        zoneId: form.zoneId || null,
+      }
+      await employeesApi.create(payload)
       setDialogOpen(false)
       setForm(emptyForm())
       load()
@@ -112,7 +136,7 @@ export default function EmployeesPage() {
         title="Employee Directory"
         description="Staff assignments by shift, hub, and warehouse zone."
         action={
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button onClick={() => openCreate()}>
             <Plus className="h-4 w-4" />
             Add Employee
           </Button>
@@ -185,12 +209,21 @@ export default function EmployeesPage() {
         description="Assign hub, zone, and shift with relational autocomplete fields."
       >
         <div className="space-y-4">
+          {error && (
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-600 border border-red-200">
+              {error}
+            </div>
+          )}
           <div>
-            <Label>Mã nhân viên</Label>
-            <Input
-              value={form.employeeId}
-              onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
-            />
+            <div className="flex items-center justify-between">
+              <Label>Mã nhân viên</Label>
+              <span className="text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                Tự động sinh mã
+              </span>
+            </div>
+            <div className="mt-1 flex h-10 w-full items-center rounded-lg border border-slate-300 bg-slate-50 px-3">
+              <span className="font-mono text-xs font-semibold text-slate-700">{previewEmpId}</span>
+            </div>
           </div>
           <div>
             <Label>Tên nhân viên</Label>

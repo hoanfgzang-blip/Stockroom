@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -36,10 +36,10 @@ namespace WMS_.Data.Entities
         public string ShiftId { get; set; } = null!;
 
         [ForeignKey("LocationId")]
-        public virtual Location? Location { get; set; } = null!;
+        public virtual Location? Location { get; set; }
         [ForeignKey("ZoneId")]
-        public virtual Zone Zone { get; set; } = null!;
+        public virtual Zone? Zone { get; set; }
         [ForeignKey("ShiftId")]
-        public virtual Shift Shift { get; set; } = null!;
+        public virtual Shift? Shift { get; set; }
     }
 }

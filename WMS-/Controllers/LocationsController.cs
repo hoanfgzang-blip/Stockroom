@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using WMS_.Data;
 using WMS_.Data.Entities;
+using WMS_.Configuration;
 using System.ComponentModel.DataAnnotations;
 
 public sealed class CreateLocationRequest
@@ -24,12 +25,16 @@ namespace WMS_.Controllers
         /// <summary>Get all warehouse locations (WarehouseLocationMap page)</summary>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Location>>> GetAll()
-            => await _db.Locations.Include(l => l.Province).ToListAsync();
+            => await _db.Locations
+                .Where(l => OperationalHubScope.HubIds.Contains(l.LocationId))
+                .Include(l => l.Province)
+                .ToListAsync();
 
         /// <summary>Get location by ID</summary>
         [HttpGet("{id}")]
         public async Task<ActionResult<Location>> GetById(string id)
         {
+            if (!OperationalHubScope.IsHub(id)) return NotFound();
             var loc = await _db.Locations.Include(l => l.Province).FirstOrDefaultAsync(l => l.LocationId == id);
             return loc == null ? NotFound() : Ok(loc);
         }
@@ -43,6 +48,10 @@ namespace WMS_.Controllers
         [HttpPost]
         public async Task<ActionResult<Location>> Create([FromBody] CreateLocationRequest request)
         {
+            if (!OperationalHubScope.IsHub(request.LocationId) || request.LocationType != "Hub")
+                return BadRequest("Chỉ được sử dụng 3 hub vận hành đã cấu hình.");
+            if (!OperationalHubScope.IsProvince(request.ProvinceId))
+                return BadRequest("Tỉnh/thành phố không thuộc phạm vi 3 hub vận hành.");
             // ID checking: ensure the LocationId is unique
             if (await _db.Locations.AnyAsync(l => l.LocationId == request.LocationId))
                 return Conflict(new { message = "Mã địa điểm/Hub này đã tồn tại trong hệ thống." });
@@ -70,6 +79,8 @@ namespace WMS_.Controllers
         public async Task<IActionResult> Update(string id, [FromBody] Location location)
         {
             if (id != location.LocationId) return BadRequest();
+            if (!OperationalHubScope.IsHub(id) || location.LocationType != "Hub" || !OperationalHubScope.IsProvince(location.ProvinceId))
+                return BadRequest("Chỉ được cập nhật thông tin của 3 hub vận hành.");
             _db.Entry(location).State = EntityState.Modified;
             try { await _db.SaveChangesAsync(); }
             catch (DbUpdateConcurrencyException)
@@ -81,6 +92,8 @@ namespace WMS_.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
+            if (OperationalHubScope.IsHub(id))
+                return Conflict(new { message = "Không được xóa 3 hub vận hành chính." });
             var loc = await _db.Locations.FindAsync(id);
             if (loc == null) return NotFound();
             _db.Locations.Remove(loc);

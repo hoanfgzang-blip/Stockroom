@@ -1,19 +1,8 @@
 -- Tai khoan kiem thu dang nhap WMS.
 -- Mat khau duoc luu bang PBKDF2-SHA256, khong phai text thuan.
+-- Chay sau demo_seed.sql de tai khoan local thuoc hub Ha Noi.
 
 BEGIN;
-
-INSERT INTO province (province_id, province_name)
-VALUES ('LOCAL-PROVINCE', 'Local')
-ON CONFLICT (province_id) DO UPDATE
-SET province_name = EXCLUDED.province_name;
-
-INSERT INTO location (location_id, province_id, location_type, location_name)
-VALUES ('LOCAL-HUB', 'LOCAL-PROVINCE', 'Hub', 'Local Hub')
-ON CONFLICT (location_id) DO UPDATE
-SET province_id = EXCLUDED.province_id,
-    location_type = EXCLUDED.location_type,
-    location_name = EXCLUDED.location_name;
 
 INSERT INTO shift (shift_id, shift_name, start_at, end_at)
 VALUES ('LOCAL-SHIFT', 'Ca local', '00:00', '23:59')
@@ -23,7 +12,7 @@ SET shift_name = EXCLUDED.shift_name,
     end_at = EXCLUDED.end_at;
 
 INSERT INTO employee (employee_id, employee_name, role_name, location_id, zone_id, shift_id)
-VALUES ('LOCAL-ADMIN-EMP', 'Admin Local', 'Manager', 'LOCAL-HUB', NULL, 'LOCAL-SHIFT')
+VALUES ('LOCAL-ADMIN-EMP', 'Admin Local', 'Manager', 'DEMO-HUB-HN', NULL, 'LOCAL-SHIFT')
 ON CONFLICT (employee_id) DO UPDATE
 SET employee_name = EXCLUDED.employee_name,
     role_name = EXCLUDED.role_name,

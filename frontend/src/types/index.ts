@@ -127,16 +127,6 @@ export interface TripQrTokenIssueResponse {
   sackCount: number
 }
 
-export interface RoutingRule {
-  ruleId: string
-  currentLocationID: string
-  cDestinationID: string
-  nextHop: string
-  currentLocation?: Location
-  cDestination?: Location
-  nextHopLocation?: Location
-}
-
 export interface InboundOrder {
   inboundOrderId: string
   inboundOrderNumber: string
@@ -194,7 +184,8 @@ export interface InventoryReservation {
 
 export interface AuditLog {
   auditLogId: number
-  userName: string
+  userId: string
+  userName?: string | null
   actionType: string
   tableName: string
   recordId: string

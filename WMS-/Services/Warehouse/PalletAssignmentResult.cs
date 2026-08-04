@@ -9,5 +9,8 @@ namespace WMS_.Services.Warehouse
         int AssignedSackCount = 0,
         string? Classification = null,
         string? DestinationName = null,
-        string? ZoneName = null);
+        string? ZoneName = null,
+        string? ProcessRole = null,
+        string? NextHopId = null,
+        string? NextHopName = null);
 }

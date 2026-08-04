@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text.Json;
 using WMS_.Data;
 using WMS_.Data.Entities;
+using WMS_.Configuration;
 
 namespace WMS_.Controllers
 {
@@ -100,6 +102,9 @@ namespace WMS_.Controllers
             if (string.IsNullOrWhiteSpace(locationId)) return Forbid();
             var query = _db.Trips.AsQueryable();
             query = query.Where(trip => trip.Origin == locationId || trip.Destination == locationId);
+            query = query.Where(trip =>
+                OperationalHubScope.HubIds.Contains(trip.Origin) &&
+                OperationalHubScope.HubIds.Contains(trip.Destination));
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(trip => trip.Status == status);
             var trips = await query.OrderByDescending(trip => trip.CreatedAt).ToListAsync();
             await PopulateSackCountsAsync(trips);
@@ -112,7 +117,10 @@ namespace WMS_.Controllers
         {
             var locationId = User.FindFirstValue("location_id");
             if (string.IsNullOrWhiteSpace(locationId)) return Forbid();
-            var query = _db.Trips.Where(trip => trip.Destination == locationId);
+            var query = _db.Trips.Where(trip =>
+                trip.Destination == locationId &&
+                OperationalHubScope.HubIds.Contains(trip.Origin) &&
+                OperationalHubScope.HubIds.Contains(trip.Destination));
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(trip => trip.Status == status);
             var trips = await query.OrderBy(trip => trip.CreatedAt).ToListAsync();
             await PopulateSackCountsAsync(trips);
@@ -126,6 +134,7 @@ namespace WMS_.Controllers
             var locationId = User.FindFirstValue("location_id");
             var trip = await _db.Trips.FindAsync(id);
             if (trip == null) return NotFound();
+            if (!OperationalHubScope.IsHub(trip.Origin) || !OperationalHubScope.IsHub(trip.Destination)) return NotFound();
             if (!string.IsNullOrWhiteSpace(locationId) && trip.Origin != locationId && trip.Destination != locationId)
                 return Forbid();
             trip.SackCount = await _db.Sacks.CountAsync(sack => sack.TripId == id);
@@ -216,18 +225,26 @@ namespace WMS_.Controllers
                 .Select(t => (int?)t.ManifestVersion)
                 .FirstOrDefaultAsync() ?? 0;
 
-            await RevokeActiveQrTokensAsync(id);
-
             var now = DateTime.UtcNow;
             var expiresAt = now.Add(QrTokenLifetime);
+            var revokedCount = await RevokeActiveQrTokensAsync(id, now);
+            AddQrRevokeAudit(id, revokedCount, "Reissue");
+
+            var manifestVersion = lastVersion + 1;
             _db.TripQrTokens.Add(new TripQrToken
             {
                 TokenHash = tokenHash,
                 TripId = trip.TripId,
                 IssuedAt = now,
                 ExpiresAt = expiresAt,
-                ManifestVersion = lastVersion + 1
+                ManifestVersion = manifestVersion
             });
+            AddAuditLog(
+                revokedCount > 0 ? "ReissueTripQrToken" : "IssueTripQrToken",
+                "trip_qr_token",
+                trip.TripId,
+                new { RevokedTokenCount = revokedCount },
+                new { ManifestVersion = manifestVersion, IssuedAt = now, ExpiresAt = expiresAt, TripStatus = trip.Status });
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
 
@@ -237,7 +254,7 @@ namespace WMS_.Controllers
                 $"{QrTokenPrefix}{token}",
                 now,
                 expiresAt,
-                lastVersion + 1,
+                manifestVersion,
                 trip.Status,
                 trip.Employee?.EmployeeName ?? "",
                 trip.Car == null ? "" : $"{trip.CarId} · {trip.Car.CarType}",
@@ -252,45 +269,88 @@ namespace WMS_.Controllers
         {
             var locationId = User.FindFirstValue("location_id");
             if (string.IsNullOrWhiteSpace(locationId))
+            {
+                AddAuditLog("ResolveTripQrFailed", "trip_qr_token", "unknown", null, new { Reason = "MissingLocation" });
+                await _db.SaveChangesAsync();
                 return Forbid();
+            }
 
-            var qrValue = request.QrValue.Trim();
+            var qrValue = request.QrValue?.Trim() ?? string.Empty;
             if (!qrValue.StartsWith(QrTokenPrefix, StringComparison.Ordinal))
+            {
+                AddAuditLog("ResolveTripQrFailed", "trip_qr_token", "unknown", null, new { Reason = "InvalidPrefix" });
+                await _db.SaveChangesAsync();
                 return BadRequest(new { message = "QR không đúng định dạng token chuyến xe." });
+            }
 
             var token = qrValue[QrTokenPrefix.Length..];
             if (string.IsNullOrWhiteSpace(token))
+            {
+                AddAuditLog("ResolveTripQrFailed", "trip_qr_token", "unknown", null, new { Reason = "MissingToken" });
+                await _db.SaveChangesAsync();
                 return BadRequest(new { message = "QR thiếu token chuyến xe." });
+            }
 
             var tokenHash = HashQrToken(token);
             var tokenReference = await _db.TripQrTokens
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
             if (tokenReference == null)
+            {
+                AddAuditLog("ResolveTripQrFailed", "trip_qr_token", tokenHash, null, new { Reason = "TokenNotFound" });
+                await _db.SaveChangesAsync();
                 return NotFound(new { message = "Token QR không hợp lệ." });
+            }
 
             await using var transaction = await _db.Database.BeginTransactionAsync();
             var trip = await _db.Trips
                 .FromSqlInterpolated($"SELECT * FROM trip WHERE trip_id = {tokenReference.TripId} FOR UPDATE")
                 .SingleOrDefaultAsync();
             if (trip == null)
+            {
+                AddAuditLog("ResolveTripQrFailed", "trip_qr_token", tokenHash, null, new { Reason = "TripNotFound" });
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
                 return NotFound(new { message = "Không tìm thấy chuyến xe của token QR." });
+            }
 
             var qrToken = await _db.TripQrTokens
                 .FromSqlInterpolated($"SELECT * FROM trip_qr_token WHERE token_hash = {tokenHash} FOR UPDATE")
                 .SingleOrDefaultAsync();
             if (qrToken == null)
+            {
+                AddAuditLog("ResolveTripQrFailed", "trip_qr_token", trip.TripId, null, new { Reason = "TokenNotFound" });
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
                 return NotFound(new { message = "Token QR không hợp lệ." });
+            }
             if (qrToken.RevokedAt != null)
+            {
+                AddAuditLog("ResolveTripQrFailed", "trip_qr_token", trip.TripId, null, new { Reason = "Revoked" });
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
                 return Conflict(new { message = "Token QR đã bị thu hồi." });
+            }
             if (qrToken.ExpiresAt < DateTime.UtcNow)
+            {
+                AddAuditLog("ResolveTripQrFailed", "trip_qr_token", trip.TripId, null, new { Reason = "Expired", ExpiresAt = qrToken.ExpiresAt });
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
                 return Conflict(new { message = "Token QR đã hết hạn." });
+            }
 
             if (trip.Destination != locationId)
+            {
+                AddAuditLog("ResolveTripQrFailed", "trip", trip.TripId, new { Destination = trip.Destination }, new { Reason = "WrongHub", CurrentLocation = locationId });
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
                 return StatusCode(StatusCodes.Status403Forbidden, new { message = "QR không thuộc hub hiện tại." });
+            }
             if (trip.Status is "Completed" or "Cancelled")
             {
-                await RevokeActiveQrTokensAsync(trip.TripId);
+                var revokedCount = await RevokeActiveQrTokensAsync(trip.TripId);
+                AddQrRevokeAudit(trip.TripId, revokedCount, trip.Status);
+                AddAuditLog("ResolveTripQrFailed", "trip", trip.TripId, new { Status = trip.Status }, new { Reason = $"Trip{trip.Status}" });
                 await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
                 var message = trip.Status == "Cancelled"
@@ -300,10 +360,24 @@ namespace WMS_.Controllers
             }
 
             var manifest = await BuildQrManifestAsync(qrToken.TripId);
+            if (manifest == null)
+            {
+                AddAuditLog("ResolveTripQrFailed", "trip", trip.TripId, null, new { Reason = "ManifestNotFound" });
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return NotFound(new { message = "Không tìm thấy chuyến xe của token QR." });
+            }
+
+            AddAuditLog("StartTripQrCheckIn", "trip", trip.TripId, new { Status = trip.Status }, new
+            {
+                Status = trip.Status,
+                ManifestVersion = qrToken.ManifestVersion,
+                ExpectedSackCount = manifest.Sacks.Count,
+                Location = locationId
+            });
+            await _db.SaveChangesAsync();
             await transaction.CommitAsync();
-            return manifest == null
-                ? NotFound(new { message = "Không tìm thấy chuyến xe của token QR." })
-                : Ok(new TripQrResolveResponse(qrToken.ManifestVersion, manifest));
+            return Ok(new TripQrResolveResponse(qrToken.ManifestVersion, manifest));
         }
 
         private const string QrTokenPrefix = "WMS-TRIP-QR:";
@@ -312,11 +386,38 @@ namespace WMS_.Controllers
         private static string HashQrToken(string token)
             => Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
 
-        private async Task RevokeActiveQrTokensAsync(string tripId)
+        private async Task<int> RevokeActiveQrTokensAsync(string tripId, DateTime? revokedAt = null)
         {
             var activeTokens = await _db.TripQrTokens.Where(t => t.TripId == tripId && t.RevokedAt == null).ToListAsync();
+            var timestamp = revokedAt ?? DateTime.UtcNow;
             foreach (var activeToken in activeTokens)
-                activeToken.RevokedAt = DateTime.UtcNow;
+                activeToken.RevokedAt = timestamp;
+            return activeTokens.Count;
+        }
+
+        private void AddQrRevokeAudit(string tripId, int revokedCount, string reason)
+        {
+            if (revokedCount == 0) return;
+            AddAuditLog("RevokeTripQrToken", "trip_qr_token", tripId, null, new
+            {
+                RevokedTokenCount = revokedCount,
+                Reason = reason,
+                RevokedAt = DateTime.UtcNow
+            });
+        }
+
+        private void AddAuditLog(string actionType, string tableName, string recordId, object? oldValues, object? newValues)
+        {
+            _db.AuditLogs.Add(new AuditLog
+            {
+                UserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "SYSTEM",
+                ActionType = actionType,
+                TableName = tableName,
+                RecordId = recordId,
+                OldValues = JsonSerializer.Serialize(oldValues),
+                NewValues = JsonSerializer.Serialize(newValues),
+                CreatedAt = DateTime.UtcNow
+            });
         }
 
         [HttpPost]
@@ -325,6 +426,8 @@ namespace WMS_.Controllers
         {
             var locationId = User.FindFirstValue("location_id");
             if (string.IsNullOrWhiteSpace(locationId)) return Forbid();
+            if (!OperationalHubScope.IsHub(request.Origin) || !OperationalHubScope.IsHub(request.Destination))
+                return BadRequest("Chuyến chỉ được kết nối giữa 3 hub vận hành.");
             if (request.Type == "Outbound" && request.Origin != locationId) return Forbid();
             if (request.Type is not ("Inbound" or "Outbound")) return BadRequest("Loai chuyen chi co the la Inbound hoac Outbound.");
             if (request.Type == "Outbound" &&
@@ -561,9 +664,19 @@ namespace WMS_.Controllers
                 sack.ZoneId = inboundZone.ZoneId;
                 sack.PalletId = null;
             }
+            var previousStatus = trip.Status;
             trip.Status = "Completed";
             trip.UpdatedAt = DateTime.UtcNow;
-            await RevokeActiveQrTokensAsync(id);
+            var revokedCount = await RevokeActiveQrTokensAsync(id);
+            AddQrRevokeAudit(id, revokedCount, "Completed");
+            AddAuditLog("CompleteTripQrCheckIn", "trip", trip.TripId, new { Status = previousStatus }, new
+            {
+                Status = trip.Status,
+                QrTokenPolicy = "Revoked",
+                Source = "DirectCheckIn",
+                ReceivedCount = sacks.Count,
+                ExpectedSackCount = sacks.Count
+            });
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
             return Ok(new TripCheckInResponse(trip.TripId, trip.CarId, trip.Status, sacks.Count, inboundZone.ZoneId, inboundZone.ZoneName));
@@ -581,7 +694,9 @@ namespace WMS_.Controllers
             if (string.IsNullOrWhiteSpace(tripId)) return BadRequest(new { message = "QR thieu ma chuyen xe." });
 
             await using var transaction = await _db.Database.BeginTransactionAsync();
-            var trip = await _db.Trips.FindAsync(tripId);
+            var trip = await _db.Trips
+                .FromSqlInterpolated($"SELECT * FROM trip WHERE trip_id = {tripId} FOR UPDATE")
+                .SingleOrDefaultAsync();
             if (trip == null) return NotFound(new { message = "Khong tim thay ma chuyen xe trong QR." });
 
             if (trip.Destination != myLocationId)
@@ -602,19 +717,44 @@ namespace WMS_.Controllers
             var expectedIds = dbSacks.Select(sack => sack.SackId).OrderBy(id => id).ToList();
             var arrivedIds = request.ArrivedSackIds
                  .Select(id => id.Trim()).Where(id => id.Length > 0).Distinct().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var previouslyReceivedIds = trip.Status == "CompletedWithMissing"
+                ? dbSacks.Where(sack => sack.Status != "Missing").Select(sack => sack.SackId).ToHashSet(StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var newlyArrivedIds = arrivedIds.Where(id => !previouslyReceivedIds.Contains(id)).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            var missingIds = expectedIds.Where(id => !arrivedIds.Contains(id)).ToList();
+            var missingIds = expectedIds.Where(id => !previouslyReceivedIds.Contains(id) && !arrivedIds.Contains(id)).ToList();
             var unexpectedIds = arrivedIds.Where(id => !expectedIds.Contains(id, StringComparer.OrdinalIgnoreCase)).OrderBy(id => id).ToList();
 
             if (unexpectedIds.Count > 0)
+            {
+                AddAuditLog("RejectTripQrCheckInUnexpected", "trip", trip.TripId, new { Status = trip.Status }, new
+                {
+                    ExpectedSackIds = expectedIds,
+                    ArrivedSackIds = arrivedIds.OrderBy(id => id).ToList(),
+                    MissingSackIds = missingIds,
+                    UnexpectedSackIds = unexpectedIds
+                });
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
                 return Conflict(new TripQrCheckInResponse(trip.TripId, trip.CarId, trip.Status, expectedIds.Count, arrivedIds.Count, 0, missingIds, unexpectedIds, inboundZone?.ZoneId, inboundZone?.ZoneName));
+            }
 
             if (arrivedIds.Count == 0)
+            {
+                AddAuditLog("EmptyTripQrCheckIn", "trip", trip.TripId, new { Status = trip.Status }, new
+                {
+                    ExpectedSackCount = expectedIds.Count,
+                    MissingSackIds = missingIds
+                });
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
                 return Ok(new TripQrCheckInResponse(trip.TripId, trip.CarId, trip.Status, expectedIds.Count, 0, 0, missingIds, [], inboundZone?.ZoneId, inboundZone?.ZoneName));
+            }
 
+            var previousStatus = trip.Status;
             var received = 0;
 
-            foreach (var sack in dbSacks.Where(sack => arrivedIds.Contains(sack.SackId)))
+            foreach (var sack in dbSacks.Where(sack => newlyArrivedIds.Contains(sack.SackId)))
             {
                 if (trip.Type == "Inbound")
                 {
@@ -638,15 +778,45 @@ namespace WMS_.Controllers
             if (missingIds.Count == 0 && expectedIds.Count > 0)
             {
                 trip.Status = "Completed"; 
-                await RevokeActiveQrTokensAsync(tripId);
+                var revokedCount = await RevokeActiveQrTokensAsync(tripId);
+                AddQrRevokeAudit(tripId, revokedCount, "Completed");
+                AddAuditLog("CompleteTripQrCheckIn", "trip", trip.TripId, new { Status = previousStatus }, new
+                {
+                    Status = trip.Status,
+                    QrTokenPolicy = "Revoked",
+                    ExpectedSackIds = expectedIds,
+                    ArrivedSackIds = arrivedIds.OrderBy(id => id).ToList(),
+                    ReceivedCount = received,
+                    MissingSackIds = missingIds,
+                    UnexpectedSackIds = unexpectedIds
+                });
             }
             else if (received > 0)
             {
                 trip.Status = "CompletedWithMissing";
+                AddAuditLog("CompleteTripQrCheckInWithMissing", "trip", trip.TripId, new { Status = previousStatus }, new
+                {
+                    Status = trip.Status,
+                    QrTokenPolicy = "ActiveForSupplementalReceipt",
+                    ExpectedSackIds = expectedIds,
+                    ArrivedSackIds = arrivedIds.OrderBy(id => id).ToList(),
+                    ReceivedCount = received,
+                    MissingSackIds = missingIds,
+                    UnexpectedSackIds = unexpectedIds
+                });
             }
             else
             {
-                return BadRequest(new { message = "Khong co bao hang nao duoc xac nhan den. Vui long quet it nhat 1 bao hang." });
+                AddAuditLog("EmptyTripQrCheckIn", "trip", trip.TripId, new { Status = trip.Status }, new
+                {
+                    Reason = "NoNewSacks",
+                    ExpectedSackCount = expectedIds.Count,
+                    ArrivedSackIds = arrivedIds.OrderBy(id => id).ToList(),
+                    MissingSackIds = missingIds
+                });
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return Ok(new TripQrCheckInResponse(trip.TripId, trip.CarId, trip.Status, expectedIds.Count, arrivedIds.Count, 0, missingIds, [], inboundZone?.ZoneId, inboundZone?.ZoneName));
             }
 
             trip.UpdatedAt = DateTime.UtcNow;
@@ -693,12 +863,16 @@ namespace WMS_.Controllers
                 }
             }
 
+            var previousStatus = trip.Status;
             trip.Status = status;
             if (status is "Completed" or "Cancelled")
             {
                 if (status == "Completed")
                     trip.UpdatedAt = DateTime.UtcNow;
-                await RevokeActiveQrTokensAsync(id);
+                var revokedCount = await RevokeActiveQrTokensAsync(id);
+                AddQrRevokeAudit(id, revokedCount, status);
+                if (status == "Completed")
+                    AddAuditLog("CompleteTripStatus", "trip", trip.TripId, new { Status = previousStatus }, new { Status = trip.Status, QrTokenPolicy = "Revoked", Source = "DispatchStatus" });
             }
             await _db.SaveChangesAsync();
             return NoContent();
@@ -768,9 +942,14 @@ namespace WMS_.Controllers
             if (employeeId == null) return Forbid();
             if (trip == null || trip.EmployeeId != employeeId) return NotFound();
             if (!((status == "InProgress" && trip.Status == "Pending") || (status == "Completed" && trip.Status == "InProgress"))) return BadRequest("Chuyen trang thai khong hop le.");
+            var previousStatus = trip.Status;
             trip.Status = status; trip.UpdatedAt = DateTime.UtcNow;
             if (status == "Completed")
-                await RevokeActiveQrTokensAsync(id);
+            {
+                var revokedCount = await RevokeActiveQrTokensAsync(id);
+                AddQrRevokeAudit(id, revokedCount, "Completed");
+                AddAuditLog("CompleteTripStatus", "trip", trip.TripId, new { Status = previousStatus }, new { Status = trip.Status, QrTokenPolicy = "Revoked", Source = "DriverStatus" });
+            }
             if (status == "InProgress" && trip.Type == "Outbound")
             {
                 var sacks = await _db.Sacks.Where(sack => sack.TripId == id).ToListAsync();

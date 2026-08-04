@@ -6,6 +6,8 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using WMS_.Data;
 using WMS_.Data.Entities;
+using WMS_.Configuration;
+using WMS_.Security;
 
 namespace WMS_.Services.Warehouse
 {
@@ -23,29 +25,46 @@ namespace WMS_.Services.Warehouse
         public async Task<IEnumerable<Zone>> GetAllZonesAsync()
         {
             var myLocationId = _httpContextAccessor.HttpContext?.User.FindFirstValue("location_id");
+            if (string.IsNullOrWhiteSpace(myLocationId))
+                return Array.Empty<Zone>();
 
-            var query = _db.Zones.Include(z => z.Location).AsQueryable();
-
-            if (!string.IsNullOrEmpty(myLocationId))
-            {
-                query = query.Where(z => z.LocationId == myLocationId);
-            }
+            var query = _db.Zones
+                .Include(z => z.Location)
+                .Where(z => OperationalHubScope.HubIds.Contains(z.LocationId) && z.LocationId == myLocationId);
 
             return await query.ToListAsync();
         }
 
         public async Task<Zone?> GetZoneByIdAsync(string id)
         {
-            return await _db.Zones.Include(z => z.Location).FirstOrDefaultAsync(z => z.ZoneId == id);
+            var myLocationId = _httpContextAccessor.HttpContext?.User.HubId();
+            if (string.IsNullOrWhiteSpace(myLocationId))
+                return null;
+
+            return await _db.Zones
+                .Include(z => z.Location)
+                .FirstOrDefaultAsync(z => z.ZoneId == id && z.LocationId == myLocationId);
         }
 
         public async Task<IEnumerable<Zone>> GetZonesByLocationAsync(string locationId)
         {
+            var user = _httpContextAccessor.HttpContext?.User;
+            if (user == null || !OperationalHubScope.IsHub(locationId) || !user.CanAccessHub(locationId))
+                return Array.Empty<Zone>();
+
             return await _db.Zones.Where(z => z.LocationId == locationId).ToListAsync();
         }
 
         public async Task<Zone> CreateZoneAsync(Zone zone)
         {
+            var user = _httpContextAccessor.HttpContext?.User;
+            if (user == null || !OperationalHubScope.IsHub(zone.LocationId) || !user.CanAccessHub(zone.LocationId))
+                throw new InvalidOperationException("Zone phải thuộc hub của tài khoản.");
+            if (string.IsNullOrWhiteSpace(zone.ProcessRole))
+                zone.ProcessRole = ZoneProcessRoles.General;
+            if (!ZoneProcessRoles.IsKnown(zone.ProcessRole))
+                throw new InvalidOperationException("Vai trò nghiệp vụ của zone không hợp lệ.");
+
             _db.Zones.Add(zone);
             await _db.SaveChangesAsync();
             return zone;
@@ -54,6 +73,16 @@ namespace WMS_.Services.Warehouse
         public async Task<bool> UpdateZoneAsync(string id, Zone zone)
         {
             if (id != zone.ZoneId) return false;
+
+            var user = _httpContextAccessor.HttpContext?.User;
+            if (user == null || !OperationalHubScope.IsHub(zone.LocationId) || !user.CanAccessHub(zone.LocationId))
+                throw new InvalidOperationException("Zone phải thuộc hub của tài khoản.");
+            if (!await _db.Zones.AnyAsync(item => item.ZoneId == id && item.LocationId == user.HubId()))
+                return false;
+            if (string.IsNullOrWhiteSpace(zone.ProcessRole))
+                zone.ProcessRole = ZoneProcessRoles.General;
+            if (!ZoneProcessRoles.IsKnown(zone.ProcessRole))
+                throw new InvalidOperationException("Vai trò nghiệp vụ của zone không hợp lệ.");
 
             _db.Entry(zone).State = EntityState.Modified;
             try
@@ -70,7 +99,11 @@ namespace WMS_.Services.Warehouse
 
         public async Task<bool> DeleteZoneAsync(string id)
         {
-            var zone = await _db.Zones.FindAsync(id);
+            var myLocationId = _httpContextAccessor.HttpContext?.User.HubId();
+            if (string.IsNullOrWhiteSpace(myLocationId))
+                return false;
+
+            var zone = await _db.Zones.FirstOrDefaultAsync(item => item.ZoneId == id && item.LocationId == myLocationId);
             if (zone == null) return false;
 
             _db.Zones.Remove(zone);

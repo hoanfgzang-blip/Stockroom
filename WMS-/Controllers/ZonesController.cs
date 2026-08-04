@@ -46,8 +46,15 @@ namespace WMS_.Controllers
         [HttpPost]
         public async Task<ActionResult<Zone>> Create([FromBody] Zone zone)
         {
-            var createdZone = await _zoneService.CreateZoneAsync(zone);
-            return CreatedAtAction(nameof(GetById), new { id = createdZone.ZoneId }, createdZone);
+            try
+            {
+                var createdZone = await _zoneService.CreateZoneAsync(zone);
+                return CreatedAtAction(nameof(GetById), new { id = createdZone.ZoneId }, createdZone);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
         }
 
         /// <summary>Update zone</summary>
@@ -56,8 +63,15 @@ namespace WMS_.Controllers
         {
             if (id != zone.ZoneId) return BadRequest(); // Báo lỗi 400 nếu truyền sai ID
 
-            var success = await _zoneService.UpdateZoneAsync(id, zone);
-            return success ? NoContent() : NotFound(); // Trả mã 204 nếu thành công, 404 nếu không tìm thấy
+            try
+            {
+                var success = await _zoneService.UpdateZoneAsync(id, zone);
+                return success ? NoContent() : NotFound(); // Trả mã 204 nếu thành công, 404 nếu không tìm thấy
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
         }
 
         /// <summary>Delete zone</summary>

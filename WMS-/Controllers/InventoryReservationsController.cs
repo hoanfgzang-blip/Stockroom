@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WMS_.Data;
 using WMS_.Data.Entities;
+using WMS_.Security;
 
 namespace WMS_.Controllers
 {
@@ -17,7 +18,7 @@ namespace WMS_.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<InventoryReservation>>> GetAll([FromQuery] string? status = null)
         {
-            var query = _db.InventoryReservations.AsQueryable();
+            var query = QueryReservationsAtCurrentHub();
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(r => r.Status == status);
             return await query.OrderByDescending(r => r.ReservedAt).ToListAsync();
@@ -27,24 +28,24 @@ namespace WMS_.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<InventoryReservation>> GetById(string id)
         {
-            var res = await _db.InventoryReservations.FindAsync(id);
+            var res = await QueryReservationsAtCurrentHub().FirstOrDefaultAsync(item => item.ReservationId == id);
             return res == null ? NotFound() : Ok(res);
         }
 
         /// <summary>Get reservations for a specific outbound order</summary>
         [HttpGet("by-order/{orderId}")]
         public async Task<ActionResult<IEnumerable<InventoryReservation>>> GetByOrder(string orderId)
-            => await _db.InventoryReservations.Where(r => r.OutboundOrderId == orderId).ToListAsync();
+            => await QueryReservationsAtCurrentHub().Where(r => r.OutboundOrderId == orderId).ToListAsync();
 
         /// <summary>Get reservations for a specific sack</summary>
         [HttpGet("by-sack/{sackId}")]
         public async Task<ActionResult<IEnumerable<InventoryReservation>>> GetBySack(string sackId)
-            => await _db.InventoryReservations.Where(r => r.SackId == sackId).ToListAsync();
+            => await QueryReservationsAtCurrentHub().Where(r => r.SackId == sackId).ToListAsync();
 
         /// <summary>Get expired active reservations</summary>
         [HttpGet("expired")]
         public async Task<ActionResult<IEnumerable<InventoryReservation>>> GetExpired()
-            => await _db.InventoryReservations
+            => await QueryReservationsAtCurrentHub()
                 .Where(r => r.Status == "Active" && r.ExpiresAt < DateTime.Now)
                 .ToListAsync();
 
@@ -52,6 +53,9 @@ namespace WMS_.Controllers
         [HttpPost]
         public async Task<ActionResult<InventoryReservation>> Create([FromBody] InventoryReservation reservation)
         {
+            if (!await QuerySacksAtCurrentHub().AnyAsync(sack => sack.SackId == reservation.SackId))
+                return Forbid();
+
             _db.InventoryReservations.Add(reservation);
             await _db.SaveChangesAsync();
             return CreatedAtAction(nameof(GetById), new { id = reservation.ReservationId }, reservation);
@@ -61,7 +65,7 @@ namespace WMS_.Controllers
         [HttpPatch("{id}/status")]
         public async Task<IActionResult> UpdateStatus(string id, [FromBody] string status)
         {
-            var res = await _db.InventoryReservations.FindAsync(id);
+            var res = await QueryReservationsAtCurrentHub().FirstOrDefaultAsync(item => item.ReservationId == id);
             if (res == null) return NotFound();
             res.Status = status;
             await _db.SaveChangesAsync();
@@ -72,11 +76,36 @@ namespace WMS_.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
-            var res = await _db.InventoryReservations.FindAsync(id);
+            var res = await QueryReservationsAtCurrentHub().FirstOrDefaultAsync(item => item.ReservationId == id);
             if (res == null) return NotFound();
             _db.InventoryReservations.Remove(res);
             await _db.SaveChangesAsync();
             return NoContent();
+        }
+
+        private IQueryable<Sack> QuerySacksAtCurrentHub()
+        {
+            var hubId = User.HubId();
+            if (string.IsNullOrWhiteSpace(hubId))
+                return _db.Sacks.Where(_ => false);
+
+            return _db.Sacks.Where(sack =>
+                (sack.ZoneId != null && sack.Zone.LocationId == hubId) ||
+                (sack.PalletId != null && sack.Pallet.Zone.LocationId == hubId) ||
+                (sack.TripId != null && (sack.Trip.Origin == hubId || sack.Trip.Destination == hubId)));
+        }
+
+        private IQueryable<InventoryReservation> QueryReservationsAtCurrentHub()
+        {
+            var hubId = User.HubId();
+            if (string.IsNullOrWhiteSpace(hubId))
+                return _db.InventoryReservations.Where(_ => false);
+
+            return _db.InventoryReservations.Where(reservation => _db.Sacks.Any(sack =>
+                sack.SackId == reservation.SackId &&
+                ((sack.ZoneId != null && sack.Zone.LocationId == hubId) ||
+                 (sack.PalletId != null && sack.Pallet.Zone.LocationId == hubId) ||
+                 (sack.TripId != null && (sack.Trip.Origin == hubId || sack.Trip.Destination == hubId)))));
         }
     }
 }

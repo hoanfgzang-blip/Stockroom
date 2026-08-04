@@ -16,6 +16,19 @@ import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHe
 import { formatDateTime, statusLabel } from '@/lib/utils'
 import type { AuditLog } from '@/types'
 
+const auditActionLabels: Record<string, string> = {
+  IssueTripQrToken: 'Cấp QR chuyến',
+  ReissueTripQrToken: 'Cấp lại QR chuyến',
+  RevokeTripQrToken: 'Thu hồi QR chuyến',
+  StartTripQrCheckIn: 'Bắt đầu đối chiếu QR',
+  ResolveTripQrFailed: 'Resolve QR thất bại',
+  EmptyTripQrCheckIn: 'Đối chiếu chưa có sack',
+  RejectTripQrCheckInUnexpected: 'Từ chối sack dư',
+  CompleteTripQrCheckIn: 'Chốt đủ hàng',
+  CompleteTripQrCheckInWithMissing: 'Chốt thiếu hàng',
+  CompleteTripStatus: 'Hoàn tất chuyến',
+}
+
 export default function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [tableFilter, setTableFilter] = useState('')
@@ -62,6 +75,9 @@ export default function AuditLogsPage() {
               <option value="Create">Tạo mới</option>
               <option value="Update">Cập nhật</option>
               <option value="Delete">Xóa</option>
+              {Object.entries(auditActionLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
             </Select>
           </div>
         </CardContent>
@@ -86,9 +102,9 @@ export default function AuditLogsPage() {
             <TableBody>
               {logs.map((log) => (
                 <TableRow key={log.auditLogId}>
-                  <TableCell className="font-medium">{log.userName}</TableCell>
+                   <TableCell className="font-medium">{log.userName ?? log.userId}</TableCell>
                   <TableCell>
-                    <Badge status={log.actionType}>{statusLabel(log.actionType)}</Badge>
+                     <Badge status={log.actionType}>{auditActionLabels[log.actionType] ?? statusLabel(log.actionType)}</Badge>
                   </TableCell>
                   <TableCell>{log.tableName}</TableCell>
                   <TableCell className="font-mono text-xs">{log.recordId}</TableCell>

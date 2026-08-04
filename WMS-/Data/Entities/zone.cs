@@ -28,6 +28,11 @@ namespace WMS_.Data.Entities
         public string ZoneType { get; set; } = null!;
 
         [Required]
+        [Column("process_role")]
+        [MaxLength(50)]
+        public string ProcessRole { get; set; } = ZoneProcessRoles.General;
+
+        [Required]
         [Column("capacity")]
         public int Capacity { get; set; } = 0;
 

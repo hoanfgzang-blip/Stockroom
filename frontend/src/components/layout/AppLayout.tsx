@@ -15,7 +15,6 @@ import {
   Route,
   ScanLine,
   Shield,
-  Timer,
   Truck,
   UserCog,
   Users,
@@ -54,7 +53,6 @@ const navGroups: NavGroup[] = [
       { to: '/inventory/inbound', label: 'Đơn nhập kho', icon: ArrowDownToLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
       { to: '/inventory/outbound', label: 'Đơn xuất kho', icon: ArrowUpFromLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
       { to: '/inventory/sacks', label: 'Bao hàng', icon: Package, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
-      { to: '/inventory/reservations', label: 'Giữ hàng', icon: Timer, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
     ],
   },
   {
@@ -62,7 +60,6 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/logistics/fleet', label: 'Quản lý phương tiện', icon: Truck, roles: ['Manager', 'Supervisor'] },
       { to: '/logistics/trips', label: 'Điều phối chuyến xe', icon: Route, roles: ['Manager', 'Supervisor'] },
-      { to: '/logistics/routing', label: 'Quy tắc định tuyến', icon: Route, roles: ['Manager', 'Supervisor'] },
     ],
   },
   {
@@ -277,8 +274,11 @@ export function Topbar({ onOpenMobile }: { onOpenMobile?: () => void }) {
             OP
           </div>
           <div className="hidden text-sm sm:block">
-            <p className="text-xs font-bold text-slate-800">{user?.employeeName}</p>
-            <p className="text-[11px] font-medium text-slate-500">{user?.roleName ? roleLabel(user.roleName) : null}</p>
+           <p className="text-xs font-bold text-slate-800">{user?.employeeName}</p>
+            <p className="text-[11px] font-medium text-slate-500">
+              {user?.roleName ? roleLabel(user.roleName) : null}
+              {user?.locationName ? ` · ${user.locationName}` : ''}
+            </p>
           </div>
           <button
             type="button"

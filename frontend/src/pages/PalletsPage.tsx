@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Plus, RefreshCcw, Search, Trash2 } from 'lucide-react'
-import { palletsApi, zonesApi } from '@/api/services'
+import { CheckCircle2, Eye, Plus, RefreshCcw, Search, Trash2 } from 'lucide-react'
+import { outboundOrdersApi, palletsApi, sacksApi, zonesApi } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,13 +15,14 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
-import { generatePreviewId, statusLabel } from '@/lib/utils'
-import type { Pallet, Zone } from '@/types'
+import { statusLabel } from '@/lib/utils'
+import type { OutboundOrder, Pallet, Sack, Zone } from '@/types'
 
 const statusOptions = ['Empty', 'Occupied', 'In Transit to Zone', 'Finalized', 'Locked']
 
 const emptyForm = () => ({
   zoneId: '',
+  capacity: '1000',
 })
 
 export default function PalletsPage() {
@@ -36,15 +37,24 @@ export default function PalletsPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState(emptyForm())
-  const [previewPalletId, setPreviewPalletId] = useState('')
+  const [detailPallet, setDetailPallet] = useState<Pallet | null>(null)
+  const [detailSacks, setDetailSacks] = useState<Sack[]>([])
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const [finalizeTarget, setFinalizeTarget] = useState<Pallet | null>(null)
+  const [outboundOrders, setOutboundOrders] = useState<OutboundOrder[]>([])
+  const [selectedOutboundOrderId, setSelectedOutboundOrderId] = useState('')
+  const [outboundLoading, setOutboundLoading] = useState(false)
+  const [finalizeError, setFinalizeError] = useState<string | null>(null)
 
   const load = () => {
     setLoading(true)
     setError(null)
     Promise.all([palletsApi.all(statusFilter || undefined), zonesApi.all()])
       .then(([palletData, zoneData]) => {
-        setPallets(palletData)
         setZones(zoneData)
+        const operationalZoneIds = new Set(zoneData.map((zone) => zone.zoneId))
+        setPallets(palletData.filter((pallet) => operationalZoneIds.has(pallet.zoneId)))
         if (!form.zoneId && zoneData.length > 0) setForm((current) => ({ ...current, zoneId: zoneData[0].zoneId }))
       })
       .catch((err: Error) => setError(err.message))
@@ -75,23 +85,28 @@ export default function PalletsPage() {
 
   const openCreate = () => {
     setForm({ ...emptyForm(), zoneId: zones[0]?.zoneId ?? '' })
-    setPreviewPalletId(generatePreviewId('PLT'))
     setDialogOpen(true)
   }
 
   const handleSave = async (event: FormEvent) => {
     event.preventDefault()
     if (!form.zoneId) {
-      setError('Hay chon khu vuc dat pallet.')
+      setError('Hãy chọn khu vực đặt pallet.')
+      return
+    }
+
+    const capacity = Number(form.capacity)
+    if (!Number.isFinite(capacity) || capacity <= 0) {
+      setError('Sức chứa pallet phải lớn hơn 0.')
       return
     }
 
     setSaving(true)
     setError(null)
     try {
-      await palletsApi.create({ zoneId: form.zoneId, palletId: previewPalletId })
+      const created = await palletsApi.create({ zoneId: form.zoneId, capacity })
       setDialogOpen(false)
-      setNotice('Da tao pallet moi. He thong da tu sinh ma pallet va dat trang thai rong.')
+      setNotice(`Đã tạo pallet ${created.palletId}. Hệ thống đặt trạng thái ban đầu là trống.`)
       load()
     } catch (err) {
       setError((err as Error).message)
@@ -101,15 +116,65 @@ export default function PalletsPage() {
   }
 
   const deletePallet = async (pallet: Pallet) => {
-    if (!window.confirm(`Xoa pallet ${pallet.palletId}?`)) return
+    if (!window.confirm(`Xóa pallet ${pallet.palletId}?`)) return
     setSaving(true)
     setError(null)
     try {
       await palletsApi.delete(pallet.palletId)
-      setNotice('Da xoa pallet.')
+      setNotice('Đã xóa pallet.')
       load()
     } catch (err) {
       setError((err as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openDetails = async (pallet: Pallet) => {
+    setDetailPallet(pallet)
+    setDetailSacks([])
+    setDetailError(null)
+    setDetailLoading(true)
+
+    try {
+      setDetailSacks(await sacksApi.byPallet(pallet.palletId))
+    } catch (err) {
+      setDetailError((err as Error).message)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  const openFinalize = async (pallet: Pallet) => {
+    setFinalizeTarget(pallet)
+    setSelectedOutboundOrderId('')
+    setOutboundOrders([])
+    setFinalizeError(null)
+    setOutboundLoading(true)
+
+    try {
+      const orders = await outboundOrdersApi.all()
+      setOutboundOrders(orders.filter((order) => !['Completed', 'Cancelled', 'Fulfilled'].includes(order.status)))
+    } catch (err) {
+      setFinalizeError((err as Error).message)
+    } finally {
+      setOutboundLoading(false)
+    }
+  }
+
+  const handleFinalize = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!finalizeTarget || !selectedOutboundOrderId) return
+
+    setSaving(true)
+    setFinalizeError(null)
+    try {
+      await palletsApi.finalize(finalizeTarget.palletId, selectedOutboundOrderId)
+      setFinalizeTarget(null)
+      setNotice(`Đã chốt pallet ${finalizeTarget.palletId} và gán vào đơn xuất kho.`)
+      load()
+    } catch (err) {
+      setFinalizeError((err as Error).message)
     } finally {
       setSaving(false)
     }
@@ -121,22 +186,7 @@ export default function PalletsPage() {
     setError(null)
     try {
       await palletsApi.moveToZone(pallet.palletId, zoneId)
-      setNotice(`Da chuyen ${pallet.palletId} sang ${zoneName(zoneId)}.`)
-      load()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const finalizePallet = async (pallet: Pallet) => {
-    if (!window.confirm(`Chot pallet ${pallet.palletId} de san sang xuat kho?`)) return
-    setSaving(true)
-    setError(null)
-    try {
-      await palletsApi.finalize(pallet.palletId)
-      setNotice('Da chot pallet.')
+      setNotice(`Đã chuyển ${pallet.palletId} sang ${zoneName(zoneId)}.`)
       load()
     } catch (err) {
       setError((err as Error).message)
@@ -151,12 +201,12 @@ export default function PalletsPage() {
   return (
     <div>
       <PageHeader
-        title="Pallet Management"
-        description="Create, classify, move, finalize, and audit warehouse pallets."
+        title="Quản lý pallet"
+        description="Theo dõi sức chứa, bao hàng, zone và trạng thái xuất kho của pallet."
         action={
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />
-            Add Pallet
+            Thêm pallet
           </Button>
         }
       />
@@ -174,7 +224,7 @@ export default function PalletsPage() {
             <Label>Tìm kiếm</Label>
             <div className="relative mt-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pallet ID or zone" />
+              <Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Mã pallet hoặc zone" />
             </div>
           </div>
           <div>
@@ -193,8 +243,8 @@ export default function PalletsPage() {
           </div>
           <div className="flex items-end">
             <Button type="button" variant="outline" onClick={load} disabled={loading}>
-              <RefreshCcw className="h-4 w-4" />
-              Refresh
+                <RefreshCcw className="h-4 w-4" />
+              Tải lại
             </Button>
           </div>
         </CardContent>
@@ -216,6 +266,7 @@ export default function PalletsPage() {
               <TableRow>
                 <TableHead>Mã pallet</TableHead>
                 <TableHead>Zone</TableHead>
+                <TableHead>Sức chứa</TableHead>
                 <TableHead>Trạng thái</TableHead>
                 <TableHead>Chuyển zone</TableHead>
                 <TableHead className="text-right">Thao tác</TableHead>
@@ -226,6 +277,7 @@ export default function PalletsPage() {
                 <TableRow key={pallet.palletId}>
                   <TableCell className="font-mono font-medium">{pallet.palletId}</TableCell>
                   <TableCell>{zoneName(pallet.zoneId)}</TableCell>
+                  <TableCell>{pallet.capacity}</TableCell>
                   <TableCell><Badge status={pallet.status}>{statusLabel(pallet.status)}</Badge></TableCell>
                   <TableCell>
                     <Select value={pallet.zoneId} onChange={(event) => void movePallet(pallet, event.target.value)} disabled={saving || pallet.status === 'Finalized' || pallet.status === 'Locked'}>
@@ -234,10 +286,13 @@ export default function PalletsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-2">
-                      <Button type="button" size="sm" variant="secondary" onClick={() => void finalizePallet(pallet)} disabled={saving || pallet.status === 'Finalized' || pallet.status === 'Empty'} title="Finalize pallet">
+                      <Button type="button" size="sm" variant="outline" onClick={() => void openDetails(pallet)} disabled={saving} title="Xem bao hàng trên pallet">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button type="button" size="sm" variant="secondary" onClick={() => void openFinalize(pallet)} disabled={saving || pallet.status === 'Finalized' || pallet.status === 'Empty' || pallet.status === 'Locked'} title="Chốt pallet cho đơn xuất kho">
                         <CheckCircle2 className="h-4 w-4" />
                       </Button>
-                      <Button type="button" size="sm" variant="destructive" onClick={() => void deletePallet(pallet)} disabled={saving} title="Delete pallet">
+                      <Button type="button" size="sm" variant="destructive" onClick={() => void deletePallet(pallet)} disabled={saving || pallet.status !== 'Empty'} title="Chỉ xóa pallet trống">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -246,7 +301,7 @@ export default function PalletsPage() {
               ))}
               {filteredPallets.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-sm text-slate-500">No pallets match the current filters.</TableCell>
+                  <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">Không có pallet phù hợp với bộ lọc hiện tại.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -257,19 +312,19 @@ export default function PalletsPage() {
       <Dialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        title="Create Pallet"
-        description="The system automatically generates the pallet ID. Its status changes during scanning operations."
+        title="Thêm pallet"
+        description="Mã pallet được hệ thống tự sinh sau khi tạo."
       >
         <form className="space-y-4" onSubmit={handleSave}>
           <div>
             <div className="flex items-center justify-between">
-              <Label>Mã Pallet</Label>
+              <Label>Mã pallet</Label>
               <span className="text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                 Tự động sinh mã
               </span>
             </div>
             <div className="mt-1 flex h-10 w-full items-center rounded-lg border border-slate-300 bg-slate-50 px-3">
-              <span className="font-mono text-xs font-semibold text-slate-700">{previewPalletId}</span>
+              <span className="text-sm text-slate-500">Mã sẽ được cấp khi lưu</span>
             </div>
           </div>
           <div>
@@ -279,9 +334,123 @@ export default function PalletsPage() {
               {zones.map((zone) => <option key={zone.zoneId} value={zone.zoneId}>{zone.zoneName}</option>)}
             </Select>
           </div>
+          <div>
+            <Label htmlFor="pallet-capacity">Sức chứa tối đa</Label>
+            <Input
+              id="pallet-capacity"
+              className="mt-1"
+              type="number"
+              min="1"
+              step="1"
+              value={form.capacity}
+              onChange={(event) => setForm({ ...form, capacity: event.target.value })}
+            />
+            <p className="mt-1 text-xs text-slate-500">Đơn vị sức chứa theo quy ước vận hành của kho.</p>
+          </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Hủy</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Đang lưu...' : 'Tạo pallet'}</Button>
+          </div>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={detailPallet !== null}
+        onClose={() => setDetailPallet(null)}
+        title={detailPallet ? `Chi tiết pallet ${detailPallet.palletId}` : 'Chi tiết pallet'}
+        description="Danh sách bao hàng đang được gán trên pallet."
+        className="max-w-3xl"
+      >
+        {detailPallet && (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border bg-slate-50 p-3">
+                <p className="text-xs text-slate-500">Trạng thái</p>
+                <div className="mt-1"><Badge status={detailPallet.status}>{statusLabel(detailPallet.status)}</Badge></div>
+              </div>
+              <div className="rounded-lg border bg-slate-50 p-3">
+                <p className="text-xs text-slate-500">Zone</p>
+                <p className="mt-1 font-medium">{zoneName(detailPallet.zoneId)}</p>
+              </div>
+              <div className="rounded-lg border bg-slate-50 p-3">
+                <p className="text-xs text-slate-500">Số bao / sức chứa</p>
+                <p className="mt-1 font-medium">{detailSacks.length} / {detailPallet.capacity}</p>
+              </div>
+            </div>
+
+            {detailLoading && <LoadingState message="Đang tải danh sách bao hàng..." />}
+            {detailError && <ErrorState message={detailError} />}
+            {!detailLoading && !detailError && (
+              detailSacks.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Mã bao</TableHead>
+                      <TableHead>Trạng thái</TableHead>
+                      <TableHead>Điểm đến</TableHead>
+                      <TableHead>Zone</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detailSacks.map((sack) => (
+                      <TableRow key={sack.sackId}>
+                        <TableCell className="font-mono text-xs font-medium">{sack.sackId}</TableCell>
+                        <TableCell><Badge status={sack.status}>{statusLabel(sack.status)}</Badge></TableCell>
+                        <TableCell>{sack.sDestination}</TableCell>
+                        <TableCell>{sack.zoneId ?? '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="py-8 text-center text-sm text-slate-500">Pallet này chưa có bao hàng.</p>
+              )
+            )}
+          </div>
+        )}
+      </Dialog>
+
+      <Dialog
+        open={finalizeTarget !== null}
+        onClose={() => setFinalizeTarget(null)}
+        title={finalizeTarget ? `Chốt pallet ${finalizeTarget.palletId}` : 'Chốt pallet'}
+        description="Chọn đơn xuất kho có cùng điểm đến với các bao trên pallet."
+      >
+        <form className="space-y-4" onSubmit={handleFinalize}>
+          <div>
+            <Label htmlFor="outbound-order">Đơn xuất kho</Label>
+            {outboundLoading ? (
+              <LoadingState message="Đang tải đơn xuất kho..." />
+            ) : (
+              <Select
+                id="outbound-order"
+                className="mt-1"
+                value={selectedOutboundOrderId}
+                onChange={(event) => setSelectedOutboundOrderId(event.target.value)}
+                disabled={outboundOrders.length === 0}
+              >
+                <option value="">Chọn đơn xuất kho</option>
+                {outboundOrders.map((order) => (
+                  <option key={order.outboundOrderId} value={order.outboundOrderId}>
+                    {order.outboundOrderNumber} · {order.outboundDestination} · {statusLabel(order.status)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </div>
+
+          {finalizeError && <ErrorState message={finalizeError} />}
+          {!outboundLoading && !finalizeError && outboundOrders.length === 0 && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Không có đơn xuất kho đang chờ xử lý để gán pallet.
+            </p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setFinalizeTarget(null)}>Hủy</Button>
+            <Button type="submit" disabled={saving || outboundLoading || !selectedOutboundOrderId}>
+              {saving ? 'Đang chốt...' : 'Chốt pallet'}
+            </Button>
           </div>
         </form>
       </Dialog>

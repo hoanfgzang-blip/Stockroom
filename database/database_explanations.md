@@ -20,7 +20,7 @@ erDiagram
     zone ||--o{ sack : "stores"
     location ||--o{ sack : "destination"
     location ||--o{ routing_rule : "current or next hop"
-    province ||--o{ routing_rule : "dest province"
+    location ||--o{ routing_rule : "destination"
     inbound_order ||--o{ inbound_order_item : "contains"
     sack ||--o{ inbound_order_item : "item"
     outbound_order ||--o{ outbound_order_item : "contains"
@@ -132,7 +132,7 @@ erDiagram
 * **Các trường dữ liệu**:
   * `rule_id` - Khóa chính: Mã quy tắc định tuyến.
   * `current_location` - Khóa ngoại -> Location: Trạm hiện tại mà bao hàng đang nằm.
-  * `c_destination` - Khóa ngoại -> Province: Tỉnh thành đích cuối cùng của bao hàng.
+  * `c_destination` - Khóa ngoại -> Location: Địa điểm đích cuối cùng của bao hàng.
   * `next_hop` - Khóa ngoại -> Location: Trạm trung chuyển tiếp theo cần gửi hàng tới.
 
 ---

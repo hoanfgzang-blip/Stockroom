@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using System;
 using WMS_.Data.Entities;
 using WMS_.Services.Warehouse;
 
@@ -53,6 +54,8 @@ namespace WMS_.Controllers
         {
             if (string.IsNullOrWhiteSpace(request.ZoneId))
                 return BadRequest("Zone đặt pallet là bắt buộc.");
+            if (request.Capacity is <= 0)
+                return BadRequest("Sức chứa pallet phải lớn hơn 0.");
 
             // Ma pallet va trang thai phai do he thong/nghiep vu quet quyet dinh.
             var pallet = new Pallet
@@ -62,16 +65,30 @@ namespace WMS_.Controllers
                 Status = "Empty",
                 Capacity = request.Capacity ?? 1000
             };
-            var createdPallet = await _palletService.CreatePalletAsync(pallet);
-            return CreatedAtAction(nameof(GetById), new { id = createdPallet.PalletId }, createdPallet);
+            try
+            {
+                var createdPallet = await _palletService.CreatePalletAsync(pallet);
+                return CreatedAtAction(nameof(GetById), new { id = createdPallet.PalletId }, createdPallet);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
         }
 
         /// <summary>Delete pallet</summary>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
-            var success = await _palletService.DeletePalletAsync(id);
-            return success ? NoContent() : NotFound();
+            try
+            {
+                var success = await _palletService.DeletePalletAsync(id);
+                return success ? NoContent() : NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
         }
 
         /// <summary>Nghiệp vụ: Gán bao hàng vào Pallet (Scanner dùng)</summary>
@@ -79,9 +96,10 @@ namespace WMS_.Controllers
         public async Task<IActionResult> AssignSackToPallet(string palletId, string sackId)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (userId == null) return Forbid();
+            var locationId = User.FindFirstValue("location_id");
+            if (userId == null || string.IsNullOrWhiteSpace(locationId)) return Forbid();
 
-            var result = await _operationService.AssignSackToPalletAsync(sackId, palletId, userId);
+            var result = await _operationService.AssignSackToPalletAsync(sackId, palletId, userId, locationId);
             return result.Succeeded ? Ok(result) : Conflict(new { message = result.Message });
         }
 
@@ -90,9 +108,10 @@ namespace WMS_.Controllers
         public async Task<IActionResult> ReassignSackToPallet(string palletId, string sackId)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (userId == null) return Forbid();
+            var locationId = User.FindFirstValue("location_id");
+            if (userId == null || string.IsNullOrWhiteSpace(locationId)) return Forbid();
 
-            var result = await _operationService.ReassignSackToPalletAsync(sackId, palletId, userId);
+            var result = await _operationService.ReassignSackToPalletAsync(sackId, palletId, userId, locationId);
             return result.Succeeded ? Ok(result) : Conflict(new { message = result.Message });
         }
 

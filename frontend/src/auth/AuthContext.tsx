@@ -6,6 +6,8 @@ export type AuthUser = {
   username: string
   employeeName: string
   roleName: string
+  locationId: string | null
+  locationName: string | null
 }
 
 type AuthContextValue = {

@@ -225,7 +225,10 @@ export default function BarcodeScannerPage() {
 
   const openTripSession = async (scannedValue: string, legacyManifest?: TripQrManifest) => {
     const manifest = legacyManifest ?? (await tripsApi.resolveQr(scannedValue)).manifest
-    setTripSession({ manifest, arrivedSackIds: [], unexpectedSackIds: [] })
+    const previouslyReceivedSackIds = manifest.status === 'CompletedWithMissing'
+      ? manifest.sacks.filter((sack) => sack.status !== 'Missing').map((sack) => sack.sackId)
+      : []
+    setTripSession({ manifest, arrivedSackIds: previouslyReceivedSackIds, unexpectedSackIds: [] })
     setLastTrip(null)
     setLastSack(null)
     addResult(

@@ -12,7 +12,6 @@ import type {
   OutboundOrderItem,
   Pallet,
   Province,
-  RoutingRule,
   Sack,
   Shift,
   Trip,
@@ -23,6 +22,7 @@ import type {
   Zone,
 } from '@/types'
 import type { AuthUser } from '@/auth/AuthContext'
+import { isOperationalHub, isOperationalProvince } from '@/lib/operationalHubs'
 
 export const authApi = {
   login: (data: { username: string; password: string; rememberMe: boolean }) =>
@@ -38,6 +38,8 @@ export type ManagedAccount = {
   username: string
   roleName: string
   isActive: boolean
+  locationId: string | null
+  locationName: string | null
 }
 
 export type SaveAccountRequest = {
@@ -46,6 +48,7 @@ export type SaveAccountRequest = {
   password?: string
   roleName: string
   isActive: boolean
+  locationId: string
 }
 
 export type PalletAssignmentResult = {
@@ -61,7 +64,8 @@ export type PalletAssignmentResult = {
 }
 
 export const accountsApi = {
-  all: () => api.get<ManagedAccount[]>('/Auth/accounts'),
+  all: (locationId?: string) =>
+    api.get<ManagedAccount[]>(`/Auth/accounts${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`),
   create: (data: SaveAccountRequest) => api.post<ManagedAccount>('/Auth/accounts', data),
   update: (id: string, data: SaveAccountRequest) => api.put<ManagedAccount>(`/Auth/accounts/${id}`, data),
   disable: (id: string) => api.delete(`/Auth/accounts/${id}`),
@@ -73,7 +77,7 @@ export const dashboardApi = {
 }
 
 export const provincesApi = {
-  all: () => api.get<Province[]>('/Provinces'),
+  all: async () => (await api.get<Province[]>('/Provinces')).filter((province) => isOperationalProvince(province.provinceId)),
   get: (id: string) => api.get<Province>(`/Provinces/${id}`),
   create: (data: Province) => api.post<Province>('/Provinces', data),
   update: (id: string, data: Province) => api.put<void>(`/Provinces/${id}`, data),
@@ -81,18 +85,18 @@ export const provincesApi = {
 }
 
 export const locationsApi = {
-  all: () => api.get<Location[]>('/Locations'),
+  all: async () => (await api.get<Location[]>('/Locations')).filter((location) => isOperationalHub(location.locationId)),
   get: (id: string) => api.get<Location>(`/Locations/${id}`),
-  byProvince: (provinceId: string) => api.get<Location[]>(`/Locations/by-province/${provinceId}`),
+  byProvince: async (provinceId: string) => (await api.get<Location[]>(`/Locations/by-province/${provinceId}`)).filter((location) => isOperationalHub(location.locationId)),
   create: (data: Location) => api.post<Location>('/Locations', data),
   update: (id: string, data: Location) => api.put<void>(`/Locations/${id}`, data),
   delete: (id: string) => api.delete(`/Locations/${id}`),
 }
 
 export const zonesApi = {
-  all: () => api.get<Zone[]>('/Zones'),
+  all: async () => (await api.get<Zone[]>('/Zones')).filter((zone) => isOperationalHub(zone.locationId)),
   get: (id: string) => api.get<Zone>(`/Zones/${id}`),
-  byLocation: (locationId: string) => api.get<Zone[]>(`/Zones/by-location/${locationId}`),
+  byLocation: async (locationId: string) => (await api.get<Zone[]>(`/Zones/by-location/${locationId}`)).filter((zone) => isOperationalHub(zone.locationId)),
   create: (data: Zone) => api.post<Zone>('/Zones', data),
   update: (id: string, data: Zone) => api.put<void>(`/Zones/${id}`, data),
   delete: (id: string) => api.delete(`/Zones/${id}`),
@@ -112,8 +116,8 @@ export const palletsApi = {
     api.delete<PalletAssignmentResult>(`/Pallets/${palletId}/sacks/${sackId}`),
   moveToZone: (palletId: string, zoneId: string) =>
     api.post<{ message: string }>(`/Pallets/${palletId}/move-to-zone/${zoneId}`, {}),
-  finalize: (palletId: string) =>
-    api.post<{ message: string }>(`/Pallets/${palletId}/finalize`, {}),
+  finalize: (palletId: string, outboundOrderId: string) =>
+    api.post<{ message: string }>(`/Pallets/${palletId}/finalize`, { outboundOrderId }),
 }
 
 export const employeesApi = {
@@ -123,7 +127,9 @@ export const employeesApi = {
     if (params?.locationId) q.set('locationId', params.locationId)
     if (params?.shiftId) q.set('shiftId', params.shiftId)
     const qs = q.toString()
-    return api.get<Employee[]>(`/Employees${qs ? `?${qs}` : ''}`)
+    return api.get<Employee[]>(`/Employees${qs ? `?${qs}` : ''}`).then((employees) =>
+      employees.filter((employee) => !employee.locationId || isOperationalHub(employee.locationId)),
+    )
   },
   get: (id: string) => api.get<Employee>(`/Employees/${id}`),
   create: (data: Employee) => api.post<Employee>('/Employees', data),
@@ -186,7 +192,9 @@ export type TripPalletsResult = {
 }
 export const tripsApi = {
   all: (status?: string) =>
-    api.get<Trip[]>(`/Trips${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+    api.get<Trip[]>(`/Trips${status ? `?status=${encodeURIComponent(status)}` : ''}`).then((trips) =>
+      trips.filter((trip) => isOperationalHub(trip.origin) && isOperationalHub(trip.destination)),
+    ),
   get: (id: string) => api.get<Trip>(`/Trips/${id}`),
   sacks: (id: string) => api.get<Sack[]>(`/Trips/${id}/sacks`),
   pallets: (id: string) => api.get<TripPalletsResult>(`/Trips/${id}/pallets`),
@@ -201,7 +209,7 @@ export const tripsApi = {
   update: (id: string, data: Trip) => api.put<void>(`/Trips/${id}`, data),
   updateStatus: (id: string, status: string) => api.patch(`/Trips/${id}/status`, status),
   delete: (id: string) => api.delete(`/Trips/${id}`),
-  mine: () => api.get<Trip[]>('/Trips/my'),
+  mine: () => api.get<Trip[]>('/Trips/my').then((trips) => trips.filter((trip) => isOperationalHub(trip.origin) && isOperationalHub(trip.destination))),
   mySacks: (id: string) => api.get<Sack[]>(`/Trips/my/${id}/sacks`),
   updateMyStatus: (id: string, status: 'InProgress' | 'Completed') =>
     api.patch(`/Trips/my/${id}/status`, status),
@@ -210,14 +218,6 @@ export const tripsApi = {
     const request: TripQrCheckInRequest = { tripId, arrivedSackIds }
     return api.post<TripQrCheckInResult>('/Trips/check-in-by-qr', request)
   },
-}
-
-export const routingRulesApi = {
-  all: () => api.get<RoutingRule[]>('/RoutingRules'),
-  get: (id: string) => api.get<RoutingRule>(`/RoutingRules/${id}`),
-  create: (data: RoutingRule) => api.post<RoutingRule>('/RoutingRules', data),
-  update: (id: string, data: RoutingRule) => api.put<void>(`/RoutingRules/${id}`, data),
-  delete: (id: string) => api.delete(`/RoutingRules/${id}`),
 }
 
 export const inboundOrdersApi = {
@@ -233,7 +233,9 @@ export const inboundOrdersApi = {
 
 export const outboundOrdersApi = {
   all: (status?: string) =>
-    api.get<OutboundOrder[]>(`/OutboundOrders${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+    api.get<OutboundOrder[]>(`/OutboundOrders${status ? `?status=${encodeURIComponent(status)}` : ''}`).then((orders) =>
+      orders.filter((order) => isOperationalHub(order.outboundDestination)),
+    ),
   get: (id: string) => api.get<OutboundOrder>(`/OutboundOrders/${id}`),
   withItems: (id: string) =>
     api.get<{ order: OutboundOrder; items: OutboundOrderItem[] }>(`/OutboundOrders/${id}/items`),
@@ -246,8 +248,11 @@ export const outboundOrdersApi = {
 
 export const sacksApi = {
   all: (status?: string) =>
-    api.get<Sack[]>(`/Sacks${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+    api.get<Sack[]>(`/Sacks${status ? `?status=${encodeURIComponent(status)}` : ''}`).then((sacks) =>
+      sacks.filter((sack) => isOperationalHub(sack.sDestination)),
+    ),
   get: (id: string) => api.get<Sack>(`/Sacks/${id}`),
+  byPallet: (palletId: string) => api.get<Sack[]>(`/Sacks/by-pallet/${palletId}`),
   create: (data: Pick<Sack, 'sDestination'> & Partial<Pick<Sack, 'zoneId' | 'palletId'>>) =>
     api.post<Sack>('/Sacks', data),
   confirmReceived: (id: string) => api.post<void>(`/Sacks/${id}/confirm-received`, {}),

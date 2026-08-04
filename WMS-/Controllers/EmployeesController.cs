@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WMS_.Data;
 using WMS_.Data.Entities;
+using WMS_.Configuration;
 
 namespace WMS_.Controllers
 {
@@ -20,7 +21,8 @@ namespace WMS_.Controllers
             [FromQuery] string? locationId = null,
             [FromQuery] string? shiftId = null)
         {
-            var query = _db.Employees.AsQueryable();
+            var query = _db.Employees
+                .Where(employee => employee.LocationId == null || OperationalHubScope.HubIds.Contains(employee.LocationId));
             if (!string.IsNullOrWhiteSpace(role))
                 query = query.Where(e => e.RoleName == role);
             if (!string.IsNullOrWhiteSpace(locationId))
@@ -34,7 +36,10 @@ namespace WMS_.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Employee>> GetById(string id)
         {
-            var emp = await _db.Employees.FindAsync(id);
+            var emp = await _db.Employees
+                .FirstOrDefaultAsync(employee =>
+                    employee.EmployeeId == id &&
+                    (employee.LocationId == null || OperationalHubScope.HubIds.Contains(employee.LocationId)));
             return emp == null ? NotFound() : Ok(emp);
         }
 
@@ -42,6 +47,8 @@ namespace WMS_.Controllers
         [HttpPost]
         public async Task<ActionResult<Employee>> Create([FromBody] Employee employee)
         {
+            if (employee.LocationId != null && !OperationalHubScope.IsHub(employee.LocationId))
+                return BadRequest("Nhân viên chỉ được gán vào 3 hub vận hành.");
             // Tự sinh ID cho nhân viên nếu chưa có
             if (string.IsNullOrWhiteSpace(employee.EmployeeId))
             {
@@ -71,6 +78,8 @@ namespace WMS_.Controllers
         public async Task<IActionResult> Update(string id, [FromBody] Employee employee)
         {
             if (id != employee.EmployeeId) return BadRequest();
+            if (employee.LocationId != null && !OperationalHubScope.IsHub(employee.LocationId))
+                return BadRequest("Nhân viên chỉ được gán vào 3 hub vận hành.");
             _db.Entry(employee).State = EntityState.Modified;
             try { await _db.SaveChangesAsync(); }
             catch (DbUpdateConcurrencyException)

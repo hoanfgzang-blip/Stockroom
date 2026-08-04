@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BrowserMultiFormatReader, type IScannerControls } from '@zxing/browser'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
 import { outboundOrdersApi } from '@/api/services'
@@ -50,6 +50,8 @@ function getScanErrorMessage(error: unknown) {
   }
 }
 
+const outboundStatuses = ['Pending', 'Reserved', 'Packing', 'Completed'] as const
+
 export default function OutboundOrdersPage() {
   const [orders, setOrders] = useState<OutboundOrder[]>([])
   const [selected, setSelected] = useState<OutboundOrder | null>(null)
@@ -57,6 +59,7 @@ export default function OutboundOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [qrDialogOpen, setQrDialogOpen] = useState(false)
+  const [activeStatus, setActiveStatus] = useState<string | null>(null)
   const [barcodeInput, setBarcodeInput] = useState('')
   const [scanProcessing, setScanProcessing] = useState(false)
   const [scanError, setScanError] = useState('')
@@ -73,6 +76,25 @@ export default function OutboundOrdersPage() {
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
+
+  const statusTabs = useMemo(() => {
+    const extraStatuses = orders
+      .map((order) => order.status)
+      .filter((status) => !outboundStatuses.includes(status as (typeof outboundStatuses)[number]))
+
+    return [
+      { value: null as string | null, label: 'Tất cả' },
+      ...[...outboundStatuses, ...new Set(extraStatuses)].map((status) => ({ value: status, label: statusLabel(status) })),
+    ]
+  }, [orders])
+
+  const visibleOrders = useMemo(
+    () =>
+      [...orders]
+        .filter((order) => activeStatus === null || order.status === activeStatus)
+        .sort((a, b) => new Date(b.createAt).getTime() - new Date(a.createAt).getTime()),
+    [activeStatus, orders],
+  )
 
   const openDetail = async (order: OutboundOrder) => {
     setSelected(order)
@@ -203,46 +225,115 @@ export default function OutboundOrdersPage() {
         title="Outbound Orders"
         description="Dispatch orders with inventory reservation linkage."
         action={
-          <Button onClick={openQrDialog}>
+          <Button onClick={openQrDialog} className="w-full sm:w-auto">
             <QrCode className="h-4 w-4 mr-1.5" />
             Quét QR Outbound
           </Button>
         }
       />
 
+      <div className="mb-6 overflow-x-auto pb-1">
+        <div className="flex w-max min-w-full gap-1.5 rounded-xl border bg-white p-1.5 shadow-sm sm:gap-2 sm:p-2">
+          {statusTabs.map((tab) => {
+            const isActive = tab.value === activeStatus
+            const count = tab.value === null ? orders.length : orders.filter((order) => order.status === tab.value).length
+
+            return (
+              <button
+                key={tab.value ?? 'all'}
+                type="button"
+                onClick={() => setActiveStatus(tab.value)}
+                aria-pressed={isActive}
+                className={cn(
+                  'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors sm:h-10 sm:gap-2 sm:px-4 sm:text-sm',
+                  isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                )}
+              >
+                {tab.label}
+                <span className={cn('rounded-full px-1.5 py-0.5 text-[11px] font-semibold sm:px-2 sm:text-xs', isActive ? 'bg-white/20' : 'bg-slate-100 text-slate-600')}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       <Card>
-        <CardHeader>
-          <CardTitle>Orders ({orders.length})</CardTitle>
+        <CardHeader className="px-4 pt-5 sm:p-6 sm:pb-4">
+          <CardTitle>{activeStatus === null ? 'Tất cả đơn xuất' : statusLabel(activeStatus)} ({visibleOrders.length})</CardTitle>
+          <p className="text-sm text-slate-500">Đơn mới nhất được hiển thị ở trên cùng.</p>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order #</TableHead>
-                <TableHead>Khách hàng</TableHead>
-                <TableHead>Điểm đến</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead>Thời điểm tạo</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.map((order) => (
-                <TableRow
-                  key={order.outboundOrderId}
-                  className={cn('cursor-pointer', selected?.outboundOrderId === order.outboundOrderId && 'bg-violet-50')}
-                  onClick={() => openDetail(order)}
-                >
-                  <TableCell className="font-medium">{order.outboundOrderNumber}</TableCell>
-                  <TableCell>{order.outboundCustomerName}</TableCell>
-                  <TableCell>{order.outboundDestination}</TableCell>
-                  <TableCell>
-                    <Badge status={order.status}>{statusLabel(order.status)}</Badge>
-                  </TableCell>
-                  <TableCell>{formatDateTime(order.createAt)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <CardContent className="px-4 pb-4 sm:p-6 sm:pt-0">
+          {visibleOrders.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500">Không có đơn xuất trong trạng thái này.</p>
+          ) : (
+            <>
+              <div className="hidden lg:block">
+                <Table className="min-w-[700px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order #</TableHead>
+                      <TableHead>Khách hàng</TableHead>
+                      <TableHead>Điểm đến</TableHead>
+                      <TableHead>Trạng thái</TableHead>
+                      <TableHead>Thời điểm tạo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleOrders.map((order) => (
+                      <TableRow
+                        key={order.outboundOrderId}
+                        className={cn('cursor-pointer', selected?.outboundOrderId === order.outboundOrderId && 'bg-violet-50')}
+                        onClick={() => openDetail(order)}
+                      >
+                        <TableCell className="font-medium">{order.outboundOrderNumber}</TableCell>
+                        <TableCell>{order.outboundCustomerName}</TableCell>
+                        <TableCell>{order.outboundDestination}</TableCell>
+                        <TableCell>
+                          <Badge status={order.status}>{statusLabel(order.status)}</Badge>
+                        </TableCell>
+                        <TableCell>{formatDateTime(order.createAt)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="space-y-3 lg:hidden">
+                {visibleOrders.map((order) => (
+                  <button
+                    key={order.outboundOrderId}
+                    type="button"
+                    onClick={() => openDetail(order)}
+                    className={cn(
+                      'w-full rounded-lg border p-4 text-left transition-colors hover:bg-slate-50',
+                      selected?.outboundOrderId === order.outboundOrderId && 'border-violet-200 bg-violet-50',
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="min-w-0 break-all font-mono text-sm font-semibold text-slate-900">{order.outboundOrderNumber}</p>
+                      <Badge status={order.status} className="shrink-0">{statusLabel(order.status)}</Badge>
+                    </div>
+                    <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                      <div className="min-w-0">
+                        <dt className="text-xs text-slate-500">Khách hàng</dt>
+                        <dd className="mt-1 break-words font-medium text-slate-800">{order.outboundCustomerName}</dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-xs text-slate-500">Điểm đến</dt>
+                        <dd className="mt-1 break-words font-mono text-xs font-medium text-slate-800">{order.outboundDestination}</dd>
+                      </div>
+                      <div className="col-span-2">
+                        <dt className="text-xs text-slate-500">Thời điểm tạo</dt>
+                        <dd className="mt-1 text-sm text-slate-700">{formatDateTime(order.createAt)}</dd>
+                      </div>
+                    </dl>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -305,7 +396,7 @@ export default function OutboundOrdersPage() {
         <div className="space-y-4">
           <form onSubmit={handleProcessScan} className="space-y-2">
             <Label htmlFor="outbound-qr-code">Mã QR hoặc mã đơn outbound</Label>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <div className="relative min-w-0 flex-1">
                 <Input
                   ref={inputRef}
@@ -319,19 +410,22 @@ export default function OutboundOrdersPage() {
                 />
                 <ScanLine className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-slate-400" />
               </div>
-              <Button type="submit" disabled={scanProcessing || !barcodeInput.trim()}>
-                {scanProcessing ? 'Đang tra cứu...' : 'Tra cứu'}
-              </Button>
-              <Button
-                type="button"
-                variant={cameraOpen ? 'default' : 'outline'}
-                onClick={cameraOpen ? stopCamera : () => void startCamera()}
-                disabled={scanProcessing}
-                title="Mở camera quét QR outbound"
-                aria-label="Mở camera quét QR outbound"
-              >
-                <Camera className="h-4 w-4" />
-              </Button>
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                <Button type="submit" disabled={scanProcessing || !barcodeInput.trim()} className="w-full sm:w-auto">
+                  {scanProcessing ? 'Đang tra cứu...' : 'Tra cứu'}
+                </Button>
+                <Button
+                  type="button"
+                  variant={cameraOpen ? 'default' : 'outline'}
+                  onClick={cameraOpen ? stopCamera : () => void startCamera()}
+                  disabled={scanProcessing}
+                  title="Mở camera quét QR outbound"
+                  aria-label="Mở camera quét QR outbound"
+                  className="w-full sm:w-auto"
+                >
+                  <Camera className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <p className="text-xs text-slate-500">QR cần chứa mã đơn hoặc mã ID đơn outbound. Có thể nhập mã trực tiếp nếu không dùng camera.</p>
           </form>

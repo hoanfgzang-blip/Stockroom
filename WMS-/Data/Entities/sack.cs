@@ -41,6 +41,10 @@ namespace WMS_.Data.Entities
         [MaxLength(50)]
         public string SDestination { get; set; } = null!;
 
+        [Column("next_hop_id")]
+        [MaxLength(50)]
+        public string? NextHopId { get; set; }
+
         [ForeignKey("TripId")]
         public virtual Trip Trip { get; set; } = null!;
 
@@ -52,6 +56,9 @@ namespace WMS_.Data.Entities
 
         [ForeignKey("SDestination")]
         public virtual Location DestinationLocation { get; set; } = null!;
+
+        [ForeignKey("NextHopId")]
+        public virtual Location? NextHopLocation { get; set; }
 
     }
 

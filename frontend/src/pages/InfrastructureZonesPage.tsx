@@ -17,7 +17,8 @@ export default function InfrastructureZonesPage() {
     Promise.all([zonesApi.all(), palletsApi.all()])
       .then(([z, p]) => {
         setZones(z)
-        setPallets(p)
+        const operationalZoneIds = new Set(z.map((zone) => zone.zoneId))
+        setPallets(p.filter((pallet) => operationalZoneIds.has(pallet.zoneId)))
         if (z.length > 0) setSelectedZone(z[0].zoneId)
       })
       .catch((e: Error) => setError(e.message))

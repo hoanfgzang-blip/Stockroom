@@ -1,5 +1,6 @@
 -- Du lieu demo day hon cho local WMS.
 -- Chay sau database_setup.sql, demo_seed.sql va auth_seed.sql.
+-- Moi luong du lieu chi xoay quanh 3 hub DEMO-HUB-HN, DEMO-HUB-HCM va DEMO-HUB-DN.
 
 BEGIN;
 
@@ -18,7 +19,7 @@ SELECT
   'RICH-OO-' || to_char(i, 'FM000'),
   'OUT-RICH-20260803-' || to_char(i, 'FM000'),
   (ARRAY['Shop Thoi Trang Minh Anh', 'Dien May Dong Do', 'Nha Sach Tre', 'My Pham An Nhien', 'Vat Tu Kho Van'])[1 + ((i - 1) % 5)],
-  (ARRAY['DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN', 'DEMO-HUB-HP', 'DEMO-HUB-CT', 'DEMO-HUB-BD'])[1 + ((i - 1) % 6)],
+  (ARRAY['DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN'])[1 + ((i - 1) % 3)],
   (ARRAY['Pending', 'Reserved', 'Packing', 'Completed'])[1 + ((i - 1) % 4)],
   NOW() - ((i * 29) || ' minutes')::interval
 FROM generate_series(1, 20) AS i
@@ -29,8 +30,8 @@ SELECT
   'RICH-TRIP-' || to_char(i, 'FM000'),
   (ARRAY['DEMO-EMP-004', 'DEMO-EMP-005', 'DEMO-EMP-007', 'DEMO-EMP-009', 'DEMO-EMP-011'])[1 + ((i - 1) % 5)],
   (ARRAY['DEMO-CAR-001', 'DEMO-CAR-002', 'DEMO-CAR-003', 'DEMO-CAR-004', 'DEMO-CAR-005', 'DEMO-CAR-006'])[1 + ((i - 1) % 6)],
-  (ARRAY['DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN', 'DEMO-HUB-HP', 'DEMO-HUB-CT', 'DEMO-HUB-BD'])[1 + ((i - 1) % 6)],
-  (ARRAY['DEMO-HUB-HCM', 'DEMO-HUB-DN', 'DEMO-HUB-HP', 'DEMO-HUB-CT', 'DEMO-HUB-BD', 'DEMO-HUB-HN'])[1 + ((i - 1) % 6)],
+  (ARRAY['DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN'])[1 + ((i - 1) % 3)],
+  (ARRAY['DEMO-HUB-HCM', 'DEMO-HUB-DN', 'DEMO-HUB-HN'])[1 + ((i - 1) % 3)],
   CASE WHEN i % 5 = 0 THEN 'LastMile' ELSE 'Linehaul' END,
   (ARRAY['Pending', 'InProgress', 'Completed'])[1 + ((i - 1) % 3)],
   NOW() - ((i * 41) || ' minutes')::interval,
@@ -46,8 +47,8 @@ SELECT
   'Sorting',
   NOW() - ((i * 7) || ' minutes')::interval,
   NULL,
-  (ARRAY['DEMO-Z-HN-IN', 'DEMO-Z-HN-SORT', 'DEMO-Z-HCM-IN', 'DEMO-Z-HCM-SORT', 'DEMO-Z-DN-SORT', 'DEMO-Z-CT-SORT'])[1 + ((i - 1) % 6)],
-  (ARRAY['DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN', 'DEMO-HUB-HP', 'DEMO-HUB-CT', 'DEMO-HUB-BD'])[1 + ((i - 1) % 6)]
+  (ARRAY['DEMO-Z-HN-IN', 'DEMO-Z-HN-SORT', 'DEMO-Z-HCM-IN', 'DEMO-Z-HCM-SORT', 'DEMO-Z-DN-SORT', 'DEMO-Z-HN-SORT'])[1 + ((i - 1) % 6)],
+  (ARRAY['DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN'])[1 + ((i - 1) % 3)]
 FROM generate_series(1, 90) AS i
 ON CONFLICT (sack_id) DO NOTHING;
 
@@ -59,8 +60,8 @@ SELECT
   'InTransit',
   NOW() - ((i * 11) || ' minutes')::interval,
   NULL,
-  (ARRAY['DEMO-Z-HN-OUT', 'DEMO-Z-HCM-OUT', 'DEMO-Z-BD-OUT'])[1 + ((i - 1) % 3)],
-  (ARRAY['DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN', 'DEMO-HUB-HP', 'DEMO-HUB-CT', 'DEMO-HUB-BD'])[1 + ((i - 1) % 6)]
+  (ARRAY['DEMO-Z-HN-OUT', 'DEMO-Z-HCM-OUT', 'DEMO-Z-HCM-OUT'])[1 + ((i - 1) % 3)],
+  (ARRAY['DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN'])[1 + ((i - 1) % 3)]
 FROM generate_series(1, 32) AS i
 ON CONFLICT (sack_id) DO NOTHING;
 
@@ -72,8 +73,8 @@ SELECT
   'ReadyForOutbound',
   NOW() - ((i * 13) || ' minutes')::interval,
   NULL,
-  (ARRAY['DEMO-Z-HN-OUT', 'DEMO-Z-HCM-OUT', 'DEMO-Z-BD-OUT'])[1 + ((i - 1) % 3)],
-  (ARRAY['DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN', 'DEMO-HUB-HP', 'DEMO-HUB-CT', 'DEMO-HUB-BD'])[1 + ((i - 1) % 6)]
+  (ARRAY['DEMO-Z-HN-OUT', 'DEMO-Z-HCM-OUT', 'DEMO-Z-HCM-OUT'])[1 + ((i - 1) % 3)],
+  (ARRAY['DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN'])[1 + ((i - 1) % 3)]
 FROM generate_series(1, 28) AS i
 ON CONFLICT (sack_id) DO NOTHING;
 
@@ -85,8 +86,8 @@ SELECT
   'Received',
   NOW() - ((i * 47) || ' minutes')::interval,
   NOW() - ((i * 31) || ' minutes')::interval,
-  (ARRAY['DEMO-Z-HN-IN', 'DEMO-Z-HCM-IN', 'DEMO-Z-DN-SORT', 'DEMO-Z-CT-SORT'])[1 + ((i - 1) % 4)],
-  (ARRAY['DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN', 'DEMO-HUB-HP', 'DEMO-HUB-CT', 'DEMO-HUB-BD'])[1 + ((i - 1) % 6)]
+  (ARRAY['DEMO-Z-HN-IN', 'DEMO-Z-HCM-IN', 'DEMO-Z-DN-SORT', 'DEMO-Z-HN-SORT'])[1 + ((i - 1) % 4)],
+  (ARRAY['DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN'])[1 + ((i - 1) % 3)]
 FROM generate_series(1, 14) AS i
 ON CONFLICT (sack_id) DO NOTHING;
 

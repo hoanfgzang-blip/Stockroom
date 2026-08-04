@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using WMS_.Configuration;
 using WMS_.Data;
+using WMS_.Data.Entities;
 using WMS_.Services.Auth;
 
 namespace WMS_.Controllers;
@@ -28,6 +30,7 @@ public class AuthController : ControllerBase
         var username = request.Username.Trim();
         var account = await _db.UserAccounts
             .Include(user => user.Employee)
+                .ThenInclude(employee => employee.Location)
             .AsNoTracking()
             .SingleOrDefaultAsync(user => user.Username == username);
 
@@ -38,7 +41,13 @@ public class AuthController : ControllerBase
         if (account == null || !account.IsActive || !PasswordHasher.Verify(request.Password, account.PasswordHash))
             return Unauthorized(new { message = "Tên đăng nhập hoặc mật khẩu không đúng." });
 
-        var response = AuthUserResponse.From(account.UserId, account.Username, account.Employee.EmployeeName, account.Employee.RoleName);
+        var response = AuthUserResponse.From(
+            account.UserId,
+            account.Username,
+            account.Employee.EmployeeName,
+            account.Employee.RoleName,
+            account.Employee.LocationId,
+            account.Employee.Location?.LocationName);
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, response.UserId),
@@ -66,12 +75,19 @@ public class AuthController : ControllerBase
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var account = await _db.UserAccounts
             .Include(user => user.Employee)
+                .ThenInclude(employee => employee.Location)
             .AsNoTracking()
             .SingleOrDefaultAsync(user => user.UserId == userId && user.IsActive);
 
         return account == null
             ? Unauthorized()
-            : Ok(AuthUserResponse.From(account.UserId, account.Username, account.Employee.EmployeeName, account.Employee.RoleName));
+            : Ok(AuthUserResponse.From(
+                account.UserId,
+                account.Username,
+                account.Employee.EmployeeName,
+                account.Employee.RoleName,
+                account.Employee.LocationId,
+                account.Employee.Location?.LocationName));
     }
 
     [Authorize]
@@ -84,11 +100,20 @@ public class AuthController : ControllerBase
 
     [Authorize(Policy = "ManagerOnly")]
     [HttpGet("accounts")]
-    public async Task<ActionResult<IEnumerable<AccountResponse>>> GetAccounts()
+    public async Task<ActionResult<IEnumerable<AccountResponse>>> GetAccounts([FromQuery] string? locationId = null)
     {
-        var accounts = await _db.UserAccounts
+        if (!string.IsNullOrWhiteSpace(locationId) && await FindHubAsync(locationId) == null)
+            return BadRequest(new { message = "Hub không tồn tại hoặc không hợp lệ." });
+
+            var query = _db.UserAccounts
             .Include(account => account.Employee)
-            .Where(account => account.IsActive)
+                .ThenInclude(employee => employee.Location)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(locationId))
+            query = query.Where(account => account.Employee.LocationId == locationId.Trim());
+
+        var accounts = await query
             .AsNoTracking()
             .OrderBy(account => account.Username)
             .ToListAsync();
@@ -109,6 +134,10 @@ public class AuthController : ControllerBase
         if (employee == null)
             return BadRequest(new { message = "Không tìm thấy nhân viên." });
 
+        var hub = await FindHubAsync(request.LocationId);
+        if (hub == null)
+            return BadRequest(new { message = "Tài khoản phải được gán vào một hub hợp lệ." });
+
         var username = request.Username.Trim();
         if (await _db.UserAccounts.AnyAsync(account => account.Username == username))
             return Conflict(new { message = "Tên đăng nhập đã tồn tại." });
@@ -116,6 +145,7 @@ public class AuthController : ControllerBase
             return Conflict(new { message = "Nhân viên này đã có tài khoản." });
 
         employee.RoleName = request.RoleName;
+        await AssignEmployeeHubAsync(employee, hub);
         var account = new WMS_.Data.Entities.UserAccount
         {
             UserId = await GenerateUserIdAsync(),
@@ -142,6 +172,13 @@ public class AuthController : ControllerBase
         if (account == null)
             return NotFound();
 
+        if (!string.Equals(account.EmployeeId, request.EmployeeId, StringComparison.Ordinal))
+            return BadRequest(new { message = "Không được đổi nhân viên của tài khoản." });
+
+        var hub = await FindHubAsync(request.LocationId);
+        if (hub == null)
+            return BadRequest(new { message = "Tài khoản phải được gán vào một hub hợp lệ." });
+
         var username = request.Username.Trim();
         if (await _db.UserAccounts.AnyAsync(item => item.Username == username && item.UserId != id))
             return Conflict(new { message = "Tên đăng nhập đã tồn tại." });
@@ -153,6 +190,7 @@ public class AuthController : ControllerBase
         account.Username = username;
         account.IsActive = request.IsActive;
         account.Employee.RoleName = request.RoleName;
+        await AssignEmployeeHubAsync(account.Employee, hub);
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
             if (request.Password.Length < 8)
@@ -183,6 +221,31 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
+    private Task<Location?> FindHubAsync(string? locationId)
+    {
+        var normalizedLocationId = locationId?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedLocationId))
+            return Task.FromResult<Location?>(null);
+
+        return _db.Locations.FirstOrDefaultAsync(location =>
+            location.LocationId == normalizedLocationId &&
+            location.LocationType == "Hub" &&
+            OperationalHubScope.IsHub(location.LocationId));
+    }
+
+    private async Task AssignEmployeeHubAsync(Employee employee, Location hub)
+    {
+        employee.LocationId = hub.LocationId;
+        employee.Location = hub;
+
+        if (!string.IsNullOrWhiteSpace(employee.ZoneId) &&
+            !await _db.Zones.AnyAsync(zone => zone.ZoneId == employee.ZoneId && zone.LocationId == hub.LocationId))
+        {
+            employee.ZoneId = null;
+            employee.Zone = null;
+        }
+    }
+
     private async Task<string> GenerateUserIdAsync()
     {
         string userId;
@@ -206,10 +269,22 @@ public sealed class LoginRequest
     public bool RememberMe { get; set; }
 }
 
-public sealed record AuthUserResponse(string UserId, string Username, string EmployeeName, string RoleName)
+public sealed record AuthUserResponse(
+    string UserId,
+    string Username,
+    string EmployeeName,
+    string RoleName,
+    string? LocationId,
+    string? LocationName)
 {
-    public static AuthUserResponse From(string userId, string username, string employeeName, string roleName)
-        => new(userId, username, employeeName, roleName);
+    public static AuthUserResponse From(
+        string userId,
+        string username,
+        string employeeName,
+        string roleName,
+        string? locationId,
+        string? locationName)
+        => new(userId, username, employeeName, roleName, locationId, locationName);
 }
 
 public sealed class SaveAccountRequest
@@ -226,11 +301,30 @@ public sealed class SaveAccountRequest
     [Required, MaxLength(50)]
     public string RoleName { get; set; } = null!;
 
+    [Required, MaxLength(50)]
+    public string LocationId { get; set; } = null!;
+
     public bool IsActive { get; set; } = true;
 }
 
-public sealed record AccountResponse(string UserId, string EmployeeId, string EmployeeName, string Username, string RoleName, bool IsActive)
+public sealed record AccountResponse(
+    string UserId,
+    string EmployeeId,
+    string EmployeeName,
+    string Username,
+    string RoleName,
+    bool IsActive,
+    string? LocationId,
+    string? LocationName)
 {
     public static AccountResponse From(WMS_.Data.Entities.UserAccount account)
-        => new(account.UserId, account.EmployeeId, account.Employee.EmployeeName, account.Username, account.Employee.RoleName, account.IsActive);
+        => new(
+            account.UserId,
+            account.EmployeeId,
+            account.Employee.EmployeeName,
+            account.Username,
+            account.Employee.RoleName,
+            account.IsActive,
+            account.Employee.LocationId,
+            account.Employee.Location?.LocationName);
 }

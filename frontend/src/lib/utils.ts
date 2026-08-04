@@ -80,7 +80,7 @@ export function statusLabel(status: string): string {
     Loading: 'Đang chất hàng', Pending: 'Chờ xử lý', InProgress: 'Đang xử lý', CompletedWithMissing: 'Đến thiếu hàng', Completed: 'Hoàn thành', Cancelled: 'Đã hủy',
     Active: 'Đang hoạt động', Inactive: 'Ngừng hoạt động', Available: 'Sẵn sàng', Occupied: 'Đang chứa hàng',
     Reserved: 'Đã giữ hàng', Expired: 'Đã hết hạn', Inbound: 'Nhập hàng', Outbound: 'Xuất hàng',
-    Processing: 'Đang xử lý', Sorting: 'Đang phân loại', Arrived: 'Đã đến', Fulfilled: 'Đã hoàn tất',
+    Processing: 'Đang xử lý', Sorting: 'Đang phân loại', Packing: 'Đang đóng gói', Arrived: 'Đã đến', Fulfilled: 'Đã hoàn tất',
     Empty: 'Trống', Finalized: 'Đã chốt', Locked: 'Đã khóa', Received: 'Đã giao',
     'In Transit to Zone': 'Đang chuyển zone', InTransit: 'Đang vận chuyển', ReadyForOutbound: 'Sẵn sàng xuất kho', Loaded: 'Đã chất lên xe',
     Create: 'Tạo mới', Update: 'Cập nhật', Delete: 'Xóa',

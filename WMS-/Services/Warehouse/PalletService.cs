@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using WMS_.Data;
 using WMS_.Data.Entities;
+using WMS_.Configuration;
+using WMS_.Security;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims; 
 
@@ -23,26 +25,44 @@ namespace WMS_.Services.Warehouse
         public async Task<IEnumerable<Pallet>> GetAllPalletsAsync(string? status = null)
         {
             var myLocationId = _httpContextAccessor.HttpContext?.User.FindFirstValue("location_id");
-            var query = _db.Pallets.Include(p => p.Zone).AsQueryable();
+            if (string.IsNullOrWhiteSpace(myLocationId))
+                return Array.Empty<Pallet>();
+
+            var query = _db.Pallets
+                .Include(p => p.Zone)
+                .Where(p => OperationalHubScope.HubIds.Contains(p.Zone.LocationId));
 
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(p => p.Status == status);
 
-            if (!string.IsNullOrEmpty(myLocationId))
-            {
-                query = query.Where(p => p.Zone.LocationId == myLocationId);
-            }
+            query = query.Where(p => p.Zone.LocationId == myLocationId);
 
             return await query.ToListAsync();
         }
 
         public async Task<Pallet?> GetPalletByIdAsync(string id)
         {
-            return await _db.Pallets.FindAsync(id);
+            var myLocationId = _httpContextAccessor.HttpContext?.User.HubId();
+            if (string.IsNullOrWhiteSpace(myLocationId))
+                return null;
+
+            return await _db.Pallets
+                .Include(p => p.Zone)
+                .FirstOrDefaultAsync(p => p.PalletId == id && p.Zone.LocationId == myLocationId);
         }
 
         public async Task<Pallet> CreatePalletAsync(Pallet pallet)
         {
+            var myLocationId = _httpContextAccessor.HttpContext?.User.HubId();
+            if (string.IsNullOrWhiteSpace(myLocationId))
+                throw new InvalidOperationException("Tài khoản chưa được gán hub.");
+
+            if (!await _db.Zones.AnyAsync(zone => zone.ZoneId == pallet.ZoneId && zone.LocationId == myLocationId))
+                throw new InvalidOperationException("Zone đặt pallet không tồn tại.");
+
+            if (!string.IsNullOrWhiteSpace(pallet.PalletId) && await _db.Pallets.AnyAsync(item => item.PalletId == pallet.PalletId))
+                throw new InvalidOperationException("Mã pallet đã tồn tại.");
+
             if (string.IsNullOrWhiteSpace(pallet.PalletId))
             {
                 pallet.PalletId = await GeneratePalletIdAsync();
@@ -66,6 +86,12 @@ namespace WMS_.Services.Warehouse
         {
             if (id != pallet.PalletId) return false;
 
+            var myLocationId = _httpContextAccessor.HttpContext?.User.HubId();
+            if (string.IsNullOrWhiteSpace(myLocationId) ||
+                !await _db.Zones.AnyAsync(zone => zone.ZoneId == pallet.ZoneId && zone.LocationId == myLocationId) ||
+                !await _db.Pallets.AnyAsync(item => item.PalletId == id && item.Zone.LocationId == myLocationId))
+                return false;
+
             _db.Entry(pallet).State = EntityState.Modified;
             try
             {
@@ -81,7 +107,13 @@ namespace WMS_.Services.Warehouse
 
         public async Task<bool> UpdatePalletStatusAsync(string id, string status)
         {
-            var pallet = await _db.Pallets.FindAsync(id);
+            var myLocationId = _httpContextAccessor.HttpContext?.User.HubId();
+            if (string.IsNullOrWhiteSpace(myLocationId))
+                return false;
+
+            var pallet = await _db.Pallets
+                .Include(item => item.Zone)
+                .FirstOrDefaultAsync(item => item.PalletId == id && item.Zone.LocationId == myLocationId);
             if (pallet == null) return false;
 
             pallet.Status = status;
@@ -91,8 +123,20 @@ namespace WMS_.Services.Warehouse
 
         public async Task<bool> DeletePalletAsync(string id)
         {
-            var pallet = await _db.Pallets.FindAsync(id);
+            var myLocationId = _httpContextAccessor.HttpContext?.User.HubId();
+            if (string.IsNullOrWhiteSpace(myLocationId))
+                return false;
+
+            var pallet = await _db.Pallets
+                .Include(item => item.Zone)
+                .FirstOrDefaultAsync(item => item.PalletId == id && item.Zone.LocationId == myLocationId);
             if (pallet == null) return false;
+
+            if (pallet.Status != "Empty")
+                throw new InvalidOperationException("Chỉ được xóa pallet đang ở trạng thái trống.");
+
+            if (await _db.Sacks.AnyAsync(sack => sack.PalletId == id))
+                throw new InvalidOperationException("Không thể xóa pallet đang chứa bao hàng.");
 
             _db.Pallets.Remove(pallet);
             await _db.SaveChangesAsync();

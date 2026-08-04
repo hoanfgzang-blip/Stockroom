@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS sack (
 CREATE TABLE IF NOT EXISTS routing_rule (
     rule_id VARCHAR(50) PRIMARY KEY,
     current_location VARCHAR(50) NOT NULL REFERENCES location(location_id) ON DELETE CASCADE,
-    c_destination VARCHAR(50) NOT NULL REFERENCES province(province_id) ON DELETE CASCADE,
+    c_destination VARCHAR(50) NOT NULL REFERENCES location(location_id) ON DELETE CASCADE,
     next_hop VARCHAR(50) NOT NULL REFERENCES location(location_id) ON DELETE CASCADE,
     CONSTRAINT unique_route UNIQUE (current_location, c_destination)
 );

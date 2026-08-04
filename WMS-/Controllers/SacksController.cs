@@ -4,6 +4,8 @@ using System.Security.Cryptography;
 using System.ComponentModel.DataAnnotations;
 using WMS_.Data;
 using WMS_.Data.Entities;
+using WMS_.Configuration;
+using WMS_.Security;
 
 namespace WMS_.Controllers
 {
@@ -21,7 +23,7 @@ namespace WMS_.Controllers
             [FromQuery] string? status = null,
             [FromQuery] bool sortByTrip = false)
         {
-            var query = _db.Sacks.AsQueryable();
+            var query = QuerySacksAtCurrentHub();
 
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(s => s.Status == status);
@@ -41,36 +43,65 @@ namespace WMS_.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Sack>> GetById(string id)
         {
-            var sack = await _db.Sacks.FindAsync(id);
+            var sack = await QuerySacksAtCurrentHub().FirstOrDefaultAsync(item => item.SackId == id);
             return sack == null ? NotFound() : Ok(sack);
         }
 
         /// <summary>Get sacks by trip</summary>
         [HttpGet("by-trip/{tripId}")]
-        public async Task<ActionResult<IEnumerable<Sack>>> GetByTrip(string tripId)
-            => await _db.Sacks.Where(s => s.TripId == tripId).ToListAsync();
+    public async Task<ActionResult<IEnumerable<Sack>>> GetByTrip(string tripId)
+            => await QuerySacksAtCurrentHub()
+                .Where(s => s.TripId == tripId)
+                .ToListAsync();
 
         /// <summary>Get sacks by pallet</summary>
         [HttpGet("by-pallet/{palletId}")]
-        public async Task<ActionResult<IEnumerable<Sack>>> GetByPallet(string palletId)
-            => await _db.Sacks.Where(s => s.PalletId == palletId).ToListAsync();
+    public async Task<ActionResult<IEnumerable<Sack>>> GetByPallet(string palletId)
+            => await QuerySacksAtCurrentHub()
+                .Where(s => s.PalletId == palletId)
+                .ToListAsync();
 
         /// <summary>Get sacks by destination location</summary>
         [HttpGet("by-destination/{destination}")]
         public async Task<ActionResult<IEnumerable<Sack>>> GetByDestination(string destination)
-            => await _db.Sacks.Where(s => s.SDestination == destination).ToListAsync();
+        {
+            if (!OperationalHubScope.IsOutboundDestination(destination)) return Ok(Array.Empty<Sack>());
+            return await QuerySacksAtCurrentHub().Where(s => s.SDestination == destination).ToListAsync();
+        }
 
         /// <summary>Create new sack</summary>
         [HttpPost]
         public async Task<ActionResult<Sack>> Create([FromBody] CreateSackRequest request)
         {
+            if (!OperationalHubScope.IsOutboundDestination(request.SDestination))
+                return BadRequest("Điểm đến của bao phải là hub hoặc location phát nội tỉnh đã cấu hình.");
+
+            var hubId = User.HubId();
+            if (string.IsNullOrWhiteSpace(hubId))
+                return Forbid();
+
+            var zoneId = request.ZoneId;
+            if (!string.IsNullOrWhiteSpace(zoneId) &&
+                !await _db.Zones.AnyAsync(zone => zone.ZoneId == zoneId && zone.LocationId == hubId))
+                return BadRequest("Zone của bao phải thuộc hub của tài khoản.");
+
+            if (string.IsNullOrWhiteSpace(zoneId))
+            {
+                zoneId = await _db.Zones
+                    .Where(zone => zone.LocationId == hubId && zone.ZoneType == "Sorting")
+                    .Select(zone => zone.ZoneId)
+                    .FirstOrDefaultAsync();
+                if (zoneId == null)
+                    return BadRequest("Hub chưa có zone Sorting để tạo bao hàng.");
+            }
+
             var sack = new Sack
             {
                 SackId = await GenerateSackIdAsync(),
                 Status = "Sorting",
                 CreatedAt = DateTime.UtcNow,
                 SDestination = request.SDestination,
-                ZoneId = request.ZoneId,
+                ZoneId = zoneId,
                 PalletId = request.PalletId
             };
 
@@ -107,7 +138,7 @@ namespace WMS_.Controllers
         [HttpPost("{id}/confirm-received")]
         public async Task<IActionResult> ConfirmReceived(string id)
         {
-            var sack = await _db.Sacks.FindAsync(id);
+            var sack = await QuerySacksAtCurrentHub().FirstOrDefaultAsync(item => item.SackId == id);
             if (sack == null) return NotFound();
             if (sack.Status != "InTransit") return Conflict(new { message = "Chỉ bao đang vận chuyển mới được xác nhận đã giao." });
 
@@ -121,11 +152,23 @@ namespace WMS_.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
-            var sack = await _db.Sacks.FindAsync(id);
+            var sack = await QuerySacksAtCurrentHub().FirstOrDefaultAsync(item => item.SackId == id);
             if (sack == null) return NotFound();
             _db.Sacks.Remove(sack);
             await _db.SaveChangesAsync();
             return NoContent();
+        }
+
+        private IQueryable<Sack> QuerySacksAtCurrentHub()
+        {
+            var hubId = User.HubId();
+            if (string.IsNullOrWhiteSpace(hubId))
+                return _db.Sacks.Where(_ => false);
+
+            return _db.Sacks.Where(sack =>
+                (sack.ZoneId != null && sack.Zone.LocationId == hubId) ||
+                (sack.PalletId != null && sack.Pallet.Zone.LocationId == hubId) ||
+                (sack.TripId != null && (sack.Trip.Origin == hubId || sack.Trip.Destination == hubId)));
         }
     }
 }

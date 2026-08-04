@@ -12,7 +12,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(text || `Request failed: ${res.status}`)
+    let message = text
+    try {
+      const body = JSON.parse(text) as { message?: string; title?: string }
+      message = body.message ?? body.title ?? text
+    } catch {
+      // Keep the raw response when the API does not return JSON.
+    }
+    throw new Error(message || `Request failed: ${res.status}`)
   }
 
   if (res.status === 204) return undefined as T

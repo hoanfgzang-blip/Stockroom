@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Pencil, Plus, UserRoundX } from 'lucide-react'
-import { accountsApi, employeesApi, type ManagedAccount, type SaveAccountRequest } from '@/api/services'
+import { accountsApi, employeesApi, locationsApi, type ManagedAccount, type SaveAccountRequest } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,7 +8,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { Input, Label, Select } from '@/components/ui/input'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import type { Employee } from '@/types'
+import type { Employee, Location } from '@/types'
 import { roleLabel } from '@/lib/utils'
 
 type AccountForm = SaveAccountRequest & { userId?: string }
@@ -19,6 +19,7 @@ const emptyForm = (): AccountForm => ({
   password: '',
   roleName: 'WarehouseStaff',
   isActive: true,
+  locationId: '',
 })
 
 const roles = ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator', 'Driver']
@@ -26,6 +27,8 @@ const roles = ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator', 'Driver']
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<ManagedAccount[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
+  const [locationFilter, setLocationFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -34,16 +37,17 @@ export default function AccountsPage() {
 
   const load = () => {
     setLoading(true)
-    Promise.all([accountsApi.all(), employeesApi.all()])
-      .then(([accountList, employeeList]) => {
+    Promise.all([accountsApi.all(), employeesApi.all(), locationsApi.all()])
+      .then(([accountList, employeeList, locationList]) => {
         setAccounts(accountList)
         setEmployees(employeeList)
+        setLocations(locationList)
       })
       .catch((reason: Error) => setError(reason.message))
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [locationFilter])
 
   const openCreate = () => {
     setForm(emptyForm())
@@ -58,8 +62,18 @@ export default function AccountsPage() {
       password: '',
       roleName: account.roleName,
       isActive: account.isActive,
+      locationId: account.locationId ?? '',
     })
     setDialogOpen(true)
+  }
+
+  const handleEmployeeChange = (employeeId: string) => {
+    const employee = employees.find((item) => item.employeeId === employeeId)
+    setForm((current) => ({
+      ...current,
+      employeeId,
+      locationId: employee?.locationId ?? current.locationId,
+    }))
   }
 
   const save = async () => {
@@ -90,6 +104,9 @@ export default function AccountsPage() {
   }
 
   const availableEmployees = employees.filter((employee) => !accounts.some((account) => account.employeeId === employee.employeeId) || employee.employeeId === form.employeeId)
+  const visibleAccounts = locationFilter
+    ? accounts.filter((account) => account.locationId === locationFilter)
+    : accounts
 
   if (loading && accounts.length === 0) return <LoadingState />
   if (error && accounts.length === 0) return <ErrorState message={error} />
@@ -98,21 +115,34 @@ export default function AccountsPage() {
     <div>
       <PageHeader
         title="Quản lý tài khoản"
-        description="Tạo và quản trị quyền truy cập của nhân viên vào WMS."
+        description="Tạo tài khoản, gán hub vận hành và quản trị quyền truy cập của nhân viên vào WMS."
         action={<Button onClick={openCreate}><Plus className="h-4 w-4" />Tạo tài khoản</Button>}
       />
       {error && <div className="mb-4"><ErrorState message={error} /></div>}
 
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="max-w-sm">
+            <Label htmlFor="account-hub-filter">Lọc theo hub</Label>
+            <Select id="account-hub-filter" value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)} className="mt-1">
+              <option value="">Tất cả hub</option>
+              {locations.map((location) => <option key={location.locationId} value={location.locationId}>{location.locationName}</option>)}
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
-        <CardHeader><CardTitle>Tài khoản ({accounts.length})</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Tài khoản ({visibleAccounts.length})</CardTitle></CardHeader>
         <CardContent>
           <Table>
-            <TableHeader><TableRow><TableHead>Nhân viên</TableHead><TableHead>Tên đăng nhập</TableHead><TableHead>Vai trò</TableHead><TableHead>Trạng thái</TableHead><TableHead className="w-28">Thao tác</TableHead></TableRow></TableHeader>
+           <TableHeader><TableRow><TableHead>Nhân viên</TableHead><TableHead>Hub</TableHead><TableHead>Tên đăng nhập</TableHead><TableHead>Vai trò</TableHead><TableHead>Trạng thái</TableHead><TableHead className="w-28">Thao tác</TableHead></TableRow></TableHeader>
             <TableBody>
-              {accounts.map((account) => (
+              {visibleAccounts.map((account) => (
                 <TableRow key={account.userId}>
-                  <TableCell><p className="font-medium">{account.employeeName}</p><p className="font-mono text-xs text-slate-500">{account.employeeId}</p></TableCell>
-                  <TableCell className="font-mono">{account.username}</TableCell>
+                   <TableCell><p className="font-medium">{account.employeeName}</p><p className="font-mono text-xs text-slate-500">{account.employeeId}</p></TableCell>
+                   <TableCell>{account.locationName ?? account.locationId ?? 'Chưa gán hub'}</TableCell>
+                   <TableCell className="font-mono">{account.username}</TableCell>
                   <TableCell><Badge status={account.roleName}>{roleLabel(account.roleName)}</Badge></TableCell>
                   <TableCell><Badge status={account.isActive ? 'Active' : 'Inactive'}>{account.isActive ? 'Đang hoạt động' : 'Đã vô hiệu hóa'}</Badge></TableCell>
                   <TableCell>
@@ -132,21 +162,29 @@ export default function AccountsPage() {
         <div className="space-y-4">
           <div>
             <Label htmlFor="account-employee">Nhân viên</Label>
-            <Select id="account-employee" value={form.employeeId} onChange={(event) => setForm({ ...form, employeeId: event.target.value })} disabled={Boolean(form.userId)} className="mt-1">
+               <Select id="account-employee" value={form.employeeId} onChange={(event) => handleEmployeeChange(event.target.value)} disabled={Boolean(form.userId)} className="mt-1">
               <option value="">Chọn nhân viên</option>
               {availableEmployees.map((employee) => <option key={employee.employeeId} value={employee.employeeId}>{employee.employeeName}</option>)}
             </Select>
           </div>
           <div><Label htmlFor="account-username">Tên đăng nhập</Label><Input id="account-username" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} className="mt-1" /></div>
           <div><Label htmlFor="account-password">{form.userId ? 'Mật khẩu mới' : 'Mật khẩu'}</Label><Input id="account-password" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value.replace(/[^\x21-\x7E]/g, '') })} placeholder={form.userId ? 'Để trống nếu không đổi' : 'Ít nhất 4 ký tự'} className="mt-1" /></div>
-          <div>
-            <Label htmlFor="account-role">Vai trò</Label>
+           <div>
+             <Label htmlFor="account-role">Vai trò</Label>
             <Select id="account-role" value={form.roleName} onChange={(event) => setForm({ ...form, roleName: event.target.value })} className="mt-1">
               {roles.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}
-            </Select>
-          </div>
-          <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />Đang hoạt động</label>
-          <div className="flex justify-end gap-2 pt-2"><Button variant="outline" onClick={() => setDialogOpen(false)}>Hủy</Button><Button onClick={save} disabled={saving || !form.employeeId || !form.username || (!form.userId && !form.password)}>{saving ? 'Đang lưu' : 'Lưu tài khoản'}</Button></div>
+             </Select>
+           </div>
+           <div>
+             <Label htmlFor="account-location">Hub vận hành</Label>
+             <Select id="account-location" value={form.locationId} onChange={(event) => setForm({ ...form, locationId: event.target.value })} className="mt-1">
+               <option value="">Chọn hub</option>
+               {locations.map((location) => <option key={location.locationId} value={location.locationId}>{location.locationName}</option>)}
+             </Select>
+             <p className="mt-1 text-xs text-slate-500">Tài khoản chỉ được thao tác dữ liệu tại hub này.</p>
+           </div>
+           <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />Đang hoạt động</label>
+           <div className="flex justify-end gap-2 pt-2"><Button variant="outline" onClick={() => setDialogOpen(false)}>Hủy</Button><Button onClick={save} disabled={saving || !form.employeeId || !form.username || !form.locationId || (!form.userId && !form.password)}>{saving ? 'Đang lưu' : 'Lưu tài khoản'}</Button></div>
         </div>
       </Dialog>
     </div>

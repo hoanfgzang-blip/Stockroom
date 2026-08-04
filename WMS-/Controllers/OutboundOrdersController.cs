@@ -41,8 +41,15 @@ namespace WMS_.Controllers
         [HttpPost]
         public async Task<ActionResult<OutboundOrder>> Create([FromBody] OutboundOrder order)
         {
-            await _outboundService.CreateOrderAsync(order);
-            return CreatedAtAction(nameof(GetById), new { id = order.OutboundOrderId }, order);
+            try
+            {
+                await _outboundService.CreateOrderAsync(order);
+                return CreatedAtAction(nameof(GetById), new { id = order.OutboundOrderId }, order);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         /// <summary>Update outbound order</summary>

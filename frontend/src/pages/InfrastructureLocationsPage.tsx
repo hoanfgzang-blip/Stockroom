@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { locationsApi, provincesApi } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,30 +33,6 @@ const defaultForm: LocationFormState = {
   locationName: '',
 }
 
-const generateLocationId = (provinceId: string, locationType: string, existingLocs: Location[]) => {
-  const prefixMap: Record<string, string> = {
-    Hub: 'HUB',
-    Warehouse: 'WH',
-    SortingCenter: 'SC',
-    DistributionCenter: 'DC',
-  }
-  const prefix = prefixMap[locationType] ?? 'HUB'
-  const prov = provinceId || '01'
-  const pattern = new RegExp(`^${prefix}-${prov}-(\\d+)$`, 'i')
-  let maxNum = 0
-  for (const loc of existingLocs) {
-    const match = loc.locationId.match(pattern)
-    if (match) {
-      const num = parseInt(match[1], 10)
-      if (!isNaN(num) && num > maxNum) {
-        maxNum = num
-      }
-    }
-  }
-  const nextNum = (maxNum + 1).toString().padStart(2, '0')
-  return `${prefix}-${prov}-${nextNum}`
-}
-
 export default function InfrastructureLocationsPage() {
   const [tab, setTab] = useState('locations')
   const [provinces, setProvinces] = useState<Province[]>([])
@@ -65,7 +41,7 @@ export default function InfrastructureLocationsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Dialog & Form states for Add/Edit Hub Location
+  // Dialog & form state for editing one of the three operational hubs.
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingLocation, setEditingLocation] = useState<Location | null>(null)
   const [form, setForm] = useState<LocationFormState>(defaultForm)
@@ -93,21 +69,6 @@ export default function InfrastructureLocationsPage() {
     return locations.filter((l) => l.provinceId === provinceFilter)
   }, [locations, provinceFilter])
 
-  const openCreateDialog = () => {
-    setEditingLocation(null)
-    const initialProvince = provinces[0]?.provinceId ?? '01'
-    const initialType = 'Hub'
-    const autoId = generateLocationId(initialProvince, initialType, locations)
-    setForm({
-      locationId: autoId,
-      provinceId: initialProvince,
-      locationType: initialType,
-      locationName: '',
-    })
-    setFormError(null)
-    setDialogOpen(true)
-  }
-
   const openEditDialog = (loc: Location) => {
     setEditingLocation(loc)
     setForm({
@@ -121,21 +82,7 @@ export default function InfrastructureLocationsPage() {
   }
 
   const handleProvinceChange = (newProvinceId: string) => {
-    if (!editingLocation) {
-      const newAutoId = generateLocationId(newProvinceId, form.locationType, locations)
-      setForm((prev) => ({ ...prev, provinceId: newProvinceId, locationId: newAutoId }))
-    } else {
-      setForm((prev) => ({ ...prev, provinceId: newProvinceId }))
-    }
-  }
-
-  const handleLocationTypeChange = (newType: string) => {
-    if (!editingLocation) {
-      const newAutoId = generateLocationId(form.provinceId, newType, locations)
-      setForm((prev) => ({ ...prev, locationType: newType, locationId: newAutoId }))
-    } else {
-      setForm((prev) => ({ ...prev, locationType: newType }))
-    }
+    setForm((prev) => ({ ...prev, provinceId: newProvinceId }))
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -148,42 +95,19 @@ export default function InfrastructureLocationsPage() {
     setSaving(true)
     setFormError(null)
     try {
-      if (editingLocation) {
-        // Edit location
-        await locationsApi.update(editingLocation.locationId, {
-          locationId: form.locationId,
-          provinceId: form.provinceId,
-          locationType: form.locationType,
-          locationName: form.locationName,
-        })
-      } else {
-        // Create location
-        await locationsApi.create({
-          locationId: form.locationId.trim(),
-          provinceId: form.provinceId,
-          locationType: form.locationType,
-          locationName: form.locationName.trim(),
-        })
-      }
+      if (!editingLocation) return
+      await locationsApi.update(editingLocation.locationId, {
+        locationId: form.locationId,
+        provinceId: form.provinceId,
+        locationType: form.locationType,
+        locationName: form.locationName.trim(),
+      })
       setDialogOpen(false)
       loadData()
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : 'Không thể lưu thông tin địa điểm.')
     } finally {
       setSaving(false)
-    }
-  }
-
-  const handleDelete = async (loc: Location) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa địa điểm/hub "${loc.locationName}" (${loc.locationId})?`)) {
-      return
-    }
-
-    try {
-      await locationsApi.delete(loc.locationId)
-      loadData()
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Không thể xóa địa điểm này.')
     }
   }
 
@@ -194,13 +118,7 @@ export default function InfrastructureLocationsPage() {
     <div>
       <PageHeader
         title="Quản lý hạ tầng"
-        description="Tỉnh, hub kho và cấu trúc địa điểm."
-        action={
-          <Button onClick={openCreateDialog}>
-            <Plus className="h-4 w-4 mr-1" />
-            Thêm địa điểm / Hub
-          </Button>
-        }
+        description="Mạng lưới vận hành cố định quanh 3 hub: Hà Nội, Hồ Chí Minh và Đà Nẵng."
       />
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -256,9 +174,6 @@ export default function InfrastructureLocationsPage() {
                           <Button variant="ghost" size="sm" onClick={() => openEditDialog(loc)} title="Sửa địa điểm">
                             <Pencil className="h-4 w-4 text-slate-600" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(loc)} title="Xóa địa điểm">
-                            <Trash2 className="h-4 w-4 text-rose-600" />
-                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -307,12 +222,12 @@ export default function InfrastructureLocationsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Modal Dialog thêm / sửa Địa điểm Hub */}
+      {/* Modal Dialog chỉnh sửa một trong ba hub vận hành */}
       <Dialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        title={editingLocation ? 'Chỉnh sửa địa điểm / Hub' : 'Thêm mới địa điểm / Hub'}
-        description={editingLocation ? `Cập nhật thông tin cho mã ${editingLocation.locationId}` : 'Khai báo địa điểm hoặc hub kho mới trong hệ thống.'}
+        title="Chỉnh sửa địa điểm / Hub"
+        description={editingLocation ? `Cập nhật thông tin cho mã ${editingLocation.locationId}` : undefined}
       >
         <form onSubmit={handleSave} className="space-y-4">
           {formError && (
@@ -324,9 +239,6 @@ export default function InfrastructureLocationsPage() {
           <div>
             <div className="flex items-center justify-between">
               <Label htmlFor="locationId">Mã địa điểm / Hub</Label>
-              <span className="text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                Tự động sinh mã
-              </span>
             </div>
             <Input
               id="locationId"
@@ -372,14 +284,10 @@ export default function InfrastructureLocationsPage() {
             <Select
               id="locationType"
               value={form.locationType}
-              onChange={(e) => handleLocationTypeChange(e.target.value)}
-              required
+              disabled
               className="mt-1"
             >
               <option value="Hub">Hub kho</option>
-              <option value="Warehouse">Kho hàng</option>
-              <option value="SortingCenter">Trung tâm chia chọn (Sorting Center)</option>
-              <option value="DistributionCenter">Trung tâm phân phối (Distribution Center)</option>
             </Select>
           </div>
 
@@ -388,7 +296,7 @@ export default function InfrastructureLocationsPage() {
               Hủy
             </Button>
             <Button type="submit" disabled={saving}>
-              {saving ? 'Đang lưu...' : editingLocation ? 'Lưu thay đổi' : 'Thêm mới'}
+              {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
             </Button>
           </div>
         </form>

@@ -5,11 +5,9 @@ import InfrastructureLocationsPage from '@/pages/InfrastructureLocationsPage'
 import InfrastructureZonesPage from '@/pages/InfrastructureZonesPage'
 import EmployeesPage from '@/pages/EmployeesPage'
 import TripsPage from '@/pages/TripsPage'
-import RoutingRulesPage from '@/pages/RoutingRulesPage'
 import InboundOrdersPage from '@/pages/InboundOrdersPage'
 import OutboundOrdersPage from '@/pages/OutboundOrdersPage'
 import SacksPage from '@/pages/SacksPage'
-import ReservationsPage from '@/pages/ReservationsPage'
 import AuditLogsPage from '@/pages/AuditLogsPage'
 import FleetPage from '@/pages/FleetPage'
 import ShiftsPage from '@/pages/ShiftsPage'
@@ -37,12 +35,10 @@ export default function App() {
         <Route path="/inventory/inbound" element={<InboundOrdersPage />} />
         <Route path="/inventory/outbound" element={<OutboundOrdersPage />} />
         <Route path="/inventory/sacks" element={<SacksPage />} />
-        <Route path="/inventory/reservations" element={<ReservationsPage />} />
         <Route path="/operations/barcode-scanner" element={<BarcodeScannerPage />} />
         <Route path="/driver/deliveries" element={<DriverDeliveriesPage />} />
         <Route path="/logistics/fleet" element={<FleetPage />} />
         <Route path="/logistics/trips" element={<TripsPage />} />
-        <Route path="/logistics/routing" element={<RoutingRulesPage />} />
         <Route path="/hr/employees" element={<EmployeesPage />} />
         <Route path="/hr/shifts" element={<ShiftsPage />} />
         <Route path="/audit-logs" element={<AuditLogsPage />} />

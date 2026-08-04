@@ -124,7 +124,6 @@ export default function SacksPage() {
                 <TableHead>Trạng thái</TableHead>
                 <TableHead>Pallet chứa</TableHead>
                 <TableHead>Zone</TableHead>
-                <TableHead>Chuyến xe</TableHead>
                 <TableHead>Điểm đến</TableHead>
                 <TableHead>Thời điểm tạo</TableHead>
                 <TableHead className="whitespace-nowrap">Thao tác</TableHead>
@@ -139,7 +138,6 @@ export default function SacksPage() {
                   </TableCell>
                   <TableCell>{sack.palletId ?? '—'}</TableCell>
                   <TableCell>{sack.zoneId ?? '—'}</TableCell>
-                  <TableCell>{sack.tripId ?? '—'}</TableCell>
                   <TableCell>{destName(sack.sDestination)}</TableCell>
                   <TableCell>{formatDateTime(sack.createdAt)}</TableCell>
                   <TableCell>

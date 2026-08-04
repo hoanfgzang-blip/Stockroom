@@ -37,6 +37,6 @@ npm run preview
 | `/` | Dashboard KPIs, charts, alerts |
 | `/infrastructure/*` | Provinces, locations, zones, pallets |
 | `/inventory/*` | Inbound/outbound orders, sacks, reservations |
-| `/logistics/*` | Fleet, trip kanban, routing rules |
+| `/logistics/*` | Fleet, trip kanban |
 | `/hr/*` | Employees, shifts |
 | `/audit-logs` | Compliance audit trail with JSON diff |

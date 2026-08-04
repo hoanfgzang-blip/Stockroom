@@ -37,7 +37,17 @@ type InboundCheckInResult = Partial<TripCheckInResult> & Partial<TripQrCheckInRe
   status: string
 }
 
+<<<<<<< HEAD
 /* ─── Code-39 barcode helpers ─────────────────────────────────────────────── */
+=======
+type TripCheckInSession = {
+  manifest: TripQrManifest
+  arrivedSackIds: string[]
+  unexpectedSackIds: string[]
+}
+
+const TRIP_QR_PREFIX = 'WMS-TRIP-QR:'
+>>>>>>> 652fce01594347f00281419fdec7fdd0a1b5f065
 
 const code39Patterns: Record<string, string> = {
   '0': 'nnnwwnwnn', '1': 'wnnwnnnnw', '2': 'nnwwnnnnw', '3': 'wnwwnnnnn', '4': 'nnnwwnnnw',
@@ -118,7 +128,11 @@ function printBarcode(value: string) {
 /* ─── Mode definitions ────────────────────────────────────────────────────── */
 
 const modes: Array<{ id: ScanMode; title: string; description: string; icon: typeof PackageCheck }> = [
+<<<<<<< HEAD
   { id: 'inbound', title: 'Xe inbound', description: 'Quét xe → quét pallet → quét từng bao để nhập kho', icon: Truck },
+=======
+  { id: 'inbound', title: 'Xe inbound', description: 'Quét QR xe, sau đó kiểm đếm từng sack trước khi xác nhận', icon: Truck },
+>>>>>>> 652fce01594347f00281419fdec7fdd0a1b5f065
   { id: 'sorting', title: 'Chia chọn', description: 'Xác nhận bao đang được xử lý', icon: ScanLine },
   { id: 'outbound', title: 'Xuất kho', description: 'Giữ bao cho đơn xuất đã chọn', icon: Send },
   { id: 'received', title: 'Nhận hàng', description: 'Xác nhận bao đã đến điểm đích', icon: ClipboardCheck },
@@ -200,6 +214,8 @@ export default function BarcodeScannerPage() {
   const [outboundOrderId, setOutboundOrderId] = useState('')
   const [lastSack, setLastSack] = useState<Sack | null>(null)
   const [lastTrip, setLastTrip] = useState<InboundCheckInResult | null>(null)
+  const [tripSession, setTripSession] = useState<TripCheckInSession | null>(null)
+  const [tripConfirming, setTripConfirming] = useState(false)
   const [classification, setClassification] = useState<{ label: string; destinationName?: string | null; zoneName?: string | null } | null>(null)
   const [results, setResults] = useState<ScanResult[]>([])
   const [processing, setProcessing] = useState(false)
@@ -263,6 +279,7 @@ export default function BarcodeScannerPage() {
     setResults((current) => [{ id: Date.now(), sackId, message, success, at: new Date() }, ...current].slice(0, 8))
   }
 
+<<<<<<< HEAD
   const resetInboundWizard = () => {
     setInboundStep('idle')
     setTripManifest(null)
@@ -310,6 +327,61 @@ export default function BarcodeScannerPage() {
 
   /* ─── Main scan processor ────────────────────────────────────────────── */
 
+=======
+  const openTripSession = async (scannedValue: string, legacyManifest?: TripQrManifest) => {
+    const manifest = legacyManifest ?? (await tripsApi.resolveQr(scannedValue)).manifest
+    setTripSession({ manifest, arrivedSackIds: [], unexpectedSackIds: [] })
+    setLastTrip(null)
+    setLastSack(null)
+    addResult(
+      manifest.tripId,
+      legacyManifest
+        ? 'Đã mở phiên từ QR JSON cũ. Hãy quét từng sack thực tế, chưa gọi API nhận hàng.'
+        : `Đã mở phiên đối chiếu xe ${manifest.tripId}. Hãy quét từng sack thực tế.`,
+      true,
+    )
+  }
+
+  const recordTripSack = (scannedSackId: string) => {
+    if (!tripSession) return
+
+    const normalizedId = scannedSackId.trim()
+    const expectedSack = tripSession.manifest.sacks.find((sack) => sack.sackId.toLowerCase() === normalizedId.toLowerCase())
+    if (!expectedSack) {
+      setTripSession((current) => current && current.unexpectedSackIds.some((id) => id.toLowerCase() === normalizedId.toLowerCase())
+        ? current
+        : current ? { ...current, unexpectedSackIds: [...current.unexpectedSackIds, normalizedId] } : current)
+      addResult(normalizedId, 'Sack không thuộc chuyến xe này. Không thể chốt phiên.', false)
+      return
+    }
+
+    if (tripSession.arrivedSackIds.some((id) => id.toLowerCase() === expectedSack.sackId.toLowerCase())) {
+      addResult(expectedSack.sackId, 'Sack đã được quét trong phiên này.', false)
+      return
+    }
+
+    setTripSession((current) => current ? { ...current, arrivedSackIds: [...current.arrivedSackIds, expectedSack.sackId] } : current)
+    addResult(expectedSack.sackId, 'Đã ghi nhận sack trong phiên đối chiếu. Chưa cập nhật server.', true)
+  }
+
+  const confirmTripSession = async () => {
+    if (!tripSession || tripSession.arrivedSackIds.length === 0 || tripSession.unexpectedSackIds.length > 0 || tripConfirming) return
+
+    setTripConfirming(true)
+    try {
+      const trip = await tripsApi.checkInByQr(tripSession.manifest.tripId, tripSession.arrivedSackIds)
+      setLastTrip(trip)
+      setLastSack(null)
+      addResult(trip.tripId, formatTripQrResult(trip, tripSession.manifest), true)
+      setTripSession(null)
+    } catch (error) {
+      addResult(tripSession.manifest.tripId, error instanceof Error ? error.message : 'Không thể xác nhận nhận hàng.', false)
+    } finally {
+      setTripConfirming(false)
+    }
+  }
+
+>>>>>>> 652fce01594347f00281419fdec7fdd0a1b5f065
   const processScan = async (event: FormEvent) => {
     event.preventDefault()
     const scannedCode = barcode.trim()
@@ -317,6 +389,7 @@ export default function BarcodeScannerPage() {
 
     setProcessing(true)
     try {
+<<<<<<< HEAD
       /* ── INBOUND mode ── */
       if (mode === 'inbound') {
         /* Step 1 — quét xe: nhận manifest */
@@ -375,6 +448,26 @@ export default function BarcodeScannerPage() {
           addResult(trip.tripId, formatTripQrResult(trip, manifest), (trip.missingSackIds?.length ?? 0) === 0)
           return
         }
+=======
+      if (scannedCode.startsWith(TRIP_QR_PREFIX)) {
+        await openTripSession(scannedCode)
+        return
+      }
+
+      const legacyManifest = parseTripManifest(scannedCode)
+      if (legacyManifest) {
+        await openTripSession(scannedCode, legacyManifest)
+        return
+      }
+
+      if (tripSession) {
+        recordTripSack(scannedCode)
+        return
+      }
+
+      if (mode === 'inbound') {
+        throw new Error('Hãy quét QR xe để mở phiên đối chiếu trước khi quét sack.')
+>>>>>>> 652fce01594347f00281419fdec7fdd0a1b5f065
       }
 
       /* ── Sack-level modes ── */
@@ -409,7 +502,16 @@ export default function BarcodeScannerPage() {
     }
   }
 
+<<<<<<< HEAD
   const selectedOrder = orders.find((o) => o.outboundOrderId === outboundOrderId)
+=======
+  const selectedOrder = orders.find((order) => order.outboundOrderId === outboundOrderId)
+  const sessionExpectedSackIds = tripSession?.manifest.sacks.map((sack) => sack.sackId) ?? []
+  const sessionArrivedSackIds = tripSession?.arrivedSackIds ?? []
+  const sessionUnexpectedSackIds = tripSession?.unexpectedSackIds ?? []
+  const sessionArrivedSet = new Set(sessionArrivedSackIds.map((id) => id.toLowerCase()))
+  const sessionMissingSackIds = sessionExpectedSackIds.filter((id) => !sessionArrivedSet.has(id.toLowerCase()))
+>>>>>>> 652fce01594347f00281419fdec7fdd0a1b5f065
 
   const createSack = async () => {
     if (!destinationId || creating) return
@@ -710,6 +812,7 @@ export default function BarcodeScannerPage() {
                         </button>
                       </div>
                     </div>
+<<<<<<< HEAD
 
                     {/* Progress bar */}
                     <div>
@@ -851,6 +954,22 @@ export default function BarcodeScannerPage() {
                           : allScanned
                             ? 'Xác nhận nhập kho (đủ hàng)'
                             : `Xác nhận nhập kho (${scannedCount}/${totalExpected})`}
+=======
+                    <div className="mt-1 flex gap-3">
+                      <input
+                        ref={palletInputRef}
+                        id="sorting-pallet"
+                        value={sortingPalletId}
+                        onChange={(event) => setSortingPalletId(event.target.value)}
+                        placeholder="Quét hoặc nhập mã pallet"
+                        autoComplete="off"
+                        className="flex h-12 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-base outline-none ring-primary focus:ring-2"
+                       disabled={processing || tripConfirming}
+                      />
+                      <Button type="button" variant="outline" className="h-12 shrink-0 px-4" onClick={() => void startCamera('pallet')} title="Quét pallet bằng camera">
+                        <Camera className="h-5 w-5" />
+                        Quét pallet
+>>>>>>> 652fce01594347f00281419fdec7fdd0a1b5f065
                       </Button>
                     </div>
                   </div>
@@ -859,6 +978,7 @@ export default function BarcodeScannerPage() {
             </Card>
           )}
 
+<<<<<<< HEAD
           {/* ═══════════════════════════════════════════════════════════ */}
           {/* OTHER MODES scan card                                      */}
           {/* ═══════════════════════════════════════════════════════════ */}
@@ -936,8 +1056,32 @@ export default function BarcodeScannerPage() {
                         {processing ? 'Đang xử lý' : 'Xử lý'}
                       </Button>
                     </div>
+=======
+                <div>
+                   <Label htmlFor="barcode">{tripSession ? 'Mã sack thực tế' : mode === 'inbound' ? 'Mã QR chuyến xe inbound' : 'Mã bao hàng'}</Label>
+                  <div className="mt-1 flex gap-3">
+                    <input
+                      ref={inputRef}
+                      id="barcode"
+                      value={barcode}
+                      onChange={(event) => setBarcode(event.target.value)}
+                       placeholder={tripSession ? 'Quét từng mã SACK-...' : mode === 'inbound' ? 'Quét QR WMS-TRIP-QR:...' : 'Quét hoặc nhập mã, ví dụ SACK-...'}
+                      autoComplete="off"
+                      className="flex h-14 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-base outline-none ring-primary focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                       disabled={processing || tripConfirming}
+                    />
+                    <Button type="button" variant="outline" size="lg" className="h-14 shrink-0 px-4" onClick={() => void startCamera()} title="Quét mã bằng camera">
+                      <Camera className="h-5 w-5" />
+                      Camera
+                    </Button>
+                    <Button type="submit" size="lg" disabled={!barcode.trim() || processing || (mode === 'sorting' && !sortingPalletId.trim())} className="h-14 shrink-0">
+                      <ScanLine className="h-5 w-5" />
+                       {processing ? 'Đang xử lý' : 'Xử lý'}
+                    </Button>
+>>>>>>> 652fce01594347f00281419fdec7fdd0a1b5f065
                   </div>
 
+<<<<<<< HEAD
                   <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
                     {mode === 'sorting' ? 'Quét pallet trước, sau đó quét từng bao để đưa vào pallet đó.' : 'Mẹo: cấu hình máy quét gửi phím Enter sau mã để tự động xử lý ngay sau khi quét.'}
                   </p>
@@ -947,6 +1091,66 @@ export default function BarcodeScannerPage() {
           )}
 
           {/* ── Last trip result ── */}
+=======
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                   {mode === 'inbound' ? 'Quét QR xe để mở phiên đối chiếu, sau đó quét từng sack. Chưa bấm xác nhận thì server chưa đổi trạng thái.' : mode === 'sorting' ? 'Quét pallet trước, sau đó quét từng bao để đưa vào pallet đó.' : 'Mẹo: cấu hình máy quét gửi phím Enter sau mã để tự động xử lý ngay sau khi quét.'}
+                </p>
+              </form>
+            </CardContent>
+          </Card>
+
+          {tripSession && (
+            <Card className="border-blue-200 bg-blue-50/40">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between gap-3 text-base">
+                  <span>Phiên đối chiếu chuyến xe</span>
+                  <Badge status={tripSession.manifest.status}>{tripSession.manifest.status}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                  <div><p className="text-xs text-slate-500">Mã chuyến</p><p className="mt-1 font-mono font-semibold">{tripSession.manifest.tripId}</p></div>
+                  <div><p className="text-xs text-slate-500">Xe / tài xế</p><p className="mt-1 font-medium">{tripSession.manifest.vehicle.id} · {tripSession.manifest.driver.name}</p></div>
+                  <div><p className="text-xs text-slate-500">Tuyến</p><p className="mt-1 font-medium">{tripSession.manifest.origin.name} → {tripSession.manifest.destination.name}</p></div>
+                  <div><p className="text-xs text-slate-500">Số bao dự kiến</p><p className="mt-1 font-semibold">{sessionExpectedSackIds.length}</p></div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                    <p className="text-xs font-semibold text-emerald-800">Đã quét ({sessionArrivedSackIds.length})</p>
+                    <div className="mt-2 max-h-32 space-y-1 overflow-y-auto">
+                      {sessionArrivedSackIds.map((sackId) => <p key={sackId} className="font-mono text-xs text-emerald-900">{sackId}</p>)}
+                      {sessionArrivedSackIds.length === 0 && <p className="text-xs text-emerald-700">Chưa có sack</p>}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-xs font-semibold text-amber-800">Còn thiếu ({sessionMissingSackIds.length})</p>
+                    <div className="mt-2 max-h-32 space-y-1 overflow-y-auto">
+                      {sessionMissingSackIds.map((sackId) => <p key={sackId} className="font-mono text-xs text-amber-900">{sackId}</p>)}
+                      {sessionMissingSackIds.length === 0 && <p className="text-xs text-amber-700">Đã quét đủ</p>}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                    <p className="text-xs font-semibold text-rose-800">Không thuộc chuyến ({sessionUnexpectedSackIds.length})</p>
+                    <div className="mt-2 max-h-32 space-y-1 overflow-y-auto">
+                      {sessionUnexpectedSackIds.map((sackId) => <p key={sackId} className="font-mono text-xs text-rose-900">{sackId}</p>)}
+                      {sessionUnexpectedSackIds.length === 0 && <p className="text-xs text-rose-700">Không có</p>}
+                    </div>
+                  </div>
+                </div>
+
+                {sessionUnexpectedSackIds.length > 0 && <p className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">Có sack ngoài chuyến. Hãy hủy phiên và quét lại QR xe; không thể xác nhận phiên này.</p>}
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button variant="outline" onClick={() => setTripSession(null)} disabled={tripConfirming}>Hủy phiên</Button>
+                  <Button onClick={() => void confirmTripSession()} disabled={tripConfirming || sessionArrivedSackIds.length === 0 || sessionUnexpectedSackIds.length > 0}>
+                    {tripConfirming ? 'Đang xác nhận...' : 'Xác nhận nhập hàng'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+>>>>>>> 652fce01594347f00281419fdec7fdd0a1b5f065
           {lastTrip && (
             <Card className="border-emerald-200 bg-emerald-50/40">
               <CardHeader><CardTitle className="text-base">Xe inbound vừa vào kho</CardTitle></CardHeader>

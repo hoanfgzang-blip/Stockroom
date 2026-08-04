@@ -16,7 +16,10 @@ import type {
   Sack,
   Shift,
   Trip,
+  TripQrCheckInRequest,
+  TripQrCheckInResult,
   TripQrManifest,
+  TripQrTokenIssueResponse,
   Zone,
 } from '@/types'
 import type { AuthUser } from '@/auth/AuthContext'
@@ -172,17 +175,10 @@ export type ScanTripSealResult = {
   loadedCount: number
   sealedAt?: string | null
 }
-export type TripQrCheckInResult = {
-  tripId: string
-  carId: string
-  status: string
-  expectedCount: number
-  arrivedCount: number
-  receivedCount: number
-  missingSackIds: string[]
-  unexpectedSackIds: string[]
-  zoneId?: string | null
-  zoneName?: string | null
+export type { TripQrCheckInResult } from '@/types'
+export type TripQrResolveResult = {
+  manifestVersion: number
+  manifest: TripQrManifest
 }
 export type TripPalletsResult = {
   palletCount: number
@@ -195,6 +191,8 @@ export const tripsApi = {
   sacks: (id: string) => api.get<Sack[]>(`/Trips/${id}/sacks`),
   pallets: (id: string) => api.get<TripPalletsResult>(`/Trips/${id}/pallets`),
   qrManifest: (id: string) => api.get<TripQrManifest>(`/Trips/${id}/qr-manifest`),
+  issueQrToken: (tripId: string) => api.post<TripQrTokenIssueResponse>(`/Trips/${tripId}/qr-token`, {}),
+  resolveQr: (qrValue: string) => api.post<TripQrResolveResult>('/Trips/resolve-qr', { qrValue }),
   create: (data: CreateTripRequest) => api.post<Trip>('/Trips', data),
   loadSack: (tripId: string, sackId: string) =>
     api.post<LoadTripSackResult>(`/Trips/${tripId}/load-sack/${sackId}`, {}),
@@ -208,11 +206,10 @@ export const tripsApi = {
   updateMyStatus: (id: string, status: 'InProgress' | 'Completed') =>
     api.patch(`/Trips/my/${id}/status`, status),
   checkIn: (id: string) => api.post<TripCheckInResult>(`/Trips/${id}/check-in`, {}),
-  checkInByQr: (manifest: TripQrManifest, arrivedSackIds?: string[]) =>
-    api.post<TripQrCheckInResult>('/Trips/check-in-by-qr', {
-      manifest,
-      arrivedSackIds: arrivedSackIds ?? manifest.sacks.map((sack) => sack.sackId),
-    }),
+  checkInByQr: (tripId: string, arrivedSackIds: string[]) => {
+    const request: TripQrCheckInRequest = { tripId, arrivedSackIds }
+    return api.post<TripQrCheckInResult>('/Trips/check-in-by-qr', request)
+  },
 }
 
 export const routingRulesApi = {

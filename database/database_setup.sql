@@ -97,6 +97,18 @@ CREATE TABLE IF NOT EXISTS trip (
     CONSTRAINT chk_trip_time CHECK (end_at IS NULL OR end_at >= created_at)
 );
 
+-- Bảng Token QR chuyến xe
+CREATE TABLE IF NOT EXISTS trip_qr_token (
+    token_hash VARCHAR(64) PRIMARY KEY,
+    trip_id VARCHAR(50) NOT NULL REFERENCES trip(trip_id) ON DELETE RESTRICT,
+    issued_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,
+    manifest_version INTEGER NOT NULL DEFAULT 1
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_trip_qr_token_token_hash ON trip_qr_token (token_hash);
+CREATE INDEX IF NOT EXISTS ix_trip_qr_token_trip_id ON trip_qr_token (trip_id);
+
 -- Bảng Bao hàng vận chuyển
 CREATE TABLE IF NOT EXISTS sack (
     sack_id VARCHAR(50) PRIMARY KEY,

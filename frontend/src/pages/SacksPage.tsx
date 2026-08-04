@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { BrowserQRCodeSvgWriter } from '@zxing/browser'
+import { Eye } from 'lucide-react'
 import { locationsApi, sacksApi } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
 import { formatDateTime, statusLabel } from '@/lib/utils'
@@ -29,12 +32,32 @@ const statusFilters = [
   },
 ] as const
 
+function SackQrCode({ value }: { value: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const svg = new BrowserQRCodeSvgWriter().write(value, 240, 240)
+    svg.classList.add('h-full', 'w-full')
+    svg.setAttribute('role', 'img')
+    svg.setAttribute('aria-label', `Mã QR chứa ${value}`)
+    container.replaceChildren(svg)
+
+    return () => container.replaceChildren()
+  }, [value])
+
+  return <div ref={containerRef} className="aspect-square w-56 max-w-full rounded-lg border border-slate-200 bg-white p-2" />
+}
+
 export default function SacksPage() {
   const [sacks, setSacks] = useState<Sack[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeStatus, setActiveStatus] = useState<(typeof statusFilters)[number]['value']>('Sorting')
+  const [selectedSack, setSelectedSack] = useState<Sack | null>(null)
 
   useEffect(() => {
     Promise.all([sacksApi.all(), locationsApi.all()])
@@ -104,6 +127,7 @@ export default function SacksPage() {
                 <TableHead>Chuyến xe</TableHead>
                 <TableHead>Điểm đến</TableHead>
                 <TableHead>Thời điểm tạo</TableHead>
+                <TableHead className="whitespace-nowrap">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -118,6 +142,18 @@ export default function SacksPage() {
                   <TableCell>{sack.tripId ?? '—'}</TableCell>
                   <TableCell>{destName(sack.sDestination)}</TableCell>
                   <TableCell>{formatDateTime(sack.createdAt)}</TableCell>
+                  <TableCell>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedSack(sack)}
+                      title={`Xem thông tin và QR của ${sack.sackId}`}
+                    >
+                      <Eye className="h-4 w-4" />
+                      Xem
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -128,6 +164,61 @@ export default function SacksPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={selectedSack !== null}
+        onClose={() => setSelectedSack(null)}
+        title={selectedSack ? `Thông tin sack ${selectedSack.sackId}` : 'Thông tin sack'}
+        description="Mã QR bên dưới chứa ID của sack để quét và tra cứu."
+        className="max-w-2xl"
+      >
+        {selectedSack && (
+          <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_14rem]">
+            <dl className="grid content-start gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs text-slate-500">Mã bao</dt>
+                <dd className="mt-1 break-all font-mono text-sm font-semibold text-primary">{selectedSack.sackId}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Trạng thái</dt>
+                <dd className="mt-1"><Badge status={selectedSack.status}>{statusLabel(selectedSack.status)}</Badge></dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Điểm đến</dt>
+                <dd className="mt-1 text-sm font-medium">{destName(selectedSack.sDestination)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Pallet chứa</dt>
+                <dd className="mt-1 break-all font-mono text-sm">{selectedSack.palletId ?? 'Chưa gán'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Zone</dt>
+                <dd className="mt-1 break-all font-mono text-sm">{selectedSack.zoneId ?? 'Chưa gán'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Chuyến xe</dt>
+                <dd className="mt-1 break-all font-mono text-sm">{selectedSack.tripId ?? 'Chưa gán'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Thời điểm tạo</dt>
+                <dd className="mt-1 text-sm">{formatDateTime(selectedSack.createdAt)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Thời điểm kết thúc</dt>
+                <dd className="mt-1 text-sm">{formatDateTime(selectedSack.endAt)}</dd>
+              </div>
+            </dl>
+
+            <div className="flex flex-col items-center rounded-xl border border-slate-200 bg-slate-50 p-4 text-center">
+              <p className="text-sm font-semibold text-slate-800">QR ID sack</p>
+              <div className="mt-3">
+                <SackQrCode value={selectedSack.sackId} />
+              </div>
+              <p className="mt-3 break-all font-mono text-xs text-slate-600">{selectedSack.sackId}</p>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </div>
   )
 }

@@ -105,6 +105,38 @@ export interface TripQrManifest {
   sacks: TripQrSack[]
 }
 
+export interface TripQrCheckInRequest {
+  tripId: string
+  arrivedSackIds: string[]
+}
+
+export interface TripQrCheckInResult {
+  tripId: string
+  carId: string
+  status: string
+  expectedCount: number
+  arrivedCount: number
+  receivedCount: number
+  missingSackIds: string[]
+  unexpectedSackIds: string[]
+  zoneId?: string | null
+  zoneName?: string | null
+}
+
+export interface TripQrTokenIssueResponse {
+  tripId: string
+  qrValue: string
+  issuedAt: string
+  expiresAt: string
+  manifestVersion: number
+  status: string
+  driverName: string
+  carInfo: string
+  originName: string
+  destinationName: string
+  sackCount: number
+}
+
 export interface RoutingRule {
   ruleId: string
   currentLocationID: string

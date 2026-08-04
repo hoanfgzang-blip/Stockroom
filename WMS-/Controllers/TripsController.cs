@@ -398,7 +398,7 @@ namespace WMS_.Controllers
             if (trip == null) return NotFound(new { message = "Khong tim thay ma chuyen xe trong QR." });
 
             if (trip.Destination != myLocationId)
-                return BadRequest(new { message = "Chuyến xe không có điểm đến là hub của bạn. Không thể check-in bằng QR!" });
+                return BadRequest(new { message = "Chuyen xe khong co diem den la hub cua ban. Khong the check-in bang QR!" });
 
             if (trip.Type is not ("Inbound" or "Outbound")) return BadRequest(new { message = "Loai chuyen xe khong hop le." });
             if (trip.Status == "Completed") return Conflict(new { message = "Chuyen xe nay da duoc xac nhan den kho." });
@@ -413,15 +413,17 @@ namespace WMS_.Controllers
             var dbSacks = await _db.Sacks.Where(sack => sack.TripId == tripId).ToListAsync();
             var expectedIds = dbSacks.Select(sack => sack.SackId).OrderBy(id => id).ToList();
             var manifestIds = request.Manifest.Sacks.Select(sack => sack.SackId.Trim()).Where(id => id.Length > 0).Distinct().OrderBy(id => id).ToList();
-            var arrivedIds = (request.ArrivedSackIds.Count > 0 ? request.ArrivedSackIds : manifestIds)
-                .Select(id => id.Trim()).Where(id => id.Length > 0).Distinct().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var arrivedIds = request.ArrivedSackIds
+                 .Select(id => id.Trim()).Where(id => id.Length > 0).Distinct().ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             var missingIds = expectedIds.Where(id => !arrivedIds.Contains(id)).ToList();
             var unexpectedIds = arrivedIds.Where(id => !expectedIds.Contains(id, StringComparer.OrdinalIgnoreCase)).OrderBy(id => id).ToList();
+
             if (unexpectedIds.Count > 0)
                 return Conflict(new TripQrCheckInResponse(trip.TripId, trip.CarId, trip.Status, expectedIds.Count, arrivedIds.Count, 0, missingIds, unexpectedIds, inboundZone?.ZoneId, inboundZone?.ZoneName));
 
             var received = 0;
+
             foreach (var sack in dbSacks.Where(sack => arrivedIds.Contains(sack.SackId)))
             {
                 if (trip.Type == "Inbound")
@@ -438,15 +440,25 @@ namespace WMS_.Controllers
                 received++;
             }
 
-            if (missingIds.Count == 0)
+            foreach (var sack in dbSacks.Where(sack => missingIds.Contains(sack.SackId)))
             {
-                trip.Status = "Completed";
-                trip.UpdatedAt = DateTime.UtcNow;
+                sack.Status = "Missing"; 
+            }
+
+            if (missingIds.Count == 0 && expectedIds.Count > 0)
+            {
+                trip.Status = "Completed"; 
+            }
+            else if (received > 0)
+            {
+                trip.Status = "CompletedWithMissing";
             }
             else
             {
-                trip.Status = "InProgress";
+                return BadRequest(new { message = "Khong co bao hang nao duoc xac nhan den. Vui long quet it nhat 1 bao hang." });
             }
+
+            trip.UpdatedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();

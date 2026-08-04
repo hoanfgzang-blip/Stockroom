@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using WMS_.Data;
 using WMS_.Data.Entities;
+using System.ComponentModel.DataAnnotations;
 
 public sealed class CreateLocationRequest
 {

@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/table'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
 import { cn, formatDateTime, generatePreviewId, statusLabel } from '@/lib/utils'
-import type { InboundOrder, InboundOrderItem, Pallet, TripQrManifest, Zone } from '@/types'
+import type { InboundOrder, InboundOrderItem, Pallet, Trip, TripQrManifest, Zone } from '@/types'
 
 type ScanResult = {
   id: number
@@ -210,6 +210,12 @@ export default function InboundOrdersPage() {
   const [processing, setProcessing] = useState(false)
   const [results, setResults] = useState<ScanResult[]>([])
   const [lastCheckIn, setLastCheckIn] = useState<InboundCheckInResult | null>(null)
+  
+  // Trip check-in state
+  const [inboundTrips, setInboundTrips] = useState<Trip[]>([])
+  const [selectedTripId, setSelectedTripId] = useState('')
+  const [tripPallets, setTripPallets] = useState<string[]>([])
+  const [tripPalletCount, setTripPalletCount] = useState(0)
 
   // Camera scanner state
   const [cameraOpen, setCameraOpen] = useState(false)
@@ -244,12 +250,15 @@ export default function InboundOrdersPage() {
   // Load pallets and zones when dialog opens
   useEffect(() => {
     if (qrDialogOpen && !palletLoaded) {
-      Promise.allSettled([palletsApi.all(), zonesApi.all()])
-        .then(([palletsResult, zonesResult]) => {
+      Promise.allSettled([palletsApi.all(), zonesApi.all(), tripsApi.all()])
+        .then(([palletsResult, zonesResult, tripsResult]) => {
           const loadedPallets = palletsResult.status === 'fulfilled' ? palletsResult.value : []
           const loadedZones = zonesResult.status === 'fulfilled' ? zonesResult.value : []
+          const trips = tripsResult.status === 'fulfilled' ? tripsResult.value : []
+          
           setPallets(loadedPallets)
           setZones(loadedZones)
+          setInboundTrips(trips.filter(t => t.type === 'Inbound' && t.status.startsWith('Completed')))
           setPalletLoaded(true)
           // Auto-select the most recently created pallet (last in list, sorted by ID which contains timestamp)
           if (loadedPallets.length > 0) {
@@ -260,9 +269,25 @@ export default function InboundOrdersPage() {
         .catch(() => {
           setPallets([])
           setZones([])
+          setInboundTrips([])
         })
     }
   }, [qrDialogOpen, palletLoaded])
+
+  useEffect(() => {
+    if (selectedTripId) {
+      tripsApi.pallets(selectedTripId).then(res => {
+        setTripPallets(res.pallets.map(p => p.palletId))
+        setTripPalletCount(res.palletCount)
+      }).catch(() => {
+        setTripPallets([])
+        setTripPalletCount(0)
+      })
+    } else {
+      setTripPallets([])
+      setTripPalletCount(0)
+    }
+  }, [selectedTripId])
 
   const stopCamera = useCallback(() => {
     scannerControlsRef.current?.stop()
@@ -342,11 +367,21 @@ export default function InboundOrdersPage() {
     if (!scannedCode || processing) return
     setProcessing(true)
     try {
+      if (selectedTripId) {
+        if (tripPallets.includes(scannedCode)) {
+          addScanResult(scannedCode, 'Pallet hợp lệ và thuộc chuyến xe này.', true)
+        } else {
+          addScanResult(scannedCode, 'Pallet không thuộc chuyến xe này.', false)
+        }
+        return
+      }
+
       // Case 1: Check if scanned value is a JSON Trip QR Manifest
       const manifest = parseTripManifest(scannedCode)
       if (manifest) {
         const tripResult: InboundCheckInResult = await tripsApi.checkInByQr(manifest)
         setLastCheckIn(tripResult)
+        setSelectedTripId(tripResult.tripId)
         addScanResult(tripResult.tripId, formatTripQrResult(tripResult, manifest), (tripResult.missingSackIds?.length ?? 0) === 0)
         fetchOrders()
         // After successful QR check-in, reload pallets and select newest
@@ -375,6 +410,7 @@ export default function InboundOrdersPage() {
       // Case 3: Process as standard Trip check-in code
       const tripResult: InboundCheckInResult = await tripsApi.checkIn(scannedCode)
       setLastCheckIn(tripResult)
+      setSelectedTripId(tripResult.tripId)
       addScanResult(tripResult.tripId, formatTripQrResult(tripResult), true)
       fetchOrders()
       // After successful check-in, reload pallets and select newest
@@ -598,6 +634,38 @@ export default function InboundOrdersPage() {
         className="max-w-xl"
       >
         <div className="space-y-4">
+          {/* Chọn chuyến xe Inbound */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <Label htmlFor="inbound-trip" className="text-xs">Chuyến xe Inbound</Label>
+              {selectedTripId && (
+                <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setSelectedTripId('')}>
+                  Đổi chuyến khác
+                </Button>
+              )}
+            </div>
+            <Select
+              id="inbound-trip"
+              value={selectedTripId}
+              onChange={(e) => setSelectedTripId(e.target.value)}
+              className="h-9 text-sm"
+              disabled={processing}
+            >
+              <option value="">-- Quét mã QR chuyến xe mới hoặc chọn chuyến đã tới --</option>
+              {inboundTrips.map((trip) => (
+                <option key={trip.tripId} value={trip.tripId}>
+                  {trip.tripId} - Xe {trip.carId}
+                </option>
+              ))}
+            </Select>
+            {selectedTripId && (
+              <p className="mt-1.5 text-xs text-slate-500">
+                Chuyến xe đang chọn có <span className="font-medium text-slate-700">{tripPalletCount}</span> pallet.
+                {tripPallets.length > 0 && ` (${tripPallets.join(', ')})`}
+              </p>
+            )}
+          </div>
+
           {/* Form quét / nhập mã vạch */}
           <form onSubmit={handleProcessScan} className="flex gap-2">
             <div className="relative flex-1">
@@ -605,7 +673,7 @@ export default function InboundOrdersPage() {
                 ref={inputRef}
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
-                placeholder="Quét mã QR chuyến xe, mã đơn hoặc mã bao..."
+                placeholder={selectedTripId ? "Quét mã pallet để kiểm tra..." : "Quét mã QR chuyến xe, mã đơn hoặc mã bao..."}
                 disabled={processing}
                 className="font-mono pr-9"
               />

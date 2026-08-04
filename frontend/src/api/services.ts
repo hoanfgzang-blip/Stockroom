@@ -184,11 +184,16 @@ export type TripQrCheckInResult = {
   zoneId?: string | null
   zoneName?: string | null
 }
+export type TripPalletsResult = {
+  palletCount: number
+  pallets: Pallet[]
+}
 export const tripsApi = {
   all: (status?: string) =>
     api.get<Trip[]>(`/Trips${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Trip>(`/Trips/${id}`),
   sacks: (id: string) => api.get<Sack[]>(`/Trips/${id}/sacks`),
+  pallets: (id: string) => api.get<TripPalletsResult>(`/Trips/${id}/pallets`),
   qrManifest: (id: string) => api.get<TripQrManifest>(`/Trips/${id}/qr-manifest`),
   create: (data: CreateTripRequest) => api.post<Trip>('/Trips', data),
   loadSack: (tripId: string, sackId: string) =>

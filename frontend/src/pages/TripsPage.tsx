@@ -49,31 +49,22 @@ export default function TripsPage() {
   const [scanModalNotice, setScanModalNotice] = useState<string | null>(null)
   const scanInputRef = useRef<HTMLInputElement>(null)
 
-  const load = () => {
-    setLoading(true)
-    Promise.allSettled([tripsApi.all(), employeesApi.all(), carsApi.all(), locationsApi.all(), sacksApi.all()])
-      .then((results) => {
-        const tripsData = results[0].status === "fulfilled" ? results[0].value : []
-        const employeeData = results[1].status === "fulfilled" ? results[1].value : []
-        const carData = results[2].status === "fulfilled" ? results[2].value : []
-        const locationData = results[3].status === "fulfilled" ? results[3].value : []
-        const sackData = results[4].status === "fulfilled" ? results[4].value : []
-
-        setTrips(tripsData)
-        setEmployees(employeeData)
-        setCars(carData)
-        setLocations(locationData)
-        setSacks(sackData)
+  const load = (showSpinner = false) => {
+    if (showSpinner) setLoading(true)
+    Promise.all([tripsApi.all(), employeesApi.all(), carsApi.all(), locationsApi.all(), sacksApi.all()])
+      .then(([tripData, employeeData, carData, locationData, sackData]) => {
+        setTrips(tripData); setEmployees(employeeData); setCars(carData); setLocations(locationData); setSacks(sackData)
       })
       .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false))
+      .finally(() => { if (showSpinner) setLoading(false) })
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(true) }, [])
 
   const grouped = useMemo(() => {
+    const sorted = [...trips].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     const map: Record<string, Trip[]> = {}
-    TRIP_COLUMNS.forEach((column) => { map[column] = trips.filter((trip) => trip.status === column) })
+    TRIP_COLUMNS.forEach((column) => { map[column] = sorted.filter((trip) => trip.status === column) })
     return map
   }, [trips])
   const availableSacks = useMemo(() => sacks.filter((sack) => !sack.tripId), [sacks])
@@ -94,10 +85,18 @@ export default function TripsPage() {
     setSaving(true); setError(null)
     try {
       const created = await tripsApi.create(form)
+      const newTrip: Trip = {
+        ...created,
+        status: created.status || (form.type === 'Outbound' ? 'Loading' : 'Pending'),
+      }
       setCreateOpen(false)
       const message = form.type === 'Outbound' ? `Đã tạo ${created.tripId}. Chuyến đang chờ chất hàng.` : `Đã tạo ${created.tripId} với ${created.sackCount ?? form.sackIds.length} sack.`
       setNotice(message)
-      load()
+      setTrips((prev) => [newTrip, ...prev.filter((t) => t.tripId !== newTrip.tripId)])
+      if (form.sackIds.length > 0) {
+        setSacks((prev) => prev.map((s) => (form.sackIds.includes(s.sackId) ? { ...s, tripId: newTrip.tripId } : s)))
+      }
+      load(false)
     } catch (err) { setError((err as Error).message) } finally { setSaving(false) }
   }
 

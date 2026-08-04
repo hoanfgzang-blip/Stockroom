@@ -2,7 +2,6 @@ import { NavLink } from 'react-router-dom'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
-  Bell,
   Building2,
   Calendar,
   ChevronRight,
@@ -159,14 +158,7 @@ export function Topbar() {
           </select>
         </div>
 
-        <button
-          type="button"
-          className="relative rounded-lg border p-2 text-slate-500 hover:bg-slate-50"
-          aria-label="Thông báo"
-        >
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />
-        </button>
+
 
         <div className="flex items-center gap-3 rounded-lg border px-3 py-1.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">

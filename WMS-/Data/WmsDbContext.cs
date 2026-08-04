@@ -79,6 +79,16 @@ namespace WMS_.Data
                 .HasForeignKey(t => t.Destination)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<Trip>()
+                .HasIndex(t => t.SealCode)
+                .IsUnique();
+
+            modelBuilder.Entity<Trip>()
+                .HasOne(t => t.SealedByUser)
+                .WithMany()
+                .HasForeignKey(t => t.SealedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<Sack>()
                 .HasOne(s => s.Trip)
                 .WithMany()

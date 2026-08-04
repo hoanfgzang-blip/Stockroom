@@ -49,6 +49,17 @@ namespace WMS_.Data.Entities
         [Column("end_at")]
         public DateTime? UpdatedAt { get; set; }
 
+        [Column("seal_code")]
+        [MaxLength(100)]
+        public string? SealCode { get; set; }
+
+        [Column("sealed_at")]
+        public DateTime? SealedAt { get; set; }
+
+        [Column("sealed_by")]
+        [MaxLength(50)]
+        public string? SealedBy { get; set; }
+
         [NotMapped]
         public int SackCount { get; set; }
 
@@ -63,5 +74,8 @@ namespace WMS_.Data.Entities
 
         [ForeignKey("Destination")]
         public virtual Location DestinationLocation { get; set; } = null!;
+
+        [ForeignKey("SealedBy")]
+        public virtual UserAccount? SealedByUser { get; set; }
     }
 }

@@ -253,9 +253,17 @@ export default function InboundOrdersPage() {
     if (!scannedCode || processing) return
     setProcessing(true)
     try {
-      const manifest = parseTripManifest(scannedCode)
+      let manifest: TripQrManifest | null = null
+
+      if (scannedCode.startsWith('WMS-TRIP-QR:')) {
+        const resolveResult = await tripsApi.resolveQr(scannedCode)
+        manifest = resolveResult.manifest
+      } else {
+        manifest = parseTripManifest(scannedCode)
+      }
+
       if (!manifest) {
-        throw new Error('Mã vừa quét không phải QR manifest hợp lệ. Hãy quét mã QR in trên tờ manifest của xe.')
+        throw new Error('Mã vừa quét không hợp lệ. Hãy quét mã QR từ tờ manifest của xe.')
       }
       setTripManifest(manifest)
       setScannedSackIds([])
@@ -336,7 +344,7 @@ export default function InboundOrdersPage() {
     if (!tripManifest || checkingIn) return
     setCheckingIn(true)
     try {
-      const result = await tripsApi.checkInByQr(tripManifest, scannedSackIds)
+      const result = await tripsApi.checkInByQr(tripManifest.tripId, scannedSackIds)
       const checkInResult: InboundCheckInResult = {
         tripId: result.tripId, carId: result.carId, status: result.status,
         receivedCount: result.receivedCount, sackCount: result.receivedCount,

@@ -13,11 +13,6 @@ echo ========================================
 echo  WMS Local Runner
 echo ========================================
 
-if not exist "%PG_BIN%\pg_ctl.exe" (
-    echo [ERROR] Khong tim thay PostgreSQL tai: %PG_BIN%
-    pause
-    exit /b 1
-)
 
 if not exist "%BACKEND_DIR%\WMS-.csproj" (
     echo [ERROR] Khong tim thay backend WMS tai: %BACKEND_DIR%
@@ -31,16 +26,7 @@ if not exist "%FRONTEND_DIR%\package.json" (
     exit /b 1
 )
 
-echo [1/4] Dang bat PostgreSQL tren o D...
-"%PG_BIN%\pg_ctl.exe" -D "%PG_DATA%" -l "%PG_LOG%" start >nul 2>nul
 
-echo [2/4] Dang kiem tra PostgreSQL...
-"%PG_BIN%\pg_isready.exe" -h 127.0.0.1 -p 5432 >nul 2>nul
-if errorlevel 1 (
-    echo [ERROR] PostgreSQL chua san sang. Xem log: %PG_LOG%
-    pause
-    exit /b 1
-)
 
 echo [OK] PostgreSQL dang chay tai 127.0.0.1:5432
 

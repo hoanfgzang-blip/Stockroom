@@ -42,9 +42,19 @@ export default function TripsPage() {
 
   const load = () => {
     setLoading(true)
-    Promise.all([tripsApi.all(), employeesApi.all(), carsApi.all(), locationsApi.all(), sacksApi.all()])
-      .then(([tripData, employeeData, carData, locationData, sackData]) => {
-        setTrips(tripData); setEmployees(employeeData); setCars(carData); setLocations(locationData); setSacks(sackData)
+    Promise.allSettled([tripsApi.all(), employeesApi.all(), carsApi.all(), locationsApi.all(), sacksApi.all()])
+      .then((results) => {
+        const tripsData = results[0].status === "fulfilled" ? results[0].value : []
+        const employeeData = results[1].status === "fulfilled" ? results[1].value : []
+        const carData = results[2].status === "fulfilled" ? results[2].value : []
+        const locationData = results[3].status === "fulfilled" ? results[3].value : []
+        const sackData = results[4].status === "fulfilled" ? results[4].value : []
+
+        setTrips(tripsData)
+        setEmployees(employeeData)
+        setCars(carData)
+        setLocations(locationData)
+        setSacks(sackData)
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false))

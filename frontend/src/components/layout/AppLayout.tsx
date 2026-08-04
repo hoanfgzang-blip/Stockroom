@@ -12,7 +12,6 @@ import {
   Menu,
   Package,
   PanelLeftClose,
-  PanelLeftOpen,
   Route,
   ScanLine,
   Shield,

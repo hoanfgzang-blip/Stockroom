@@ -91,18 +91,8 @@ export interface TripQrSack {
 }
 
 export interface TripQrManifest {
-  kind: 'WMS_TRIP_MANIFEST'
-  version: 1
   tripId: string
-  type: string
-  status: string
-  driver: TripQrParty
-  vehicle: TripQrVehicle
-  origin: TripQrParty
-  destination: TripQrParty
-  createdAt: string
-  issuedAt: string
-  sacks: TripQrSack[]
+  sacks: string[]
 }
 
 export interface TripQrCheckInRequest {

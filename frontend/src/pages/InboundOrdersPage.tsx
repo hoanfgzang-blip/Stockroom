@@ -46,8 +46,6 @@ function parseTripManifest(value: string): TripQrManifest | null {
   try {
     const parsed = JSON.parse(value) as Partial<TripQrManifest>
     if (
-      parsed.kind !== 'WMS_TRIP_MANIFEST' ||
-      parsed.version !== 1 ||
       !parsed.tripId ||
       !Array.isArray(parsed.sacks)
     ) return null
@@ -57,12 +55,10 @@ function parseTripManifest(value: string): TripQrManifest | null {
   }
 }
 
-function formatTripQrResult(trip: InboundCheckInResult, manifest?: TripQrManifest | null) {
+function formatTripQrResult(trip: InboundCheckInResult) {
   const count = trip.sackCount ?? trip.receivedCount ?? 0
   const missingCount = trip.missingSackIds?.length ?? 0
-  const action = manifest?.type === 'Outbound'
-    ? `${count} bao đã được xác nhận nhận tại điểm đích`
-    : `${count} bao đã đưa vào ${trip.zoneName ?? trip.zoneId ?? 'zone nhập kho'}`
+  const action = `${count} bao đã đưa vào ${trip.zoneName ?? trip.zoneId ?? 'zone nhập kho'}`
   const suffix = missingCount > 0
     ? ` Còn thiếu ${missingCount} bao: ${trip.missingSackIds?.join(', ')}.`
     : ' Đã đến đủ hàng.'
@@ -272,7 +268,7 @@ export default function InboundOrdersPage() {
       setSelectedPalletId('')
       setSackFilter('all')
       setInboundStep('pallet-scan')
-      addResult(manifest.tripId, `Xe ${manifest.vehicle.id} đã đến. Manifest có ${manifest.sacks.length} bao. Tiếp tục quét pallet.`, true)
+      addResult(manifest.tripId, `Chuyến xe ${manifest.tripId} đã đến. Manifest có ${manifest.sacks.length} bao. Tiếp tục quét pallet.`, true)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Không thể đọc QR chuyến xe.'
       addResult(scannedCode, msg, false)
@@ -312,7 +308,7 @@ export default function InboundOrdersPage() {
         addResult(scannedCode, 'Bao này đã được ghi nhận là không thuộc chuyến.', false)
         return
       }
-      const isExpected = tripManifest.sacks.some((s) => s.sackId === scannedCode)
+      const isExpected = tripManifest.sacks.includes(scannedCode)
       if (!isExpected) {
         setWrongSackIds((prev) => [...prev, scannedCode])
         addResult(scannedCode, '⚠️ Bao KHÔNG thuộc chuyến xe này! Kiểm tra lại.', false)
@@ -352,7 +348,7 @@ export default function InboundOrdersPage() {
         missingSackIds: result.missingSackIds, unexpectedSackIds: result.unexpectedSackIds,
       }
       setLastCheckIn(checkInResult)
-      addResult(result.tripId, formatTripQrResult(checkInResult, tripManifest), result.missingSackIds.length === 0)
+      addResult(result.tripId, formatTripQrResult(checkInResult), result.missingSackIds.length === 0)
       fetchOrders()
       resetWizard()
     } catch (err: unknown) {
@@ -395,9 +391,9 @@ export default function InboundOrdersPage() {
   const allScanned = scannedCount === totalExpected && totalExpected > 0
 
   const filteredSacks = expectedSacks.filter((s) => {
-    if (sackFilter === 'scanned') return scannedSackIds.includes(s.sackId)
-    if (sackFilter === 'missing') return !scannedSackIds.includes(s.sackId)
-    if (sackFilter === 'wrong') return wrongSackIds.includes(s.sackId)
+    if (sackFilter === 'scanned') return scannedSackIds.includes(s)
+    if (sackFilter === 'missing') return !scannedSackIds.includes(s)
+    if (sackFilter === 'wrong') return wrongSackIds.includes(s)
     return true
   })
 
@@ -604,19 +600,13 @@ export default function InboundOrdersPage() {
               {/* Trip summary */}
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Chuyến xe đã nhận</p>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-2">
                   <div>
                     <p className="text-[10px] text-slate-400">Mã chuyến</p>
                     <p className="font-mono text-xs font-bold text-slate-900">{tripManifest.tripId}</p>
                   </div>
-                  <div>
-                    <p className="text-[10px] text-slate-400">Xe</p>
-                    <p className="text-xs font-semibold">{tripManifest.vehicle.id}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-slate-400">Từ</p>
-                    <p className="text-xs font-medium">{tripManifest.origin.name}</p>
-                  </div>
+                  
+                  
                   <div>
                     <p className="text-[10px] text-slate-400">Số bao</p>
                     <p className="text-xs font-bold text-primary">{tripManifest.sacks.length} bao</p>
@@ -676,8 +666,8 @@ export default function InboundOrdersPage() {
               <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs">
                 <div className="flex items-center gap-1.5">
                   <Truck className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                  <span className="text-slate-500">Xe:</span>
-                  <span className="font-mono font-semibold text-slate-800 truncate">{tripManifest.vehicle.id}</span>
+                  <span className="text-slate-500">Chuyến:</span>
+                  <span className="font-mono font-semibold text-slate-800 truncate">{tripManifest.tripId}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Package className="h-3.5 w-3.5 shrink-0 text-slate-400" />
@@ -787,10 +777,10 @@ export default function InboundOrdersPage() {
                   <div className="py-4 text-center text-xs text-slate-400">Không có bao nào trong bộ lọc này.</div>
                 ) : (
                   filteredSacks.map((sack) => {
-                    const isScanned = scannedSackIds.includes(sack.sackId)
+                    const isScanned = scannedSackIds.includes(sack)
                     return (
                       <div
-                        key={sack.sackId}
+                        key={sack}
                         className={`flex items-center gap-2 rounded-md border px-3 py-1.5 transition-colors ${
                           isScanned ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'
                         }`}
@@ -800,11 +790,9 @@ export default function InboundOrdersPage() {
                           : <div className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-slate-300" />
                         }
                         <p className={`font-mono text-xs font-bold truncate ${isScanned ? 'text-emerald-800' : 'text-slate-700'}`}>
-                          {sack.sackId}
+                          {sack}
                         </p>
-                        <span className={`ml-auto shrink-0 text-[10px] ${isScanned ? 'text-emerald-600' : 'text-slate-400'}`}>
-                          {sack.destination}
-                        </span>
+                        
                         <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                           isScanned ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
                         }`}>

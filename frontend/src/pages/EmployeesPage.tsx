@@ -248,7 +248,7 @@ export default function EmployeesPage() {
             <Label>Địa điểm kho</Label>
             <Combobox
               options={locationOptions}
-              value={form.locationId}
+              value={form.locationId || ''}
               onChange={(locationId) => setForm({ ...form, locationId, zoneId: '' })}
               placeholder="Search locations..."
             />

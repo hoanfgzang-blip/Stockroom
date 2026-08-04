@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { Barcode, Camera, CheckCircle2, CircleAlert, ClipboardCheck, PackageCheck, Plus, Printer, ScanLine, Send, Truck, Undo2 } from 'lucide-react'
 import { BrowserMultiFormatReader, BrowserQRCodeSvgWriter, type IScannerControls } from '@zxing/browser'

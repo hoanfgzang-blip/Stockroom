@@ -83,7 +83,7 @@ export default function EmployeesPage() {
     label: `${s.shiftName} (${formatTimeSpan(s.startAt)} – ${formatTimeSpan(s.endAt)})`,
   }))
 
-  const getLocationName = (id: string) => locations.find((l) => l.locationId === id)?.locationName ?? id
+  const getLocationName = (id?: string | null) => (id ? locations.find((l) => l.locationId === id)?.locationName ?? id : '—')
   const getZoneName = (id?: string | null) => zones.find((z) => z.zoneId === id)?.zoneName ?? id ?? '—'
   const getShiftName = (id: string) => {
     const s = shifts.find((sh) => sh.shiftId === id)

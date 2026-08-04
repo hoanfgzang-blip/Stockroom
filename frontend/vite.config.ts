@@ -13,7 +13,9 @@ export default defineConfig({
     assetsDir: 'Assets',
   },
   server: {
+    host: '0.0.0.0',
     port: 5173,
+    allowedHosts: ['phamduy.taila34f60.ts.net', 'wms.ice-tcv.id.vn', '100.125.44.63'],
     proxy: {
       '/api': {
         target: 'http://localhost:5295',

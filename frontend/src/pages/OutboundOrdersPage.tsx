@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { outboundOrdersApi } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Drawer } from '@/components/ui/dialog'
+import { Dialog, Drawer } from '@/components/ui/dialog'
+
 import {
   Table,
   TableBody,
@@ -14,6 +15,8 @@ import {
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
 import { cn, formatDateTime, statusLabel } from '@/lib/utils'
 import type { OutboundOrder, OutboundOrderItem } from '@/types'
+import { Button } from '@/components/ui/button'
+import { Camera, CheckCircle2, CircleAlert, QrCode, ScanLine } from 'lucide-react'
 
 export default function OutboundOrdersPage() {
   const [orders, setOrders] = useState<OutboundOrder[]>([])
@@ -21,6 +24,12 @@ export default function OutboundOrdersPage() {
   const [items, setItems] = useState<OutboundOrderItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [qrDialogOpen, setQrDialogOpen] = useState(false)
+
+    const [cameraOpen, setCameraOpen] = useState(false)
+    const [cameraError, setCameraError] = useState('')
+    const videoRef = useRef<HTMLVideoElement>(null)
+    const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     outboundOrdersApi
@@ -48,6 +57,12 @@ export default function OutboundOrdersPage() {
       <PageHeader
         title="Outbound Orders"
         description="Dispatch orders with inventory reservation linkage."
+        action={
+          <Button onClick={() => setQrDialogOpen(true)} variant="secondary">
+            <QrCode className="h-4 w-4 mr-1.5" />
+            Quét QR Outbound
+          </Button>
+        }
       />
 
       <Card>
@@ -133,6 +148,20 @@ export default function OutboundOrdersPage() {
           </div>
         )}
       </Drawer>
+
+      {/* modal dialog quét qr outbound */}
+      <Dialog
+        open={qrDialogOpen}
+        onClose={() => setQrDialogOpen(false)}
+        title="Quét QR Outbound"
+        description="Quét mã QR để truy xuất thông tin đơn hàng outbound."
+        className="max-w-xl"
+      >
+        <div className="space-y-4">
+          {/* form quet / nhap ma vach */}
+        </div>
+        
+      </Dialog>
     </div>
   )
 }

@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using WMS_.Data;
@@ -100,6 +102,13 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+// Cloudflare terminates HTTPS; trust forwarded scheme only from the local tunnel origin.
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+    KnownProxies = { IPAddress.Loopback }
+});
 
 if (app.Environment.IsDevelopment())
 {

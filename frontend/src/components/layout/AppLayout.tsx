@@ -2,7 +2,6 @@ import { NavLink } from 'react-router-dom'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
-  Bell,
   Building2,
   Calendar,
   ChevronRight,

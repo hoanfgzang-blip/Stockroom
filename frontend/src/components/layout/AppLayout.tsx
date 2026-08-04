@@ -13,7 +13,6 @@ import {
   PackageCheck,
   PanelLeftClose,
   Route,
-  ScanLine,
   Shield,
   Truck,
   UserCog,
@@ -49,7 +48,6 @@ const navGroups: NavGroup[] = [
   {
     label: 'Hàng hóa và đơn hàng',
       items: [
-        { to: '/operations/barcode-scanner', label: 'Quét mã vạch', icon: ScanLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
         { to: '/inventory/inbound', label: 'Đơn nhập kho', icon: ArrowDownToLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
         { to: '/operations/sorting', label: 'Phân loại', icon: PackageCheck, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
       { to: '/inventory/outbound', label: 'Đơn xuất kho', icon: ArrowUpFromLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },

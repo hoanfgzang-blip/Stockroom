@@ -54,7 +54,7 @@ function getSortingStage(processRole?: string | null): SortingStage {
     return {
       round: 'Phân loại lần 1',
       zoneLabel: 'Zone A',
-      description: 'Khu gom chung sau inbound cho cả hàng nội tỉnh và liên tỉnh.',
+      description: 'Quét sack sau inbound để xác định location đích hoặc hub next hop.',
     }
   }
   if (processRole === 'LocalOutbound') {
@@ -68,7 +68,7 @@ function getSortingStage(processRole?: string | null): SortingStage {
     return {
       round: 'Phân loại lần 2',
       zoneLabel: 'Zone C',
-      description: 'Nhận hàng liên tỉnh từ Zone A và gom theo hub next hop.',
+      description: 'Khu outbound liên tỉnh, nhận sack đã được phân tuyến từ Zone A.',
     }
   }
   return {
@@ -163,7 +163,7 @@ export default function SortingPage() {
       setSelectedPallet({ ...pallet, destinationLocationId: isZoneA ? null : palletDestinationId })
       setLastClassification(null)
       setPalletSelectionNotice(isZoneA
-        ? `Mọi sack sau inbound được gom tạm vào pallet ${pallet.palletId}. Từ đây quét lại vào Zone B hoặc Zone C theo tuyến.`
+        ? `Quét sack tại Zone A để hệ thống xác định location đích hoặc hub next hop trước khi đưa sang outbound.`
         : stage.zoneLabel === 'Zone C'
         ? `Sack ngoại tỉnh sẽ vào pallet ${pallet.palletId}. Hệ thống tra Routing Rule và chỉ nhận sack có hub next hop ${palletDestinationId}.`
         : `Sack nội tỉnh sẽ được đưa vào pallet ${pallet.palletId} · điểm phát ${palletDestinationId}.`)
@@ -259,7 +259,7 @@ export default function SortingPage() {
           palletId: assignment.palletId ?? palletId,
           zoneId: assignment.zoneId ?? sack.zoneId,
           nextHopId: assignment.nextHopId ?? sack.nextHopId,
-          status: selectedStage.zoneLabel === 'Zone A' ? 'Sorting' : 'Sorted',
+          status: 'Sorted',
         },
         assignment,
       })
@@ -297,7 +297,7 @@ export default function SortingPage() {
     <div>
       <PageHeader
         title="Phân loại hàng"
-        description="Mọi hàng đi qua Zone A sau inbound, sau đó được phân sang Zone B (nội tỉnh) hoặc Zone C (liên tỉnh)."
+        description="Zone A xác định tuyến/location; Zone B và Zone C chỉ tiếp nhận hàng đã phân tuyến để outbound."
         action={
           <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${hasSelectedPallet ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'}`}>
             <span className={`h-2 w-2 rounded-full ${hasSelectedPallet ? 'bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]' : 'bg-slate-300'}`} />
@@ -333,17 +333,17 @@ export default function SortingPage() {
                 <div className="mt-3 grid gap-3 lg:grid-cols-3">
                   <button type="button" aria-pressed={activeProcessRole === 'LocalSortBuffer'} onClick={() => selectWorkflow('LocalSortBuffer')} className={`rounded-2xl border p-4 text-left transition-all ${activeProcessRole === 'LocalSortBuffer' ? 'border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-200' : 'border-blue-200 bg-white/85 text-slate-900 hover:border-blue-400 hover:bg-blue-50'}`}>
                     <div className="flex items-start justify-between gap-3"><span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${activeProcessRole === 'LocalSortBuffer' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'}`}>Trạm 01</span><span className={`text-xs font-semibold ${activeProcessRole === 'LocalSortBuffer' ? 'text-blue-100' : 'text-blue-600'}`}>Lần 1</span></div>
-                    <p className="mt-4 text-base font-bold">Zone A · Gom sau inbound</p><p className={`mt-1 text-xs leading-5 ${activeProcessRole === 'LocalSortBuffer' ? 'text-blue-100' : 'text-slate-600'}`}>Nhận toàn bộ sack sau inbound, không phân biệt nội tỉnh hay liên tỉnh.</p>
-                    <p className={`mt-4 flex items-center gap-1.5 text-xs font-semibold ${activeProcessRole === 'LocalSortBuffer' ? 'text-white' : 'text-blue-700'}`}>Zone A <ArrowRight className="h-3.5 w-3.5" /> Zone B / Zone C</p>
+                    <p className="mt-4 text-base font-bold">Zone A · Phân tuyến</p><p className={`mt-1 text-xs leading-5 ${activeProcessRole === 'LocalSortBuffer' ? 'text-blue-100' : 'text-slate-600'}`}>Quét toàn bộ sack sau inbound để xác định location đích hoặc hub next hop.</p>
+                    <p className={`mt-4 flex items-center gap-1.5 text-xs font-semibold ${activeProcessRole === 'LocalSortBuffer' ? 'text-white' : 'text-blue-700'}`}>Zone A <ArrowRight className="h-3.5 w-3.5" /> Outbound B / C</p>
                   </button>
                   <button type="button" aria-pressed={activeProcessRole === 'InterprovinceOutbound'} onClick={() => selectWorkflow('InterprovinceOutbound')} className={`rounded-2xl border p-4 text-left transition-all ${activeProcessRole === 'InterprovinceOutbound' ? 'border-violet-500 bg-violet-600 text-white shadow-lg shadow-violet-200' : 'border-violet-200 bg-white/85 text-slate-900 hover:border-violet-400 hover:bg-violet-50'}`}>
                     <div className="flex items-start justify-between gap-3"><span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${activeProcessRole === 'InterprovinceOutbound' ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-700'}`}>Trạm 02</span><span className={`text-xs font-semibold ${activeProcessRole === 'InterprovinceOutbound' ? 'text-violet-100' : 'text-violet-600'}`}>Lần 2</span></div>
-                    <p className="mt-4 text-base font-bold">Zone C · Liên tỉnh</p><p className={`mt-1 text-xs leading-5 ${activeProcessRole === 'InterprovinceOutbound' ? 'text-violet-100' : 'text-slate-600'}`}>Nhận sack ngoại tỉnh từ Zone A; server tra Routing Rule và đối chiếu hub next hop của pallet.</p>
+                    <p className="mt-4 text-base font-bold">Zone C · Outbound liên tỉnh</p><p className={`mt-1 text-xs leading-5 ${activeProcessRole === 'InterprovinceOutbound' ? 'text-violet-100' : 'text-slate-600'}`}>Nhận sack ngoại tỉnh đã có hub next hop từ Zone A để gom outbound.</p>
                     <p className={`mt-4 flex items-center gap-1.5 text-xs font-semibold ${activeProcessRole === 'InterprovinceOutbound' ? 'text-white' : 'text-violet-700'}`}>Zone C <ArrowRight className="h-3.5 w-3.5" /> Xuất kho</p>
                   </button>
                   <button type="button" aria-pressed={activeProcessRole === 'LocalOutbound'} onClick={() => selectWorkflow('LocalOutbound')} className={`rounded-2xl border p-4 text-left transition-all ${activeProcessRole === 'LocalOutbound' ? 'border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'border-emerald-200 bg-white/85 text-slate-900 hover:border-emerald-400 hover:bg-emerald-50'}`}>
                     <div className="flex items-start justify-between gap-3"><span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${activeProcessRole === 'LocalOutbound' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700'}`}>Trạm 03</span><span className={`text-xs font-semibold ${activeProcessRole === 'LocalOutbound' ? 'text-emerald-100' : 'text-emerald-600'}`}>Lần 2</span></div>
-                    <p className="mt-4 text-base font-bold">Zone B · Nội tỉnh</p><p className={`mt-1 text-xs leading-5 ${activeProcessRole === 'LocalOutbound' ? 'text-emerald-100' : 'text-slate-600'}`}>Nhận sack từ Zone A, chia theo điểm phát và chuẩn bị outbound.</p>
+                    <p className="mt-4 text-base font-bold">Zone B · Outbound nội tỉnh</p><p className={`mt-1 text-xs leading-5 ${activeProcessRole === 'LocalOutbound' ? 'text-emerald-100' : 'text-slate-600'}`}>Nhận sack nội tỉnh đã có location đích từ Zone A để gom outbound.</p>
                     <p className={`mt-4 flex items-center gap-1.5 text-xs font-semibold ${activeProcessRole === 'LocalOutbound' ? 'text-white' : 'text-emerald-700'}`}>Zone B <ArrowRight className="h-3.5 w-3.5" /> Xuất kho</p>
                   </button>
                 </div>

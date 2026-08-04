@@ -9,7 +9,7 @@ export const zoneProcessRoleMeta: Record<string, { label: string; description: s
   },
   LocalSortBuffer: {
     label: 'Zone A',
-    description: 'Khu gom chung sau inbound; từ đây chia sang Zone B hoặc Zone C.',
+    description: 'Quét sack sau inbound để xác định location đích hoặc hub next hop.',
   },
   LocalOutbound: {
     label: 'Zone B',
@@ -17,7 +17,7 @@ export const zoneProcessRoleMeta: Record<string, { label: string; description: s
   },
   InterprovinceOutbound: {
     label: 'Zone C',
-    description: 'Nhận hàng liên tỉnh từ Zone A và outbound theo hub next hop.',
+    description: 'Khu outbound liên tỉnh, nhận sack đã được phân tuyến từ Zone A.',
   },
 }
 

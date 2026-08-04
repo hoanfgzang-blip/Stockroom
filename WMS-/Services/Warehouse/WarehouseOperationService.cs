@@ -122,7 +122,7 @@ namespace WMS_.Services.Warehouse
                 return new(false, "Bao hàng đang vận chuyển hoặc đã giao, không thể phân loại lại.");
 
             SackRoute? route = null;
-            if (ZoneProcessRoles.IsDispatch(targetZone.ProcessRole))
+            if (targetZone.ProcessRole == ZoneProcessRoles.LocalSortBuffer)
             {
                 try
                 {
@@ -132,6 +132,26 @@ namespace WMS_.Services.Warehouse
                 {
                     return new(false, ex.Message);
                 }
+
+                var flowError = await ValidateTargetZoneFlowAsync(sack, targetPallet, targetZone, route);
+                if (flowError != null) return new(false, flowError);
+            }
+            else if (ZoneProcessRoles.IsDispatch(targetZone.ProcessRole))
+            {
+                if (string.IsNullOrWhiteSpace(sack.NextHopId))
+                    return new(false, "Bao phải được phân tuyến tại Zone A trước khi vào khu outbound.");
+
+                try
+                {
+                    route = await ResolveSackRouteAsync(locationId, sack.SDestination);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return new(false, ex.Message);
+                }
+
+                if (!string.Equals(sack.NextHopId, route.NextHopId, StringComparison.OrdinalIgnoreCase))
+                    return new(false, "Tuyến của bao đã thay đổi. Hãy đưa bao trở lại Zone A để phân tuyến lại.");
 
                 var flowError = await ValidateTargetZoneFlowAsync(sack, targetPallet, targetZone, route);
                 if (flowError != null) return new(false, flowError);
@@ -179,8 +199,8 @@ namespace WMS_.Services.Warehouse
             var oldValues = new { sack.PalletId, sack.ZoneId, sack.NextHopId, sack.Status };
             sack.PalletId = palletId;
             sack.ZoneId = targetPallet.ZoneId;
-            sack.NextHopId = ZoneProcessRoles.IsDispatch(targetZone.ProcessRole) ? route?.NextHopId : null;
-            sack.Status = targetZone.ProcessRole == ZoneProcessRoles.LocalSortBuffer ? "Sorting" : "Sorted";
+            sack.NextHopId = route?.NextHopId ?? sack.NextHopId;
+            sack.Status = "Sorted";
             if (targetPallet.Status == "Empty") targetPallet.Status = "Occupied";
 
             if (previousPalletId != null && pallets.TryGetValue(previousPalletId, out var previousPallet))

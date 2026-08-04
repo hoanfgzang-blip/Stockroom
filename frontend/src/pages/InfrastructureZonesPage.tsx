@@ -108,7 +108,7 @@ export default function InfrastructureZonesPage() {
                 >
                   <option value="General">Khu chung</option>
                   <option value="InboundReceipt">Inbound</option>
-                  <option value="LocalSortBuffer">Zone A - Gom toàn bộ hàng sau inbound</option>
+                  <option value="LocalSortBuffer">Zone A - Phân tuyến/location sau inbound</option>
                   <option value="LocalOutbound">Zone B - Outbound nội tỉnh</option>
                   <option value="InterprovinceOutbound">Zone C - Outbound ngoại tỉnh</option>
                 </Select>

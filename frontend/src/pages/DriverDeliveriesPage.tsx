@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowRight, CheckCircle2, Circle, MapPin, PackageCheck, Play, ScanLine, Truck } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Circle, MapPin, PackageCheck, Play, Truck } from 'lucide-react'
 import { tripsApi } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -92,7 +91,7 @@ export default function DriverDeliveriesPage() {
           {selectedTrip && <section className="space-y-5" aria-label="Chi tiết chuyến giao">
             <Card><CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2"><Truck className="h-5 w-5 text-primary" />Chuyến {selectedTrip.tripId}</CardTitle><CardDescription className="mt-2">Phương tiện: {selectedTrip.carId} · Loại chuyến: {selectedTrip.type}</CardDescription></div><Badge status={selectedTrip.status}>{tripColumnLabel(selectedTrip.status)}</Badge></div></CardHeader><CardContent>
               <div className="grid gap-3 sm:grid-cols-2"><div className="rounded-lg border border-slate-200 p-4"><p className="text-xs font-medium uppercase text-slate-500">Điểm lấy hàng</p><p className="mt-2 flex items-center gap-2 text-sm font-semibold"><MapPin className="h-4 w-4 text-slate-500" />{selectedTrip.origin}</p></div><div className="rounded-lg border border-slate-200 p-4"><p className="text-xs font-medium uppercase text-slate-500">Điểm giao</p><p className="mt-2 flex items-center gap-2 text-sm font-semibold"><MapPin className="h-4 w-4 text-primary" />{selectedTrip.destination}</p></div></div>
-              <div className="mt-5 flex flex-wrap gap-3">{selectedTrip.status === 'Pending' && <Button onClick={() => void updateTrip('InProgress')} disabled={updating}><Play className="h-4 w-4" />Bắt đầu chuyến</Button>}{selectedTrip.status === 'InProgress' && <><Button onClick={() => void updateTrip('Completed')} disabled={updating}><CheckCircle2 className="h-4 w-4" />Hoàn tất chuyến</Button><Link to="/operations/barcode-scanner" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50"><ScanLine className="h-4 w-4" />Quét xác nhận giao</Link></>}</div>
+              <div className="mt-5 flex flex-wrap gap-3">{selectedTrip.status === 'Pending' && <Button onClick={() => void updateTrip('InProgress')} disabled={updating}><Play className="h-4 w-4" />Bắt đầu chuyến</Button>}{selectedTrip.status === 'InProgress' && <Button onClick={() => void updateTrip('Completed')} disabled={updating}><CheckCircle2 className="h-4 w-4" />Hoàn tất chuyến</Button>}</div>
             </CardContent></Card>
 
             <Card><CardHeader><div className="flex items-center justify-between gap-3"><CardTitle className="flex items-center gap-2 text-base"><PackageCheck className="h-5 w-5 text-primary" />Bao hàng trên chuyến</CardTitle><span className="text-sm text-slate-500">{deliveredCount}/{sacks.length} đã giao</span></div></CardHeader><CardContent>

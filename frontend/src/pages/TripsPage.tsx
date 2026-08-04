@@ -51,9 +51,21 @@ export default function TripsPage() {
 
   const load = (showSpinner = false) => {
     if (showSpinner) setLoading(true)
-    Promise.all([tripsApi.all(), employeesApi.all(), carsApi.all(), locationsApi.all(), sacksApi.all()])
-      .then(([tripData, employeeData, carData, locationData, sackData]) => {
-        setTrips(tripData); setEmployees(employeeData); setCars(carData); setLocations(locationData); setSacks(sackData)
+    Promise.allSettled([tripsApi.all(), employeesApi.all(), carsApi.all(), locationsApi.all(), sacksApi.all()])
+      .then(([tripsRes, employeesRes, carsRes, locationsRes, sacksRes]) => {
+        if (tripsRes.status === 'fulfilled') setTrips(tripsRes.value)
+        if (employeesRes.status === 'fulfilled') setEmployees(employeesRes.value)
+        if (carsRes.status === 'fulfilled') setCars(carsRes.value)
+        if (locationsRes.status === 'fulfilled') setLocations(locationsRes.value)
+        if (sacksRes.status === 'fulfilled') setSacks(sacksRes.value)
+
+        const errors = [tripsRes, employeesRes, carsRes, locationsRes, sacksRes]
+          .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+          .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+
+        if (errors.length > 0) {
+          setError(`Đồng bộ dữ liệu thất bại: ${errors.join(', ')}`)
+        }
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => { if (showSpinner) setLoading(false) })

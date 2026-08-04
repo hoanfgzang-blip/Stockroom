@@ -142,9 +142,11 @@ namespace WMS_.Controllers
         public async Task<IActionResult> PreparePalletForOutbound(string palletId, [FromBody] FinalizePalletRequest request)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "SYSTEM";
+            var locationId = User.FindFirstValue("location_id");
+            if (string.IsNullOrWhiteSpace(locationId)) return Forbid();
             try
             {
-                var success = await _operationService.PreparePalletForOutboundAsync(palletId, request.OutboundOrderId, userId);
+                var success = await _operationService.PreparePalletForOutboundAsync(palletId, request.OutboundOrderId, userId, locationId);
                 return success
                     ? Ok(new { message = "Đã chuẩn bị Pallet và gán vào đơn xuất kho thành công!" })
                     : BadRequest(new { message = "Không thể chuẩn bị Pallet." });

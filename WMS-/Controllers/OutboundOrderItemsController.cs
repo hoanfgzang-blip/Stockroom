@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using WMS_.Data;
 using WMS_.Data.Entities;
 using WMS_.Services;
+using WMS_.Configuration;
+using WMS_.Security;
 
 namespace WMS_.Controllers
 {
@@ -22,13 +24,23 @@ namespace WMS_.Controllers
         /// <summary>Get all items for an outbound order</summary>
         [HttpGet("by-order/{orderId}")]
         public async Task<ActionResult<IEnumerable<OutboundOrderItem>>> GetByOrder(string orderId)
-            => await _db.OutboundOrderItems.Where(i => i.OutboundOrderId == orderId).ToListAsync();
+        {
+            if (await _outboundService.GetOrderAsync(orderId) == null) return NotFound();
+            var currentSackIds = QuerySacksAtCurrentHub().Select(sack => sack.SackId);
+            return await _db.OutboundOrderItems
+                .Where(item => item.OutboundOrderId == orderId && currentSackIds.Contains(item.SackId))
+                .ToListAsync();
+        }
 
         /// <summary>Get item by ID</summary>
         [HttpGet("{id}")]
         public async Task<ActionResult<OutboundOrderItem>> GetById(string id)
         {
-            var item = await _db.OutboundOrderItems.FindAsync(id);
+            var currentSackIds = QuerySacksAtCurrentHub().Select(sack => sack.SackId);
+            var item = await _db.OutboundOrderItems
+                .FirstOrDefaultAsync(candidate => candidate.OutboundOrderItemId == id && currentSackIds.Contains(candidate.SackId));
+            if (item != null && await _outboundService.GetOrderAsync(item.OutboundOrderId) == null)
+                item = null;
             return item == null ? NotFound() : Ok(item);
         }
 
@@ -52,6 +64,9 @@ namespace WMS_.Controllers
         public async Task<IActionResult> Update(string id, [FromBody] OutboundOrderItem item)
         {
             if (id != item.OutboundOrderItemId) return BadRequest();
+            if (await _outboundService.GetOrderAsync(item.OutboundOrderId) == null ||
+                !await QuerySacksAtCurrentHub().AnyAsync(sack => sack.SackId == item.SackId))
+                return Forbid();
             _db.Entry(item).State = EntityState.Modified;
             try { await _db.SaveChangesAsync(); }
             catch (DbUpdateConcurrencyException)
@@ -63,11 +78,27 @@ namespace WMS_.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
-            var item = await _db.OutboundOrderItems.FindAsync(id);
+            var currentSackIds = QuerySacksAtCurrentHub().Select(sack => sack.SackId);
+            var item = await _db.OutboundOrderItems
+                .FirstOrDefaultAsync(candidate => candidate.OutboundOrderItemId == id && currentSackIds.Contains(candidate.SackId));
             if (item == null) return NotFound();
+            if (await _outboundService.GetOrderAsync(item.OutboundOrderId) == null) return Forbid();
             _db.OutboundOrderItems.Remove(item);
             await _db.SaveChangesAsync();
             return NoContent();
+        }
+
+        private IQueryable<Sack> QuerySacksAtCurrentHub()
+        {
+            var hubId = User.HubId();
+            if (string.IsNullOrWhiteSpace(hubId))
+                return _db.Sacks.Where(_ => false);
+
+            return _db.Sacks.Where(sack =>
+                OperationalHubScope.OutboundDestinationIds.Contains(sack.SDestination) &&
+                ((sack.ZoneId != null && sack.Zone.LocationId == hubId) ||
+                 (sack.PalletId != null && sack.Pallet.Zone.LocationId == hubId) ||
+                 (sack.TripId != null && (sack.Trip.Origin == hubId || sack.Trip.Destination == hubId))));
         }
     }
 }

@@ -3,15 +3,16 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { Barcode, Camera, CheckCircle2, CircleAlert, ClipboardCheck, PackageCheck, Plus, Printer, ScanLine, Send, Truck, Undo2 } from 'lucide-react'
 import { BrowserMultiFormatReader, BrowserQRCodeSvgWriter, type IScannerControls } from '@zxing/browser'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
-import { locationsApi, outboundOrdersApi, palletsApi, sacksApi, tripsApi, type TripCheckInResult, type TripQrCheckInResult } from '@/api/services'
+import { locationsApi, palletsApi, sacksApi, tripsApi, type TripCheckInResult, type TripQrCheckInResult } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog } from '@/components/ui/dialog'
 import { Label, Select } from '@/components/ui/input'
 import { PageHeader } from '@/components/shared/PageHeader'
-import type { Location, OutboundOrder, Sack, TripQrManifest } from '@/types'
+import type { Location, Sack, TripQrManifest } from '@/types'
 import { useAuth } from '@/auth/AuthContext'
+import { zoneProcessRoleLabel } from '@/lib/zoneFlow'
 
 type ScanMode = 'inbound' | 'sorting' | 'outbound' | 'received'
 type ScanResult = {
@@ -32,6 +33,12 @@ type TripCheckInSession = {
   manifest: TripQrManifest
   arrivedSackIds: string[]
   unexpectedSackIds: string[]
+}
+
+type OutboundLoadSession = {
+  tripId: string
+  qrValue: string
+  loadedSackIds: string[]
 }
 
 const TRIP_QR_PREFIX = 'WMS-TRIP-QR:'
@@ -125,7 +132,7 @@ function printBarcode(value: string) {
 const modes: Array<{ id: ScanMode; title: string; description: string; icon: typeof PackageCheck }> = [
   { id: 'inbound', title: 'Xe inbound', description: 'Quét QR xe, sau đó kiểm đếm từng sack trước khi xác nhận', icon: Truck },
   { id: 'sorting', title: 'Chia chọn', description: 'Xác nhận bao đang được xử lý', icon: ScanLine },
-  { id: 'outbound', title: 'Xuất kho', description: 'Giữ bao cho đơn xuất đã chọn', icon: Send },
+  { id: 'outbound', title: 'Xuất kho', description: 'Quét QR xe, chất sack, quét lại QR xe để chốt', icon: Send },
   { id: 'received', title: 'Nhận hàng', description: 'Xác nhận bao đã đến điểm đích', icon: ClipboardCheck },
 ]
 
@@ -169,14 +176,19 @@ export default function BarcodeScannerPage() {
   const [mode, setMode] = useState<ScanMode>(isDriver ? 'received' : 'inbound')
   const [barcode, setBarcode] = useState('')
   const [sortingPalletId, setSortingPalletId] = useState('')
-  const [orders, setOrders] = useState<OutboundOrder[]>([])
   const [locations, setLocations] = useState<Location[]>([])
-  const [outboundOrderId, setOutboundOrderId] = useState('')
   const [lastSack, setLastSack] = useState<Sack | null>(null)
   const [lastTrip, setLastTrip] = useState<InboundCheckInResult | null>(null)
   const [tripSession, setTripSession] = useState<TripCheckInSession | null>(null)
+  const [outboundLoadSession, setOutboundLoadSession] = useState<OutboundLoadSession | null>(null)
   const [tripConfirming, setTripConfirming] = useState(false)
-  const [classification, setClassification] = useState<{ label: string; destinationName?: string | null; zoneName?: string | null } | null>(null)
+  const [classification, setClassification] = useState<{
+    label: string
+    destinationName?: string | null
+    zoneName?: string | null
+    processRole?: string | null
+    nextHopName?: string | null
+  } | null>(null)
   const [results, setResults] = useState<ScanResult[]>([])
   const [processing, setProcessing] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -195,20 +207,15 @@ export default function BarcodeScannerPage() {
 
   useEffect(() => {
     if (isDriver) {
-      setOrders([])
       setLocations([])
       return
     }
-    Promise.allSettled([
-      outboundOrdersApi.all(), locationsApi.all()])
-      .then(([outboundOrdersResult, warehouseLocationsResult]) => {
-        const outboundOrders = outboundOrdersResult.status === 'fulfilled' ? outboundOrdersResult.value : []
+    Promise.allSettled([locationsApi.dispatchDestinations()])
+      .then(([warehouseLocationsResult]) => {
         const warehouseLocations = warehouseLocationsResult.status === 'fulfilled' ? warehouseLocationsResult.value : []
-        setOrders(outboundOrders.filter((order) => order.status !== 'Completed'))
         setLocations(warehouseLocations)
       })
       .catch(() => {
-        setOrders([])
         setLocations([])
       })
   }, [isDriver])
@@ -238,6 +245,38 @@ export default function BarcodeScannerPage() {
         : `Đã mở phiên đối chiếu xe ${manifest.tripId}. Hãy quét từng sack thực tế.`,
       true,
     )
+  }
+
+  const openOutboundLoadSession = async (scannedValue: string) => {
+    const manifest = (await tripsApi.resolveQr(scannedValue)).manifest
+    const loadedSackIds = (manifest.sacks ?? [])
+      .map((sack) => typeof sack === 'string' ? sack : sack.sackId)
+      .filter(Boolean)
+    setOutboundLoadSession({ tripId: manifest.tripId, qrValue: scannedValue, loadedSackIds })
+    setTripSession(null)
+    setLastTrip(null)
+    setLastSack(null)
+    addResult(manifest.tripId, 'Đã mở phiên chất hàng bằng QR xe. Hãy quét từng sack, sau đó quét lại QR xe để hoàn tất xuất kho.', true)
+  }
+
+  const loadOutboundSack = async (scannedCode: string) => {
+    if (!outboundLoadSession) return
+    const sack = await sacksApi.get(scannedCode)
+    const result = await tripsApi.loadSack(outboundLoadSession.tripId, sack.sackId)
+    setLastSack({ ...sack, tripId: outboundLoadSession.tripId, status: 'Loaded' })
+    setOutboundLoadSession((current) => current
+      ? { ...current, loadedSackIds: [...current.loadedSackIds, sack.sackId] }
+      : current)
+    addResult(sack.sackId, `Đã chất sack lên xe. Hiện có ${result.loadedCount} sack trên chuyến.`, true)
+  }
+
+  const departOutboundByQr = async (scannedValue: string) => {
+    if (!outboundLoadSession) return
+    const result = await tripsApi.departByQr(scannedValue)
+    setLastTrip({ ...result, sackCount: result.loadedCount })
+    setLastSack(null)
+    setOutboundLoadSession(null)
+    addResult(result.tripId, `Đã quét QR xe lần hai. Xuất kho hoàn tất với ${result.loadedCount} sack; xe đang vận chuyển.`, true)
   }
 
   const recordTripSack = (scannedSackId: string) => {
@@ -287,13 +326,29 @@ export default function BarcodeScannerPage() {
     setProcessing(true)
     try {
       if (scannedCode.startsWith(TRIP_QR_PREFIX)) {
-        await openTripSession(scannedCode)
+        if (mode === 'outbound') {
+          if (outboundLoadSession) {
+            await departOutboundByQr(scannedCode)
+          } else {
+            await openOutboundLoadSession(scannedCode)
+          }
+        } else {
+          await openTripSession(scannedCode)
+        }
         return
       }
 
       const legacyManifest = parseTripManifest(scannedCode)
       if (legacyManifest) {
+        if (mode === 'outbound') {
+          throw new Error('Xuất kho cần QR xe dạng WMS-TRIP-QR: mới.')
+        }
         await openTripSession(scannedCode, legacyManifest)
+        return
+      }
+
+      if (outboundLoadSession) {
+        await loadOutboundSack(scannedCode)
         return
       }
 
@@ -306,6 +361,10 @@ export default function BarcodeScannerPage() {
         throw new Error('Hãy quét QR xe để mở phiên đối chiếu trước khi quét sack.')
       }
 
+      if (mode === 'outbound') {
+        throw new Error('Hãy quét QR xe trước, sau đó mới quét sack để chất hàng.')
+      }
+
       const sack = await sacksApi.get(scannedCode)
       setLastSack(sack)
       setLastTrip(null)
@@ -314,14 +373,24 @@ export default function BarcodeScannerPage() {
         const palletId = sortingPalletId.trim()
         if (!palletId) throw new Error('Quét hoặc nhập mã pallet trước khi quét bao hàng.')
         const result = await palletsApi.assignSack(palletId, sack.sackId)
-        setLastSack({ ...sack, palletId: result.palletId ?? palletId, zoneId: result.zoneId ?? null, status: 'Sorted' })
-        const label = result.classification === 'IntraProvince' ? 'Hàng nội tỉnh' : result.classification === 'InterProvince' ? 'Hàng liên tỉnh' : 'Đã phân loại'
-        setClassification({ label, destinationName: result.destinationName, zoneName: result.zoneName })
+        setLastSack({
+          ...sack,
+          palletId: result.palletId ?? palletId,
+          zoneId: result.zoneId ?? null,
+          nextHopId: result.nextHopId ?? null,
+          status: 'Sorted',
+        })
+        const label = result.processRole
+          ? `${zoneProcessRoleLabel(result.processRole)} - ${result.classification === 'InterProvince' ? 'hàng ngoại tỉnh' : 'hàng nội tỉnh'}`
+          : result.classification === 'IntraProvince' ? 'Hàng nội tỉnh' : result.classification === 'InterProvince' ? 'Hàng liên tỉnh' : 'Đã phân loại'
+        setClassification({
+          label,
+          destinationName: result.destinationName,
+          zoneName: result.zoneName,
+          processRole: result.processRole,
+          nextHopName: result.nextHopName,
+        })
         addResult(sack.sackId, `${result.message} Pallet hiện có ${result.assignedSackCount} bao.`, true)
-      } else if (mode === 'outbound') {
-        if (!outboundOrderId) throw new Error('Chọn đơn xuất trước khi quét bao hàng.')
-        await outboundOrdersApi.reserveSack(outboundOrderId, sack.sackId)
-        addResult(sack.sackId, 'Đã giữ bao hàng cho đơn xuất.', true)
       } else {
         await sacksApi.confirmReceived(sack.sackId)
         setLastSack({ ...sack, status: 'Received' })
@@ -337,8 +406,8 @@ export default function BarcodeScannerPage() {
     }
   }
 
-  const selectedOrder = orders.find((order) => order.outboundOrderId === outboundOrderId)
-  const sessionExpectedSackIds = tripSession?.manifest.sacks.map((sack) => sack.sackId) ?? []
+  const sessionExpectedSackIds = tripSession?.manifest.sacks
+    .map((sack) => typeof sack === 'string' ? sack : sack.sackId) ?? []
   const sessionArrivedSackIds = tripSession?.arrivedSackIds ?? []
   const sessionUnexpectedSackIds = tripSession?.unexpectedSackIds ?? []
   const sessionArrivedSet = new Set(sessionArrivedSackIds.map((id) => id.toLowerCase()))
@@ -370,7 +439,13 @@ export default function BarcodeScannerPage() {
     setProcessing(true)
     try {
       const result = await palletsApi.reassignSack(palletId, lastSack.sackId)
-      setLastSack({ ...lastSack, palletId: result.palletId ?? palletId, zoneId: result.zoneId ?? null, status: 'Sorted' })
+      setLastSack({
+        ...lastSack,
+        palletId: result.palletId ?? palletId,
+        zoneId: result.zoneId ?? null,
+        nextHopId: result.nextHopId ?? null,
+        status: 'Sorted',
+      })
       addResult(lastSack.sackId, result.message, true)
     } catch (error) {
       addResult(lastSack.sackId, error instanceof Error ? error.message : 'Không thể chuyển bao sang pallet mới.', false)
@@ -385,7 +460,7 @@ export default function BarcodeScannerPage() {
     setProcessing(true)
     try {
       const result = await palletsApi.removeSack(lastSack.palletId, lastSack.sackId)
-      setLastSack({ ...lastSack, palletId: null, zoneId: null, status: 'Sorting' })
+      setLastSack({ ...lastSack, palletId: null, zoneId: null, nextHopId: null, status: 'Sorting' })
       addResult(lastSack.sackId, result.message, true)
     } catch (error) {
       addResult(lastSack.sackId, error instanceof Error ? error.message : 'Không thể tháo bao khỏi pallet.', false)
@@ -463,7 +538,11 @@ export default function BarcodeScannerPage() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setMode(item.id)}
+                  onClick={() => {
+                    setMode(item.id)
+                    if (item.id !== 'outbound') setOutboundLoadSession(null)
+                    if (item.id !== 'inbound') setTripSession(null)
+                  }}
                   className={`min-h-28 rounded-lg border p-4 text-left transition-colors ${
                     active ? 'border-primary bg-blue-50 ring-2 ring-primary/20' : 'border-slate-200 bg-white hover:border-slate-300'
                   }`}
@@ -486,26 +565,11 @@ export default function BarcodeScannerPage() {
             <CardContent>
               <form onSubmit={processScan} className="space-y-5">
                 {mode === 'outbound' && (
-                  <div>
-                    <Label htmlFor="outbound-order">Đơn xuất</Label>
-                    <Select
-                      id="outbound-order"
-                      value={outboundOrderId}
-                      onChange={(event) => setOutboundOrderId(event.target.value)}
-                      className="mt-1"
-                    >
-                      <option value="">Chọn đơn xuất cần xử lý</option>
-                      {orders.map((order) => (
-                        <option key={order.outboundOrderId} value={order.outboundOrderId}>
-                          {order.outboundOrderNumber} - {order.outboundCustomerName}
-                        </option>
-                      ))}
-                    </Select>
-                    {selectedOrder && (
-                      <p className="mt-2 text-xs text-slate-500">
-                        Điểm đến: <span className="font-medium text-slate-700">{selectedOrder.outboundDestination}</span>
-                      </p>
-                    )}
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                    <p className="font-semibold">Quy trình xuất kho</p>
+                    <p className="mt-1 text-xs leading-5 text-blue-800">
+                      1. Quét QR xe để mở chuyến. 2. Quét từng sack để chất lên xe. 3. Quét lại QR xe để hoàn tất xuất kho.
+                    </p>
                   </div>
                 )}
 
@@ -535,14 +599,14 @@ export default function BarcodeScannerPage() {
                 )}
 
                 <div>
-                   <Label htmlFor="barcode">{tripSession ? 'Mã sack thực tế' : mode === 'inbound' ? 'Mã QR chuyến xe inbound' : 'Mã bao hàng'}</Label>
+                    <Label htmlFor="barcode">{tripSession ? 'Mã sack thực tế' : mode === 'inbound' ? 'Mã QR chuyến xe inbound' : mode === 'outbound' ? outboundLoadSession ? 'Mã sack hoặc QR xe để chốt' : 'Mã QR xe outbound' : 'Mã bao hàng'}</Label>
                   <div className="mt-1 flex gap-3">
                     <input
                       ref={inputRef}
                       id="barcode"
                       value={barcode}
                       onChange={(event) => setBarcode(event.target.value)}
-                       placeholder={tripSession ? 'Quét từng mã SACK-...' : mode === 'inbound' ? 'Quét QR WMS-TRIP-QR:...' : 'Quét hoặc nhập mã, ví dụ SACK-...'}
+                        placeholder={tripSession ? 'Quét từng mã SACK-...' : mode === 'inbound' ? 'Quét QR WMS-TRIP-QR:...' : mode === 'outbound' ? outboundLoadSession ? 'Quét mã SACK-... hoặc QR xe' : 'Quét QR WMS-TRIP-QR:...' : 'Quét hoặc nhập mã, ví dụ SACK-...'}
                       autoComplete="off"
                       className="flex h-14 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-base outline-none ring-primary focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
                        disabled={processing || tripConfirming}
@@ -559,7 +623,7 @@ export default function BarcodeScannerPage() {
                 </div>
 
                 <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                   {mode === 'inbound' ? 'Quét QR xe để mở phiên đối chiếu, sau đó quét từng sack. Chưa bấm xác nhận thì server chưa đổi trạng thái.' : mode === 'sorting' ? 'Quét pallet trước, sau đó quét từng bao để đưa vào pallet đó.' : 'Mẹo: cấu hình máy quét gửi phím Enter sau mã để tự động xử lý ngay sau khi quét.'}
+                    {mode === 'inbound' ? 'Quét QR xe để mở phiên đối chiếu, sau đó quét từng sack. Chưa bấm xác nhận thì server chưa đổi trạng thái.' : mode === 'outbound' ? 'QR xe lần đầu mở phiên. Mỗi mã sack sẽ được chất lên xe ngay trên server. Quét lại đúng QR xe sau khi đủ hàng để chuyển xe sang đang vận chuyển.' : mode === 'sorting' ? 'Quét pallet trước, sau đó quét từng bao để đưa vào pallet đó.' : 'Mẹo: cấu hình máy quét gửi phím Enter sau mã để tự động xử lý ngay sau khi quét.'}
                 </p>
               </form>
             </CardContent>
@@ -616,14 +680,39 @@ export default function BarcodeScannerPage() {
             </Card>
           )}
 
+          {outboundLoadSession && (
+            <Card className="border-amber-200 bg-amber-50/50">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between gap-3 text-base">
+                  <span>Phiên chất hàng outbound</span>
+                  <Badge status="Loading">Đang chất hàng</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 text-sm sm:grid-cols-2">
+                  <div><p className="text-xs text-slate-500">Mã chuyến</p><p className="mt-1 font-mono font-semibold">{outboundLoadSession.tripId}</p></div>
+                  <div><p className="text-xs text-slate-500">Sack đã chất</p><p className="mt-1 font-semibold">{outboundLoadSession.loadedSackIds.length} sack</p></div>
+                </div>
+                <p className="rounded-lg border border-amber-200 bg-white p-3 text-sm text-amber-900">
+                  Đã mở QR xe. Tiếp tục quét từng sack; khi đủ hàng, quét lại đúng QR xe để hoàn tất xuất kho.
+                </p>
+                {outboundLoadSession.loadedSackIds.length > 0 && (
+                  <div className="max-h-28 space-y-1 overflow-y-auto rounded-lg border border-amber-200 bg-white p-3">
+                    {outboundLoadSession.loadedSackIds.map((sackId) => <p key={sackId} className="font-mono text-xs text-amber-900">{sackId}</p>)}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {lastTrip && (
             <Card className="border-emerald-200 bg-emerald-50/40">
-              <CardHeader><CardTitle className="text-base">Xe inbound vừa vào kho</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">{lastTrip.status === 'InProgress' ? 'Xe outbound đã xuất kho' : 'Xe inbound vừa vào kho'}</CardTitle></CardHeader>
               <CardContent><div className="grid gap-4 sm:grid-cols-4">
                 <div><p className="text-xs text-slate-500">Mã chuyến</p><p className="mt-1 font-mono font-semibold">{lastTrip.tripId}</p></div>
                 <div><p className="text-xs text-slate-500">Xe</p><p className="mt-1 font-medium">{lastTrip.carId}</p></div>
-                <div><p className="text-xs text-slate-500">Bao đã nhận</p><p className="mt-1 font-semibold">{lastTrip.sackCount ?? lastTrip.receivedCount ?? 0} bao</p></div>
-                <div><p className="text-xs text-slate-500">Zone hiện tại</p><p className="mt-1 font-medium">{lastTrip.zoneName ?? lastTrip.zoneId ?? 'Chưa xác định'}</p></div>
+                <div><p className="text-xs text-slate-500">Bao đã xử lý</p><p className="mt-1 font-semibold">{lastTrip.sackCount ?? lastTrip.loadedCount ?? lastTrip.receivedCount ?? 0} bao</p></div>
+                <div><p className="text-xs text-slate-500">Trạng thái</p><p className="mt-1 font-medium">{lastTrip.status === 'InProgress' ? 'Đang vận chuyển' : lastTrip.zoneName ?? lastTrip.zoneId ?? 'Đã nhận'}</p></div>
               </div></CardContent>
             </Card>
           )}
@@ -639,6 +728,7 @@ export default function BarcodeScannerPage() {
                 <div><p className="text-xs text-slate-500">Điểm đến</p><p className="mt-1 text-sm font-medium">{lastSack.sDestination}</p></div>
                 <div><p className="text-xs text-slate-500">Pallet chứa</p><p className="mt-1 font-mono text-sm font-semibold">{lastSack.palletId ?? 'Chưa gán'}</p></div><div><p className="text-xs text-slate-500">Khu vực</p><p className="mt-1 font-mono text-sm font-semibold">{lastSack.zoneId ?? 'Chưa gán'}</p></div>
                 </div>
+                {lastSack.nextHopId && <p className="mt-4 text-sm text-slate-600"><span className="font-semibold">Điểm xuất / next hop:</span> {lastSack.nextHopId}</p>}
                 {mode === 'sorting' && lastSack.palletId && (
                   <div className="mt-5 flex flex-wrap gap-3 border-t border-slate-100 pt-4">
                     {sortingPalletId.trim() && sortingPalletId.trim() !== lastSack.palletId && <Button variant="outline" size="sm" onClick={() => void reassignLastSack()} disabled={processing}>Chuyển sang pallet đang quét</Button>}
@@ -733,8 +823,8 @@ export default function BarcodeScannerPage() {
       </Dialog>
 
 
-      <Dialog open={classification !== null} onClose={() => setClassification(null)} title={classification?.label ?? 'Kết quả phân loại'} description="Kết quả được xác định từ tỉnh của điểm đến và zone của pallet đã quét.">
-        <div className="space-y-3 text-sm text-slate-700"><p><span className="font-semibold">Điểm đến:</span> {classification?.destinationName ?? 'Chưa xác định'}</p><p><span className="font-semibold">Zone hiện tại:</span> {classification?.zoneName ?? 'Chưa xác định'}</p><div className="flex justify-end"><Button onClick={() => setClassification(null)}>Tiếp tục quét</Button></div></div>
+      <Dialog open={classification !== null} onClose={() => setClassification(null)} title={classification?.label ?? 'Kết quả phân loại'} description="Server xác định lane theo hub hiện tại, điểm đến cuối và rule next hop.">
+        <div className="space-y-3 text-sm text-slate-700"><p><span className="font-semibold">Điểm đến cuối:</span> {classification?.destinationName ?? 'Chưa xác định'}</p><p><span className="font-semibold">Zone hiện tại:</span> {classification?.zoneName ?? 'Chưa xác định'}</p>{classification?.nextHopName && <p><span className="font-semibold">Điểm xuất / next hop:</span> {classification.nextHopName}</p>}<div className="flex justify-end"><Button onClick={() => setClassification(null)}>Tiếp tục quét</Button></div></div>
       </Dialog>
 
       <Dialog

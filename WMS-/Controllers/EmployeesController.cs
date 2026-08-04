@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using WMS_.Configuration;
 using WMS_.Data;
 using WMS_.Data.Entities;
-using WMS_.Configuration;
+using WMS_.Security;
 
 namespace WMS_.Controllers
 {
@@ -23,6 +24,8 @@ namespace WMS_.Controllers
         {
             var query = _db.Employees
                 .Where(employee => employee.LocationId == null || OperationalHubScope.HubIds.Contains(employee.LocationId));
+            if (!string.IsNullOrWhiteSpace(locationId) && !OperationalHubScope.IsHub(locationId))
+                return BadRequest("Hub không thuộc phạm vi vận hành.");
             if (!string.IsNullOrWhiteSpace(role))
                 query = query.Where(e => e.RoleName == role);
             if (!string.IsNullOrWhiteSpace(locationId))
@@ -47,8 +50,11 @@ namespace WMS_.Controllers
         [HttpPost]
         public async Task<ActionResult<Employee>> Create([FromBody] Employee employee)
         {
-            if (employee.LocationId != null && !OperationalHubScope.IsHub(employee.LocationId))
-                return BadRequest("Nhân viên chỉ được gán vào 3 hub vận hành.");
+            if (!string.IsNullOrWhiteSpace(employee.LocationId) && !OperationalHubScope.IsHub(employee.LocationId))
+                return BadRequest("Nhân viên chỉ được gán vào hub vận hành.");
+            if (!string.IsNullOrWhiteSpace(employee.ZoneId) &&
+                !await _db.Zones.AnyAsync(zone => zone.ZoneId == employee.ZoneId && zone.LocationId == employee.LocationId))
+                return BadRequest("Zone của nhân viên phải thuộc hub của tài khoản.");
             // Tự sinh ID cho nhân viên nếu chưa có
             if (string.IsNullOrWhiteSpace(employee.EmployeeId))
             {
@@ -78,8 +84,15 @@ namespace WMS_.Controllers
         public async Task<IActionResult> Update(string id, [FromBody] Employee employee)
         {
             if (id != employee.EmployeeId) return BadRequest();
-            if (employee.LocationId != null && !OperationalHubScope.IsHub(employee.LocationId))
-                return BadRequest("Nhân viên chỉ được gán vào 3 hub vận hành.");
+            var existing = await _db.Employees.AsNoTracking().FirstOrDefaultAsync(item =>
+                item.EmployeeId == id &&
+                (item.LocationId == null || OperationalHubScope.HubIds.Contains(item.LocationId)));
+            if (existing == null) return NotFound();
+            if (!string.IsNullOrWhiteSpace(employee.LocationId) && !OperationalHubScope.IsHub(employee.LocationId))
+                return BadRequest("Nhân viên chỉ được gán vào hub vận hành.");
+            if (!string.IsNullOrWhiteSpace(employee.ZoneId) &&
+                !await _db.Zones.AnyAsync(zone => zone.ZoneId == employee.ZoneId && zone.LocationId == employee.LocationId))
+                return BadRequest("Zone của nhân viên phải thuộc hub của tài khoản.");
             _db.Entry(employee).State = EntityState.Modified;
             try { await _db.SaveChangesAsync(); }
             catch (DbUpdateConcurrencyException)
@@ -91,7 +104,9 @@ namespace WMS_.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
-            var emp = await _db.Employees.FindAsync(id);
+            var emp = await _db.Employees.FirstOrDefaultAsync(item =>
+                item.EmployeeId == id &&
+                (item.LocationId == null || OperationalHubScope.HubIds.Contains(item.LocationId)));
             if (emp == null) return NotFound();
             _db.Employees.Remove(emp);
             await _db.SaveChangesAsync();

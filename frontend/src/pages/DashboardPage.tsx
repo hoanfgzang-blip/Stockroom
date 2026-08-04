@@ -19,11 +19,11 @@ import {
   Truck,
   Warehouse,
 } from 'lucide-react'
-import { dashboardApi, inboundOrdersApi, outboundOrdersApi, reservationsApi, sacksApi, tripsApi } from '@/api/services'
+import { dashboardApi, inboundOrdersApi, outboundOrdersApi, sacksApi, tripsApi } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
-import type { DashboardSummary, InboundOrder, InventoryReservation, OutboundOrder, Sack, Trip } from '@/types'
+import type { DashboardSummary, InboundOrder, OutboundOrder, Sack, Trip } from '@/types'
 import { formatDateTime } from '@/lib/utils'
 
 const PIE_COLORS = ['#2563eb', '#f59e0b', '#10b981', '#64748b', '#ef4444']
@@ -36,7 +36,6 @@ export default function DashboardPage() {
   const [inbound, setInbound] = useState<InboundOrder[]>([])
   const [outbound, setOutbound] = useState<OutboundOrder[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
-  const [expiring, setExpiring] = useState<InventoryReservation[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,7 +51,6 @@ export default function DashboardPage() {
       inboundOrdersApi.all(),
       outboundOrdersApi.all(),
       tripsApi.all(),
-      reservationsApi.all('Active'),
     ])
       .then((results) => {
         if (results[0].status === 'fulfilled') {
@@ -66,15 +64,6 @@ export default function DashboardPage() {
         setInbound(results[2].status === 'fulfilled' ? results[2].value : [])
         setOutbound(results[3].status === 'fulfilled' ? results[3].value : [])
         setTrips(results[4].status === 'fulfilled' ? results[4].value : [])
-        
-        if (results[5].status === 'fulfilled') {
-          const soon = results[5].value
-            .filter((r) => new Date(r.expiresAt).getTime() - Date.now() < 4 * 3600000)
-            .slice(0, 5)
-          setExpiring(soon)
-        } else {
-          setExpiring([])
-        }
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
@@ -370,17 +359,19 @@ export default function DashboardPage() {
             <CardTitle>Phân bố trạng thái bao hàng</CardTitle>
             <CardDescription>Tổng số {summary.totalSacks} bao hàng trong hệ thống</CardDescription>
           </CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={sackPie} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80}>
-                  {sackPie.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={sackPie} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80}>
+                    {sackPie.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
             <div className="mt-2 flex flex-wrap gap-2">
               {sackPie.map((s) => (
                 <Badge key={s.name} status={s.name}>
@@ -392,38 +383,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Cảnh báo giữ hàng</CardTitle>
-            <CardDescription>Các lượt giữ hàng sắp hết hạn</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {expiring.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-500">Không có cảnh báo giữ hàng khẩn cấp.</p>
-            ) : (
-              <ul className="space-y-3">
-                {expiring.map((r) => (
-                  <li
-                    key={r.reservationId}
-                    className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3"
-                  >
-                    <div>
-                      <p className="font-medium">{r.reservationId}</p>
-                      <p className="text-xs text-slate-500">
-                        Đơn xuất {r.outboundOrderId} · Bao hàng {r.sackId}
-                      </p>
-                    </div>
-                    <div className="text-right text-xs text-amber-700">
-                      Hết hạn {formatDateTime(r.expiresAt)}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
+      <div className="mt-6">
         <Card>
           <CardHeader>
             <CardTitle>Hoạt động gần đây</CardTitle>

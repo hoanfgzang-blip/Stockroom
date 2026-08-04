@@ -6,6 +6,7 @@ using WMS_.Data;
 using WMS_.Data.Entities;
 using WMS_.Configuration;
 using WMS_.Security;
+using WMS_.Services;
 
 namespace WMS_.Controllers
 {
@@ -15,7 +16,13 @@ namespace WMS_.Controllers
     public class SacksController : ControllerBase
     {
         private readonly WmsDbContext _db;
-        public SacksController(WmsDbContext db) => _db = db;
+        private readonly IOutboundService _outboundService;
+
+        public SacksController(WmsDbContext db, IOutboundService outboundService)
+        {
+            _db = db;
+            _outboundService = outboundService;
+        }
 
         /// <summary>Get all sacks with optional status filter and sorting</summary>
         [HttpGet]
@@ -85,6 +92,18 @@ namespace WMS_.Controllers
                 !await _db.Zones.AnyAsync(zone => zone.ZoneId == zoneId && zone.LocationId == hubId))
                 return BadRequest("Zone của bao phải thuộc hub của tài khoản.");
 
+            if (!string.IsNullOrWhiteSpace(request.PalletId))
+            {
+                var pallet = await _db.Pallets
+                    .Include(item => item.Zone)
+                    .FirstOrDefaultAsync(item => item.PalletId == request.PalletId && item.Zone.LocationId == hubId);
+                if (pallet == null)
+                    return BadRequest("Pallet của bao phải thuộc hub của tài khoản.");
+                if (zoneId != null && zoneId != pallet.ZoneId)
+                    return BadRequest("Zone của bao phải trùng zone của pallet.");
+                zoneId = pallet.ZoneId;
+            }
+
             if (string.IsNullOrWhiteSpace(zoneId))
             {
                 zoneId = await _db.Zones
@@ -144,6 +163,7 @@ namespace WMS_.Controllers
 
             sack.Status = "Received";
             sack.EndAt = DateTime.UtcNow;
+            await _outboundService.CompleteOrdersForReceivedSacksAsync(new[] { sack.SackId });
             await _db.SaveChangesAsync();
             return NoContent();
         }

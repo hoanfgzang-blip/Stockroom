@@ -13,7 +13,19 @@ ON CONFLICT (province_id) DO NOTHING;
 INSERT INTO location (location_id, province_id, location_type, location_name) VALUES
   ('DEMO-HUB-HN', 'DEMO-HN', 'Hub', 'Trung tam khai thac Ha Noi'),
   ('DEMO-HUB-HCM', 'DEMO-HCM', 'Hub', 'Trung tam khai thac Ho Chi Minh'),
-  ('DEMO-HUB-DN', 'DEMO-DN', 'Hub', 'Trung tam khai thac Da Nang')
+  ('DEMO-HUB-DN', 'DEMO-DN', 'Hub', 'Trung tam khai thac Da Nang'),
+  ('DEMO-LOC-HN-01', 'DEMO-HN', 'DeliveryPoint', 'Location HN1'),
+  ('DEMO-LOC-HN-02', 'DEMO-HN', 'DeliveryPoint', 'Location HN2'),
+  ('DEMO-LOC-HN-03', 'DEMO-HN', 'DeliveryPoint', 'Location HN3'),
+  ('DEMO-LOC-HN-04', 'DEMO-HN', 'DeliveryPoint', 'Location HN4'),
+  ('DEMO-LOC-DN-01', 'DEMO-DN', 'DeliveryPoint', 'Location DN1'),
+  ('DEMO-LOC-DN-02', 'DEMO-DN', 'DeliveryPoint', 'Location DN2'),
+  ('DEMO-LOC-DN-03', 'DEMO-DN', 'DeliveryPoint', 'Location DN3'),
+  ('DEMO-LOC-DN-04', 'DEMO-DN', 'DeliveryPoint', 'Location DN4'),
+  ('DEMO-LOC-HCM-01', 'DEMO-HCM', 'DeliveryPoint', 'Location HCM1'),
+  ('DEMO-LOC-HCM-02', 'DEMO-HCM', 'DeliveryPoint', 'Location HCM2'),
+  ('DEMO-LOC-HCM-03', 'DEMO-HCM', 'DeliveryPoint', 'Location HCM3'),
+  ('DEMO-LOC-HCM-04', 'DEMO-HCM', 'DeliveryPoint', 'Location HCM4')
 ON CONFLICT (location_id) DO NOTHING;
 
 INSERT INTO zone (zone_id, location_id, zone_name, zone_type, capacity) VALUES
@@ -25,6 +37,24 @@ INSERT INTO zone (zone_id, location_id, zone_name, zone_type, capacity) VALUES
   ('DEMO-Z-HCM-OUT', 'DEMO-HUB-HCM', 'Khu xuat Ho Chi Minh', 'Outbound', 700),
   ('DEMO-Z-DN-SORT', 'DEMO-HUB-DN', 'Khu chia chon Da Nang', 'Sorting', 500)
 ON CONFLICT (zone_id) DO NOTHING;
+
+INSERT INTO zone (zone_id, location_id, zone_name, zone_type, process_role, capacity) VALUES
+  ('DEMO-Z-HN-IN', 'DEMO-HUB-HN', 'Khu nhap Ha Noi', 'Inbound', 'InboundReceipt', 800),
+  ('DEMO-Z-HN-SORT', 'DEMO-HUB-HN', 'Zone A - Cho chia chon noi tinh Ha Noi', 'Sorting', 'LocalSortBuffer', 1200),
+  ('DEMO-Z-HN-OUT', 'DEMO-HUB-HN', 'Zone B - Outbound noi tinh Ha Noi', 'Outbound', 'LocalOutbound', 600),
+  ('DEMO-Z-HN-OUT-INTER', 'DEMO-HUB-HN', 'Zone C - Outbound ngoai tinh Ha Noi', 'Outbound', 'InterprovinceOutbound', 600),
+  ('DEMO-Z-HCM-IN', 'DEMO-HUB-HCM', 'Khu nhap Ho Chi Minh', 'Inbound', 'InboundReceipt', 900),
+  ('DEMO-Z-HCM-SORT', 'DEMO-HUB-HCM', 'Zone A - Cho chia chon noi tinh Ho Chi Minh', 'Sorting', 'LocalSortBuffer', 1400),
+  ('DEMO-Z-HCM-OUT', 'DEMO-HUB-HCM', 'Zone B - Outbound noi tinh Ho Chi Minh', 'Outbound', 'LocalOutbound', 700),
+  ('DEMO-Z-HCM-OUT-INTER', 'DEMO-HUB-HCM', 'Zone C - Outbound ngoai tinh Ho Chi Minh', 'Outbound', 'InterprovinceOutbound', 700),
+  ('DEMO-Z-DN-SORT', 'DEMO-HUB-DN', 'Zone A - Cho chia chon noi tinh Da Nang', 'Sorting', 'LocalSortBuffer', 500),
+  ('DEMO-Z-DN-OUT', 'DEMO-HUB-DN', 'Zone B - Outbound noi tinh Da Nang', 'Outbound', 'LocalOutbound', 450),
+  ('DEMO-Z-DN-OUT-INTER', 'DEMO-HUB-DN', 'Zone C - Outbound ngoai tinh Da Nang', 'Outbound', 'InterprovinceOutbound', 450)
+ON CONFLICT (zone_id) DO UPDATE SET
+  zone_name = EXCLUDED.zone_name,
+  zone_type = EXCLUDED.zone_type,
+  process_role = EXCLUDED.process_role,
+  capacity = EXCLUDED.capacity;
 
 INSERT INTO pallet (pallet_id, zone_id, status, capacity) VALUES
   ('DEMO-PLT-001', 'DEMO-Z-HN-IN', 'Occupied', 1000),
@@ -39,6 +69,15 @@ INSERT INTO pallet (pallet_id, zone_id, status, capacity) VALUES
   ('DEMO-PLT-010', 'DEMO-Z-DN-SORT', 'Empty', 800),
   ('DEMO-PLT-011', 'DEMO-Z-HN-SORT', 'Occupied', 800),
   ('DEMO-PLT-012', 'DEMO-Z-HCM-OUT', 'Occupied', 800)
+ON CONFLICT (pallet_id) DO NOTHING;
+
+INSERT INTO pallet (pallet_id, zone_id, status, capacity) VALUES
+   ('DEMO-PLT-013', 'DEMO-Z-HN-OUT-INTER', 'Empty', 1000),
+   ('DEMO-PLT-014', 'DEMO-Z-HCM-OUT-INTER', 'Empty', 1200),
+   ('DEMO-PLT-015', 'DEMO-Z-DN-OUT', 'Empty', 800),
+   ('DEMO-PLT-016', 'DEMO-Z-DN-OUT-INTER', 'Empty', 800),
+   ('DEMO-PLT-017', 'DEMO-Z-HN-OUT', 'Empty', 1000),
+   ('DEMO-PLT-018', 'DEMO-Z-HCM-OUT', 'Empty', 1200)
 ON CONFLICT (pallet_id) DO NOTHING;
 
 INSERT INTO shift (shift_id, shift_name, start_at, end_at) VALUES
@@ -74,7 +113,15 @@ INSERT INTO car (car_id, type, capacity) VALUES
   ('DEMO-CAR-003', 'Van', 800),
   ('DEMO-CAR-004', 'Truck 5T', 5000),
   ('DEMO-CAR-005', 'Van', 800),
-  ('DEMO-CAR-006', 'Truck 2.5T', 2500)
+  ('DEMO-CAR-006', 'Truck 2.5T', 2500),
+  ('DEMO-CAR-007', 'Truck 1T', 1000),
+  ('DEMO-CAR-008', 'Truck 8T', 8000),
+  ('DEMO-CAR-009', 'Van 1.2T', 1200),
+  ('DEMO-CAR-010', 'Container Truck 10T', 10000),
+  ('DEMO-CAR-011', 'Pickup', 750),
+  ('DEMO-CAR-012', 'Truck 2T', 2000),
+  ('DEMO-CAR-013', 'Electric Van', 600),
+  ('DEMO-CAR-014', 'Refrigerated Truck 3.5T', 3500)
 ON CONFLICT (car_id) DO NOTHING;
 
 INSERT INTO trip (trip_id, employee_id, car_id, origin, destination, type, status, created_at, end_at) VALUES
@@ -113,6 +160,15 @@ INSERT INTO sack (sack_id, trip_id, pallet_id, status, created_at, end_at, zone_
   ('DEMO-SACK-024', NULL, 'DEMO-PLT-003', 'Sorting', NOW() - INTERVAL '50 minutes', NULL, 'DEMO-Z-HN-SORT', 'DEMO-HUB-HN')
 ON CONFLICT (sack_id) DO NOTHING;
 
+INSERT INTO sack (sack_id, trip_id, pallet_id, status, created_at, end_at, zone_id, s_destination) VALUES
+  ('DEMO-SACK-025', NULL, NULL, 'Sorting', NOW() - INTERVAL '45 minutes', NULL, 'DEMO-Z-HN-SORT', 'DEMO-LOC-HN-01'),
+  ('DEMO-SACK-026', NULL, NULL, 'Sorting', NOW() - INTERVAL '40 minutes', NULL, 'DEMO-Z-HN-SORT', 'DEMO-LOC-HCM-01'),
+  ('DEMO-SACK-027', NULL, NULL, 'Sorting', NOW() - INTERVAL '35 minutes', NULL, 'DEMO-Z-HCM-SORT', 'DEMO-LOC-HCM-01'),
+  ('DEMO-SACK-028', NULL, NULL, 'Sorting', NOW() - INTERVAL '30 minutes', NULL, 'DEMO-Z-HCM-SORT', 'DEMO-LOC-HN-01'),
+  ('DEMO-SACK-029', NULL, NULL, 'Sorting', NOW() - INTERVAL '25 minutes', NULL, 'DEMO-Z-DN-SORT', 'DEMO-LOC-DN-01'),
+  ('DEMO-SACK-030', NULL, NULL, 'Sorting', NOW() - INTERVAL '20 minutes', NULL, 'DEMO-Z-DN-SORT', 'DEMO-LOC-HN-01')
+ON CONFLICT (sack_id) DO NOTHING;
+
 INSERT INTO routing_rule (rule_id, current_location, c_destination, next_hop) VALUES
   ('DEMO-ROUTE-001', 'DEMO-HUB-HN', 'DEMO-HUB-HCM', 'DEMO-HUB-DN'),
   ('DEMO-ROUTE-002', 'DEMO-HUB-HN', 'DEMO-HUB-HN', 'DEMO-HUB-HN'),
@@ -123,6 +179,33 @@ INSERT INTO routing_rule (rule_id, current_location, c_destination, next_hop) VA
   ('DEMO-ROUTE-007', 'DEMO-HUB-DN', 'DEMO-HUB-HN', 'DEMO-HUB-HN'),
   ('DEMO-ROUTE-008', 'DEMO-HUB-DN', 'DEMO-HUB-HCM', 'DEMO-HUB-HCM')
 ON CONFLICT (rule_id) DO NOTHING;
+
+INSERT INTO routing_rule (rule_id, current_location, c_destination, next_hop) VALUES
+  ('DEMO-R-HN-HCM-01', 'DEMO-HUB-HN', 'DEMO-LOC-HCM-01', 'DEMO-HUB-DN'),
+  ('DEMO-R-HN-HCM-02', 'DEMO-HUB-HN', 'DEMO-LOC-HCM-02', 'DEMO-HUB-DN'),
+  ('DEMO-R-HN-HCM-03', 'DEMO-HUB-HN', 'DEMO-LOC-HCM-03', 'DEMO-HUB-DN'),
+  ('DEMO-R-HN-HCM-04', 'DEMO-HUB-HN', 'DEMO-LOC-HCM-04', 'DEMO-HUB-DN'),
+  ('DEMO-R-HN-DN-01', 'DEMO-HUB-HN', 'DEMO-LOC-DN-01', 'DEMO-HUB-DN'),
+  ('DEMO-R-HN-DN-02', 'DEMO-HUB-HN', 'DEMO-LOC-DN-02', 'DEMO-HUB-DN'),
+  ('DEMO-R-HN-DN-03', 'DEMO-HUB-HN', 'DEMO-LOC-DN-03', 'DEMO-HUB-DN'),
+  ('DEMO-R-HN-DN-04', 'DEMO-HUB-HN', 'DEMO-LOC-DN-04', 'DEMO-HUB-DN'),
+  ('DEMO-R-HCM-HN-01', 'DEMO-HUB-HCM', 'DEMO-LOC-HN-01', 'DEMO-HUB-DN'),
+  ('DEMO-R-HCM-HN-02', 'DEMO-HUB-HCM', 'DEMO-LOC-HN-02', 'DEMO-HUB-DN'),
+  ('DEMO-R-HCM-HN-03', 'DEMO-HUB-HCM', 'DEMO-LOC-HN-03', 'DEMO-HUB-DN'),
+  ('DEMO-R-HCM-HN-04', 'DEMO-HUB-HCM', 'DEMO-LOC-HN-04', 'DEMO-HUB-DN'),
+  ('DEMO-R-HCM-DN-01', 'DEMO-HUB-HCM', 'DEMO-LOC-DN-01', 'DEMO-HUB-DN'),
+  ('DEMO-R-HCM-DN-02', 'DEMO-HUB-HCM', 'DEMO-LOC-DN-02', 'DEMO-HUB-DN'),
+  ('DEMO-R-HCM-DN-03', 'DEMO-HUB-HCM', 'DEMO-LOC-DN-03', 'DEMO-HUB-DN'),
+  ('DEMO-R-HCM-DN-04', 'DEMO-HUB-HCM', 'DEMO-LOC-DN-04', 'DEMO-HUB-DN'),
+  ('DEMO-R-DN-HN-01', 'DEMO-HUB-DN', 'DEMO-LOC-HN-01', 'DEMO-HUB-HN'),
+  ('DEMO-R-DN-HN-02', 'DEMO-HUB-DN', 'DEMO-LOC-HN-02', 'DEMO-HUB-HN'),
+  ('DEMO-R-DN-HN-03', 'DEMO-HUB-DN', 'DEMO-LOC-HN-03', 'DEMO-HUB-HN'),
+  ('DEMO-R-DN-HN-04', 'DEMO-HUB-DN', 'DEMO-LOC-HN-04', 'DEMO-HUB-HN'),
+  ('DEMO-R-DN-HCM-01', 'DEMO-HUB-DN', 'DEMO-LOC-HCM-01', 'DEMO-HUB-HCM'),
+  ('DEMO-R-DN-HCM-02', 'DEMO-HUB-DN', 'DEMO-LOC-HCM-02', 'DEMO-HUB-HCM'),
+  ('DEMO-R-DN-HCM-03', 'DEMO-HUB-DN', 'DEMO-LOC-HCM-03', 'DEMO-HUB-HCM'),
+  ('DEMO-R-DN-HCM-04', 'DEMO-HUB-DN', 'DEMO-LOC-HCM-04', 'DEMO-HUB-HCM')
+ON CONFLICT (current_location, c_destination) DO UPDATE SET next_hop = EXCLUDED.next_hop;
 
 INSERT INTO inbound_order (inbound_order_id, order_number, supplier_name, status, created_at) VALUES
   ('DEMO-IO-001', 'IN-DEMO-20260715-001', 'Nha cung cap Ha Noi', 'Pending', NOW() - INTERVAL '5 hours'),
@@ -142,13 +225,16 @@ INSERT INTO inbound_order_item (inbound_order_item_id, inbound_order_id, sack_id
   ('DEMO-IOI-007', 'DEMO-IO-005', 'DEMO-SACK-020')
 ON CONFLICT (inbound_order_item_id) DO NOTHING;
 
-INSERT INTO outbound_order (outbound_order_id, order_number, customer_name, destination, status, created_at) VALUES
-  ('DEMO-OO-001', 'OUT-DEMO-20260715-001', 'Khach hang Da Nang', 'DEMO-HUB-DN', 'Reserved', NOW() - INTERVAL '3 hours'),
-  ('DEMO-OO-002', 'OUT-DEMO-20260715-002', 'Khach hang Ho Chi Minh', 'DEMO-HUB-HCM', 'Pending', NOW() - INTERVAL '2 hours'),
-  ('DEMO-OO-003', 'OUT-DEMO-20260715-003', 'Khach hang Da Nang', 'DEMO-HUB-DN', 'Pending', NOW() - INTERVAL '1 hour'),
-  ('DEMO-OO-004', 'OUT-DEMO-20260714-004', 'Khach hang Ha Noi', 'DEMO-HUB-HN', 'Completed', NOW() - INTERVAL '1 day'),
-  ('DEMO-OO-005', 'OUT-DEMO-20260714-005', 'Khach hang Ha Noi', 'DEMO-HUB-HN', 'Completed', NOW() - INTERVAL '2 days'),
-  ('DEMO-OO-006', 'OUT-DEMO-20260715-006', 'Khach hang Ho Chi Minh', 'DEMO-HUB-HCM', 'Reserved', NOW() - INTERVAL '30 minutes')
+INSERT INTO outbound_order (outbound_order_id, order_number, customer_name, destination, origin_location_id, status, created_at) VALUES
+  ('DEMO-OO-001', 'OUT-DEMO-20260715-001', 'Khach hang Da Nang', 'DEMO-HUB-DN', 'DEMO-HUB-HN', 'Reserved', NOW() - INTERVAL '3 hours'),
+  ('DEMO-OO-002', 'OUT-DEMO-20260715-002', 'Khach hang Ho Chi Minh', 'DEMO-HUB-HCM', 'DEMO-HUB-HCM', 'Pending', NOW() - INTERVAL '2 hours'),
+  ('DEMO-OO-003', 'OUT-DEMO-20260715-003', 'Khach hang Da Nang', 'DEMO-HUB-DN', 'DEMO-HUB-HN', 'Pending', NOW() - INTERVAL '1 hour'),
+  ('DEMO-OO-004', 'OUT-DEMO-20260714-004', 'Khach hang Ha Noi', 'DEMO-HUB-HN', 'DEMO-HUB-HN', 'Completed', NOW() - INTERVAL '1 day'),
+  ('DEMO-OO-005', 'OUT-DEMO-20260714-005', 'Khach hang Ha Noi', 'DEMO-HUB-HN', 'DEMO-HUB-HN', 'Completed', NOW() - INTERVAL '2 days'),
+  ('DEMO-OO-006', 'OUT-DEMO-20260715-006', 'Khach hang Ho Chi Minh', 'DEMO-HUB-HCM', 'DEMO-HUB-HN', 'Reserved', NOW() - INTERVAL '30 minutes'),
+  ('DEMO-OO-007', 'OUT-DEMO-20260715-007', 'Location HN1', 'DEMO-LOC-HN-01', 'DEMO-HUB-HN', 'Pending', NOW() - INTERVAL '15 minutes'),
+  ('DEMO-OO-008', 'OUT-DEMO-20260715-008', 'Location HCM1', 'DEMO-LOC-HCM-01', 'DEMO-HUB-HCM', 'Pending', NOW() - INTERVAL '10 minutes'),
+  ('DEMO-OO-009', 'OUT-DEMO-20260715-009', 'Location DN1', 'DEMO-LOC-DN-01', 'DEMO-HUB-DN', 'Pending', NOW() - INTERVAL '5 minutes')
 ON CONFLICT (outbound_order_id) DO NOTHING;
 
 INSERT INTO outbound_order_item (outbound_order_item_id, outbound_order_id, sack_id) VALUES

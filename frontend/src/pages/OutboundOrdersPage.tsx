@@ -71,7 +71,7 @@ export default function OutboundOrdersPage() {
 
   useEffect(() => {
     outboundOrdersApi
-      .all()
+      .allForDispatch()
       .then(setOrders)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))

@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table'
 import { Combobox } from '@/components/shared/Combobox'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
+import { useAuth } from '@/auth/AuthContext'
 import { formatTimeSpan, generatePreviewId, roleLabel } from '@/lib/utils'
 import type { Employee, Location, Shift, Zone } from '@/types'
 
@@ -29,11 +30,11 @@ const emptyForm = (): Employee => ({
 })
 
 export default function EmployeesPage() {
+  const { user } = useAuth()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [zones, setZones] = useState<Zone[]>([])
   const [shifts, setShifts] = useState<Shift[]>([])
-  const [shiftFilter, setShiftFilter] = useState('')
   const [locationFilter, setLocationFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -45,7 +46,7 @@ export default function EmployeesPage() {
   const load = () => {
     setLoading(true)
     Promise.all([
-      employeesApi.all({ shiftId: shiftFilter || undefined, locationId: locationFilter || undefined }),
+      employeesApi.all({ locationId: locationFilter || undefined }),
       locationsApi.all(),
       zonesApi.all(),
       shiftsApi.all(),
@@ -62,9 +63,9 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     load()
-  }, [shiftFilter, locationFilter])
+  }, [locationFilter])
 
-  const locationOptions = locations.map((l) => ({
+  const locationOptions = locations.filter((location) => location.locationId === user?.locationId).map((l) => ({
     value: l.locationId,
     label: l.locationName,
     description: l.locationType,
@@ -85,14 +86,9 @@ export default function EmployeesPage() {
 
   const getLocationName = (id?: string | null) => (id ? locations.find((l) => l.locationId === id)?.locationName ?? id : '—')
   const getZoneName = (id?: string | null) => zones.find((z) => z.zoneId === id)?.zoneName ?? id ?? '—'
-  const getShiftName = (id: string) => {
-    const s = shifts.find((sh) => sh.shiftId === id)
-    return s ? `${s.shiftName} (${formatTimeSpan(s.startAt)}–${formatTimeSpan(s.endAt)})` : id
-  }
-
   const openCreate = () => {
     setError(null)
-    setForm(emptyForm())
+    setForm({ ...emptyForm(), locationId: user?.locationId ?? '' })
     setPreviewEmpId(generatePreviewId('EMP'))
     setDialogOpen(true)
   }
@@ -146,21 +142,10 @@ export default function EmployeesPage() {
       <Card className="mb-6">
         <CardContent className="flex flex-wrap gap-4 p-4">
           <div className="min-w-[200px]">
-            <Label>Lọc theo ca</Label>
-            <Select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)}>
-              <option value="">Tất cả ca</option>
-              {shifts.map((s) => (
-                <option key={s.shiftId} value={s.shiftId}>
-                  {s.shiftName}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="min-w-[200px]">
             <Label>Lọc theo địa điểm</Label>
             <Select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)}>
               <option value="">Tất cả địa điểm</option>
-              {locations.map((l) => (
+                {locations.filter((location) => location.locationId === user?.locationId).map((l) => (
                 <option key={l.locationId} value={l.locationId}>
                   {l.locationName}
                 </option>
@@ -180,7 +165,6 @@ export default function EmployeesPage() {
               <TableRow>
                 <TableHead>Tên</TableHead>
                 <TableHead>Vai trò</TableHead>
-                <TableHead>Ca làm việc</TableHead>
                 <TableHead>Trung tâm</TableHead>
                 <TableHead>Zone</TableHead>
               </TableRow>
@@ -192,7 +176,6 @@ export default function EmployeesPage() {
                   <TableCell>
                     <Badge status={emp.roleName}>{roleLabel(emp.roleName)}</Badge>
                   </TableCell>
-                  <TableCell>{getShiftName(emp.shiftId)}</TableCell>
                   <TableCell>{getLocationName(emp.locationId)}</TableCell>
                   <TableCell>{getZoneName(emp.zoneId)}</TableCell>
                 </TableRow>

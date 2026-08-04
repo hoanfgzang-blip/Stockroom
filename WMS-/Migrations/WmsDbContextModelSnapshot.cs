@@ -304,6 +304,11 @@ namespace WMS_.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("destination");
 
+                    b.Property<string>("OriginLocationId")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("origin_location_id");
+
                     b.Property<string>("OutboundOrderNumber")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -319,6 +324,8 @@ namespace WMS_.Migrations
                     b.HasKey("OutboundOrderId");
 
                     b.HasIndex("OutboundDestination");
+
+                    b.HasIndex("OriginLocationId");
 
                     b.HasIndex("OutboundOrderNumber")
                         .IsUnique();
@@ -454,6 +461,11 @@ namespace WMS_.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("end_at");
 
+                    b.Property<string>("NextHopId")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("next_hop_id");
+
                     b.Property<string>("PalletId")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
@@ -482,6 +494,8 @@ namespace WMS_.Migrations
                         .HasColumnName("zone_id");
 
                     b.HasKey("SackId");
+
+                    b.HasIndex("NextHopId");
 
                     b.HasIndex("PalletId");
 
@@ -555,6 +569,11 @@ namespace WMS_.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("origin");
 
+                    b.Property<string>("OutboundOrderId")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("outbound_order_id");
+
                     b.Property<string>("SealCode")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -594,6 +613,8 @@ namespace WMS_.Migrations
                     b.HasIndex("EmployeeId");
 
                     b.HasIndex("Origin");
+
+                    b.HasIndex("OutboundOrderId");
 
                     b.HasIndex("SealCode")
                         .IsUnique();
@@ -698,6 +719,12 @@ namespace WMS_.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("location_id");
+
+                    b.Property<string>("ProcessRole")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("process_role");
 
                     b.Property<string>("ZoneName")
                         .IsRequired()
@@ -811,7 +838,14 @@ namespace WMS_.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("WMS_.Data.Entities.Location", "OriginLocation")
+                        .WithMany()
+                        .HasForeignKey("OriginLocationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("OutboundDestinationLocation");
+
+                    b.Navigation("OriginLocation");
                 });
 
             modelBuilder.Entity("WMS_.Data.Entities.OutboundOrderItem", b =>
@@ -884,6 +918,11 @@ namespace WMS_.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("WMS_.Data.Entities.Location", "NextHopLocation")
+                        .WithMany()
+                        .HasForeignKey("NextHopId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("WMS_.Data.Entities.Trip", "Trip")
                         .WithMany()
                         .HasForeignKey("TripId")
@@ -895,6 +934,8 @@ namespace WMS_.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("DestinationLocation");
+
+                    b.Navigation("NextHopLocation");
 
                     b.Navigation("Pallet");
 
@@ -929,6 +970,11 @@ namespace WMS_.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("WMS_.Data.Entities.OutboundOrder", "OutboundOrder")
+                        .WithMany()
+                        .HasForeignKey("OutboundOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("WMS_.Data.Entities.UserAccount", "SealedByUser")
                         .WithMany()
                         .HasForeignKey("SealedBy")
@@ -941,6 +987,8 @@ namespace WMS_.Migrations
                     b.Navigation("Employee");
 
                     b.Navigation("OriginLocation");
+
+                    b.Navigation("OutboundOrder");
 
                     b.Navigation("SealedByUser");
                 });

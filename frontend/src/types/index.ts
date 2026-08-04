@@ -16,6 +16,7 @@ export interface Zone {
   locationId: string
   zoneName: string
   zoneType: string
+  processRole: string
   capacity: number
   location?: Location
 }
@@ -59,6 +60,7 @@ export interface Trip {
   carId: string
   origin: string
   destination: string
+  outboundOrderId?: string | null
   type: string
   status: string
   createdAt: string
@@ -146,6 +148,7 @@ export interface OutboundOrder {
   outboundOrderNumber: string
   outboundCustomerName: string
   outboundDestination: string
+  originLocationId?: string | null
   status: string
   createAt: string
 }
@@ -165,10 +168,12 @@ export interface Sack {
   endAt?: string | null
   zoneId?: string | null
   sDestination: string
+  nextHopId?: string | null
   trip?: Trip
   pallet?: Pallet
   zone?: Zone
   destinationLocation?: Location
+  nextHopLocation?: Location
 }
 
 export interface InventoryReservation {

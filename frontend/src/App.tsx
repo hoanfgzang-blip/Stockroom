@@ -13,6 +13,7 @@ import FleetPage from '@/pages/FleetPage'
 import ShiftsPage from '@/pages/ShiftsPage'
 import PalletsPage from '@/pages/PalletsPage'
 import BarcodeScannerPage from '@/pages/BarcodeScannerPage'
+import SortingPage from '@/pages/SortingPage'
 import LoginPage from '@/pages/LoginPage'
 import { useAuth } from '@/auth/AuthContext'
 import AccountsPage from '@/pages/AccountsPage'
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="/inventory/outbound" element={<OutboundOrdersPage />} />
         <Route path="/inventory/sacks" element={<SacksPage />} />
         <Route path="/operations/barcode-scanner" element={<BarcodeScannerPage />} />
+        <Route path="/operations/sorting" element={<SortingPage />} />
         <Route path="/driver/deliveries" element={<DriverDeliveriesPage />} />
         <Route path="/logistics/fleet" element={<FleetPage />} />
         <Route path="/logistics/trips" element={<TripsPage />} />

@@ -17,12 +17,12 @@ namespace WMS_.Controllers
         /// <summary>Total sack count in warehouse</summary>
         [HttpGet("total-sacks")]
         public async Task<ActionResult<int>> GetTotalSacks()
-            => await QuerySacksAtCurrentHub().CountAsync(sack => OperationalHubScope.HubIds.Contains(sack.SDestination));
+            => await QuerySacksAtCurrentHub().CountAsync();
 
         /// <summary>Sacks currently in Sorting status</summary>
         [HttpGet("sorting-sacks")]
         public async Task<ActionResult<int>> GetSortingSacks()
-            => await QuerySacksAtCurrentHub().CountAsync(s => s.Status == "Sorting" && OperationalHubScope.HubIds.Contains(s.SDestination));
+            => await QuerySacksAtCurrentHub().CountAsync(s => s.Status == "Sorting");
 
         /// <summary>Total inbound orders</summary>
         [HttpGet("total-inbound-orders")]
@@ -38,12 +38,12 @@ namespace WMS_.Controllers
         [HttpGet("total-outbound-orders")]
         public async Task<ActionResult<int>> GetTotalOutboundOrders()
         {
-            var hubId = User.HubId();
             var currentSackIds = await QuerySacksAtCurrentHub().Select(sack => sack.SackId).ToListAsync();
             return await _db.OutboundOrders.CountAsync(order =>
-                order.OutboundDestination == hubId ||
+                OperationalHubScope.OutboundDestinationIds.Contains(order.OutboundDestination) &&
+                (order.OriginLocationId == User.HubId() ||
                 _db.OutboundOrderItems.Any(item =>
-                    item.OutboundOrderId == order.OutboundOrderId && currentSackIds.Contains(item.SackId)));
+                    item.OutboundOrderId == order.OutboundOrderId && currentSackIds.Contains(item.SackId))));
         }
 
         /// <summary>Total active trips (InProgress)</summary>
@@ -62,10 +62,16 @@ namespace WMS_.Controllers
         /// <summary>Recent audit logs (default last 10)</summary>
         [HttpGet("recent-audit-logs")]
         public async Task<ActionResult<IEnumerable<AuditLog>>> GetRecentAuditLogs([FromQuery] int count = 10)
-            => await _db.AuditLogs
+        {
+            var hubId = User.HubId();
+            if (string.IsNullOrWhiteSpace(hubId)) return Ok(Array.Empty<AuditLog>());
+
+            return await _db.AuditLogs
+                .Where(log => log.User.Employee.LocationId == hubId)
                 .OrderByDescending(l => l.CreatedAt)
                 .Take(count)
                 .ToListAsync();
+        }
 
         /// <summary>Full dashboard summary — all key metrics in one call</summary>
         [HttpGet("summary")]
@@ -75,21 +81,19 @@ namespace WMS_.Controllers
             var currentSacks = QuerySacksAtCurrentHub();
             var currentSackIds = await currentSacks.Select(sack => sack.SackId).ToListAsync();
             var totalSacks = currentSackIds.Count;
-            var sortingSacks = await currentSacks.CountAsync(sack =>
-                sack.Status == "Sorting" && OperationalHubScope.HubIds.Contains(sack.SDestination));
+            var sortingSacks = await currentSacks.CountAsync(sack => sack.Status == "Sorting");
             var totalInbound = await _db.InboundOrders.CountAsync(order =>
-                order.InboundSuplierName == hubId ||
                 _db.InboundOrderItems.Any(item =>
                     item.InboundOrderId == order.InboundOrderId && currentSackIds.Contains(item.SackId)));
             var pendingInbound = await _db.InboundOrders.CountAsync(order =>
                 order.Status == "Pending" &&
-                (order.InboundSuplierName == hubId ||
-                 _db.InboundOrderItems.Any(item =>
-                     item.InboundOrderId == order.InboundOrderId && currentSackIds.Contains(item.SackId))));
+                _db.InboundOrderItems.Any(item =>
+                    item.InboundOrderId == order.InboundOrderId && currentSackIds.Contains(item.SackId)));
             var totalOutbound = await _db.OutboundOrders.CountAsync(order =>
-                order.OutboundDestination == hubId ||
+                OperationalHubScope.OutboundDestinationIds.Contains(order.OutboundDestination) &&
+                (order.OriginLocationId == hubId ||
                 _db.OutboundOrderItems.Any(item =>
-                    item.OutboundOrderId == order.OutboundOrderId && currentSackIds.Contains(item.SackId)));
+                    item.OutboundOrderId == order.OutboundOrderId && currentSackIds.Contains(item.SackId))));
             var totalTrips = await _db.Trips.CountAsync(trip =>
                 (trip.Origin == hubId || trip.Destination == hubId) &&
                 OperationalHubScope.HubIds.Contains(trip.Origin) &&

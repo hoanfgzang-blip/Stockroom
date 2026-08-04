@@ -83,7 +83,7 @@ export function statusLabel(status: string): string {
     Processing: 'Đang xử lý', Sorting: 'Đang phân loại', Packing: 'Đang đóng gói', Arrived: 'Đã đến', Fulfilled: 'Đã hoàn tất',
     Empty: 'Trống', Finalized: 'Đã chốt', Locked: 'Đã khóa', Received: 'Đã giao',
     'In Transit to Zone': 'Đang chuyển zone', InTransit: 'Đang vận chuyển', ReadyForOutbound: 'Sẵn sàng xuất kho', Loaded: 'Đã chất lên xe',
-    Create: 'Tạo mới', Update: 'Cập nhật', Delete: 'Xóa',
+    Create: 'Tạo mới', Update: 'Cập nhật', Delete: 'Xóa', Hub: 'Hub', DeliveryPoint: 'Location',
   }
   return map[status] ?? status
 }

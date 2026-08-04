@@ -53,8 +53,9 @@ erDiagram
 * **Các trường dữ liệu**:
   * `zone_id` - Khóa chính: Mã phân khu duy nhất.
   * `location_id` - Khóa ngoại: Thuộc địa điểm hoặc bưu cục nào.
-  * `zone_name`: Tên phân khu, ví dụ: Cửa dỡ hàng Inbound, Kệ lưu kho Zone A, Khu phân loại hàng đi liên tỉnh.
-  * `zone_type`: Loại phân khu - `Storage` - Lưu trữ, `Sorting` - Phân loại, `Dock` - Cửa tải hoặc dỡ hàng.
+   * `zone_name`: Tên phân khu, ví dụ: Cửa dỡ hàng Inbound, Kệ lưu kho Zone A, Khu phân loại hàng đi liên tỉnh.
+   * `zone_type`: Loại phân khu - `Storage` - Lưu trữ, `Sorting` - Phân loại, `Dock` - Cửa tải hoặc dỡ hàng.
+   * `process_role`: Vai trò theo luồng vận hành - `LocalSortBuffer` (Zone A), `LocalOutbound` (Zone B), `InterprovinceOutbound` (Zone C), hoặc `InboundReceipt`.
   * `capacity`: Sức chứa tối đa của phân khu.
 
 ### 1.4 Bảng `pallet` - Pallet chứa hàng
@@ -118,8 +119,9 @@ erDiagram
   * `trip_id` - Khóa ngoại, tùy chọn: Chuyến xe đang chuyên chở bao hàng này, bằng NULL nếu đang lưu trữ tại hub.
   * `pallet_id` - Khóa ngoại, tùy chọn: Pallet lưu giữ bao hàng trong phân khu kho.
   * `status`: Trạng thái bao hàng - `Sorting` - Đang gom hàng, `Sealed` - Đã niêm phong, `InTransit` - Đang đi đường, `Received` - Đã nhận tại trạm đích.
-  * `zone_id` - Khóa ngoại: Phân khu lưu giữ bao hàng hiện tại.
-  * `s_destination` - Khóa ngoại -> Location: Điểm đến cuối cùng của bao hàng.
+   * `zone_id` - Khóa ngoại: Phân khu lưu giữ bao hàng hiện tại.
+   * `s_destination` - Khóa ngoại -> Location: Điểm đến cuối cùng của bao hàng.
+   * `next_hop_id` - Khóa ngoại -> Location: Điểm xuất của chặng hiện tại; bằng điểm phát nội tỉnh ở Zone B hoặc hub kế tiếp ở Zone C.
   * `created_at`: Thời gian đóng bao hàng.
   * `end_at`: Thời gian mở bao hàng để chia chọn.
 
@@ -161,7 +163,8 @@ erDiagram
   * `outbound_order_id` - Khóa chính: ID đơn xuất.
   * `order_number`: Mã số đơn xuất.
   * `customer_name`: Tên người nhận hoặc đơn vị nhận bàn giao bao hàng.
-  * `destination` - Khóa ngoại -> Location: Bưu cục hoặc Địa điểm nhận hàng bàn giao.
+   * `destination` - Khóa ngoại -> Location: Bưu cục hoặc Địa điểm nhận hàng bàn giao.
+   * `origin_location_id` - Hub lập và chịu trách nhiệm cho đơn xuất.
   * `status`: Trạng thái xử lý - `Pending`, `Processing` - Đang gom hàng, `Completed` - Đã xuất xong.
   * `created_at`: Ngày tạo đơn xuất.
 

@@ -7,6 +7,7 @@ using System.Text.Json;
 using WMS_.Data;
 using WMS_.Data.Entities;
 using WMS_.Configuration;
+using WMS_.Services;
 
 namespace WMS_.Controllers
 {
@@ -17,6 +18,7 @@ namespace WMS_.Controllers
         [Required] public string Origin { get; set; } = string.Empty;
         [Required] public string Destination { get; set; } = string.Empty;
         [Required] public string Type { get; set; } = string.Empty;
+        [MaxLength(50)] public string? OutboundOrderId { get; set; }
         public List<string> SackIds { get; set; } = [];
     }
 
@@ -24,6 +26,18 @@ namespace WMS_.Controllers
     public sealed record LoadTripSackResponse(
         string TripId,
         string SackId,
+        int LoadedCount);
+
+    public sealed class DispatchTripByQrRequest
+    {
+        [Required]
+        public string QrValue { get; set; } = string.Empty;
+    }
+
+    public sealed record DispatchTripByQrResponse(
+        string TripId,
+        string CarId,
+        string Status,
         int LoadedCount);
 
     public sealed class ScanTripSealRequest
@@ -92,7 +106,13 @@ namespace WMS_.Controllers
     public class TripsController : ControllerBase
     {
         private readonly WmsDbContext _db;
-        public TripsController(WmsDbContext db) => _db = db;
+        private readonly IOutboundService _outboundService;
+
+        public TripsController(WmsDbContext db, IOutboundService outboundService)
+        {
+            _db = db;
+            _outboundService = outboundService;
+        }
 
         [HttpGet]
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
@@ -104,7 +124,7 @@ namespace WMS_.Controllers
             query = query.Where(trip => trip.Origin == locationId || trip.Destination == locationId);
             query = query.Where(trip =>
                 OperationalHubScope.HubIds.Contains(trip.Origin) &&
-                OperationalHubScope.HubIds.Contains(trip.Destination));
+                OperationalHubScope.OutboundDestinationIds.Contains(trip.Destination));
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(trip => trip.Status == status);
             var trips = await query.OrderByDescending(trip => trip.CreatedAt).ToListAsync();
             await PopulateSackCountsAsync(trips);
@@ -134,7 +154,7 @@ namespace WMS_.Controllers
             var locationId = User.FindFirstValue("location_id");
             var trip = await _db.Trips.FindAsync(id);
             if (trip == null) return NotFound();
-            if (!OperationalHubScope.IsHub(trip.Origin) || !OperationalHubScope.IsHub(trip.Destination)) return NotFound();
+            if (!OperationalHubScope.IsHub(trip.Origin) || !OperationalHubScope.IsOutboundDestination(trip.Destination)) return NotFound();
             if (!string.IsNullOrWhiteSpace(locationId) && trip.Origin != locationId && trip.Destination != locationId)
                 return Forbid();
             trip.SackCount = await _db.Sacks.CountAsync(sack => sack.TripId == id);
@@ -183,11 +203,6 @@ namespace WMS_.Controllers
             if (trip == null) return NotFound();
             if (string.IsNullOrWhiteSpace(locationId) || (trip.Origin != locationId && trip.Destination != locationId))
                 return Forbid();
-            if (trip.Type == "Outbound" && (trip.Status == "Loading" || trip.SealedAt == null))
-                return Conflict(new
-                {
-                    message = "Chuyến outbound phải chốt seal xong mới được tạo QR manifest."
-                });
             var manifest = await BuildQrManifestAsync(id);
             return manifest == null ? NotFound() : Ok(manifest);
         }
@@ -214,8 +229,6 @@ namespace WMS_.Controllers
                     : "Chuyến đã hoàn thành, không thể cấp QR token.";
                 return Conflict(new { message });
             }
-            if (trip.Type == "Outbound" && (trip.Status == "Loading" || trip.SealedAt == null))
-                return Conflict(new { message = "Chuyến outbound phải chốt seal xong mới được cấp QR token." });
 
             var token = RandomNumberGenerator.GetHexString(32);
             var tokenHash = HashQrToken(token);
@@ -339,12 +352,22 @@ namespace WMS_.Controllers
                 return Conflict(new { message = "Token QR đã hết hạn." });
             }
 
-            if (trip.Destination != locationId)
+            var isOutboundLoadingAtOrigin = trip.Type == "Outbound"
+                && trip.Origin == locationId
+                && trip.Status == "Loading";
+            if (trip.Destination != locationId && !isOutboundLoadingAtOrigin)
             {
                 AddAuditLog("ResolveTripQrFailed", "trip", trip.TripId, new { Destination = trip.Destination }, new { Reason = "WrongHub", CurrentLocation = locationId });
                 await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
                 return StatusCode(StatusCodes.Status403Forbidden, new { message = "QR không thuộc hub hiện tại." });
+            }
+            if (trip.Type == "Outbound" && trip.Destination == locationId && trip.Status != "InProgress")
+            {
+                AddAuditLog("ResolveTripQrFailed", "trip", trip.TripId, new { Status = trip.Status }, new { Reason = "OutboundNotDispatched", CurrentLocation = locationId });
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return Conflict(new { message = "Chuyến outbound chưa hoàn tất xuất kho." });
             }
             if (trip.Status is "Completed" or "Cancelled")
             {
@@ -426,9 +449,14 @@ namespace WMS_.Controllers
         {
             var locationId = User.FindFirstValue("location_id");
             if (string.IsNullOrWhiteSpace(locationId)) return Forbid();
-            if (!OperationalHubScope.IsHub(request.Origin) || !OperationalHubScope.IsHub(request.Destination))
-                return BadRequest("Chuyến chỉ được kết nối giữa 3 hub vận hành.");
+            if (request.Type == "Outbound" &&
+                (!OperationalHubScope.IsHub(request.Origin) || !OperationalHubScope.IsOutboundDestination(request.Destination)))
+                return BadRequest("Chuyến outbound phải đi từ hub tới hub hoặc location phát nội tỉnh đã cấu hình.");
+            if (request.Type == "Inbound" &&
+                (!OperationalHubScope.IsHub(request.Origin) || !OperationalHubScope.IsHub(request.Destination)))
+                return BadRequest("Chuyến inbound chỉ được kết nối giữa các hub vận hành.");
             if (request.Type == "Outbound" && request.Origin != locationId) return Forbid();
+            if (request.Type == "Inbound" && request.Destination != locationId) return Forbid();
             if (request.Type is not ("Inbound" or "Outbound")) return BadRequest("Loai chuyen chi co the la Inbound hoac Outbound.");
             if (request.Type == "Outbound" &&
                 request.SackIds.Any(id => !string.IsNullOrWhiteSpace(id)))
@@ -438,8 +466,32 @@ namespace WMS_.Controllers
                     message = "Chuyến outbound phải gán bao bằng quét mã khi chất hàng."
                 });
             }
+            if (request.Type == "Inbound" && !string.IsNullOrWhiteSpace(request.OutboundOrderId))
+                return BadRequest("Chuyến inbound không được gán đơn outbound.");
+
+            OutboundOrder? outboundOrder = null;
+            if (request.Type == "Outbound")
+            {
+                var outboundOrderId = request.OutboundOrderId?.Trim();
+                if (string.IsNullOrWhiteSpace(outboundOrderId))
+                    return BadRequest("Chuyến outbound phải được gán với một đơn outbound.");
+
+                outboundOrder = await _db.OutboundOrders
+                    .FirstOrDefaultAsync(order =>
+                        order.OutboundOrderId == outboundOrderId &&
+                        (order.OriginLocationId == null || order.OriginLocationId == locationId));
+                if (outboundOrder == null)
+                    return BadRequest("Đơn outbound không thuộc hub xuất phát hoặc không tồn tại.");
+                if (outboundOrder.OutboundDestination != request.Destination)
+                    return BadRequest("Điểm đến của chuyến không khớp với đơn outbound.");
+                if (outboundOrder.Status is "Completed" or "Cancelled" or "Fulfilled")
+                    return Conflict("Đơn outbound đã hoàn tất hoặc bị hủy.");
+
+                // Gán hub cho dữ liệu đơn cũ ngay khi nó được dùng tạo chuyến.
+                outboundOrder.OriginLocationId ??= locationId;
+            }
             if (request.Origin == request.Destination) return BadRequest("Diem di va diem den phai khac nhau.");
-            if (!await _db.Employees.AnyAsync(employee => employee.EmployeeId == request.EmployeeId) ||
+            if (!await _db.Employees.AnyAsync(employee => employee.EmployeeId == request.EmployeeId && employee.LocationId == locationId) ||
                 !await _db.Cars.AnyAsync(car => car.CarId == request.CarId) ||
                 await _db.Locations.CountAsync(location => location.LocationId == request.Origin || location.LocationId == request.Destination) != 2)
                 return BadRequest("Nhan vien, xe hoac dia diem khong hop le.");
@@ -456,6 +508,7 @@ namespace WMS_.Controllers
             {
                 TripId = await GenerateTripIdAsync(request.Type), EmployeeId = request.EmployeeId, CarId = request.CarId,
                 Origin = request.Origin, Destination = request.Destination, Type = request.Type, Status = request.Type == "Outbound" ? "Loading" : "Pending",
+                OutboundOrderId = outboundOrder?.OutboundOrderId,
                 CreatedAt = DateTime.UtcNow, SackCount = sacks.Count
             };
             _db.Trips.Add(trip);
@@ -573,9 +626,6 @@ namespace WMS_.Controllers
             if (trip.Origin != locationId)
                 return Forbid();
 
-            if (trip.SealCode == null)
-                return BadRequest(new { message = "Chuyến xe chưa được mở seal chất hàng." });
-
             if (trip.SealedAt != null)
                 return Conflict(new { message = "Chuyến xe đã chốt seal." });
 
@@ -587,6 +637,23 @@ namespace WMS_.Controllers
             if (sack == null)
                 return NotFound(new { message = "Không tìm thấy bao hàng." });
 
+            if (string.IsNullOrWhiteSpace(trip.OutboundOrderId))
+                return Conflict(new { message = "Chuyến outbound chưa được gán đơn outbound." });
+
+            var outboundOrder = await _db.OutboundOrders
+                .FirstOrDefaultAsync(order => order.OutboundOrderId == trip.OutboundOrderId);
+            if (outboundOrder == null)
+                return Conflict(new { message = "Không tìm thấy đơn outbound của chuyến xe." });
+            if (outboundOrder.OriginLocationId != null && outboundOrder.OriginLocationId != trip.Origin)
+                return Conflict(new { message = "Đơn outbound không thuộc hub xuất phát của chuyến xe." });
+            if (outboundOrder.OutboundDestination != trip.Destination)
+                return Conflict(new { message = "Điểm đến của đơn outbound không khớp với chuyến xe." });
+            if (outboundOrder.Status is "Completed" or "Cancelled" or "Fulfilled")
+                return Conflict(new { message = "Đơn outbound đã hoàn tất hoặc bị hủy." });
+            if (!await _db.OutboundOrderItems.AnyAsync(item =>
+                    item.OutboundOrderId == trip.OutboundOrderId && item.SackId == sackId))
+                return Conflict(new { message = "Bao hàng không thuộc đơn outbound của chuyến xe." });
+
             if (sack.TripId == id)
                 return Conflict(new { message = "Bao hàng đã được quét vào chuyến này." });
 
@@ -596,8 +663,9 @@ namespace WMS_.Controllers
             if (sack.Status != "ReadyForOutbound")
                 return Conflict(new { message = "Bao hàng chưa sẵn sàng xuất kho." });
 
-            if (sack.SDestination != trip.Destination)
-                return BadRequest(new { message = "Bao hàng có điểm đến không khớp với điểm đến của chuyến xe." });
+            var dispatchDestination = sack.NextHopId ?? sack.SDestination;
+            if (dispatchDestination != trip.Destination)
+                return BadRequest(new { message = "Next hop của bao không khớp với điểm đến của chuyến xe." });
 
             var palletId = sack.PalletId;
             Pallet? pallet = null;
@@ -607,22 +675,21 @@ namespace WMS_.Controllers
                     .FromSqlInterpolated($"SELECT * FROM pallet WHERE pallet_id = {palletId} FOR UPDATE")
                     .SingleOrDefaultAsync();
             }
+            if (pallet == null)
+                return Conflict(new { message = "Bao phải nằm trên pallet outbound đã chốt trước khi chất xe." });
+            if (pallet.Status != "Finalized")
+                return Conflict(new { message = "Pallet outbound phải được chốt trước khi chất xe." });
+
+            var palletZone = await _db.Zones.FindAsync(pallet.ZoneId);
+            if (palletZone == null || palletZone.LocationId != locationId)
+                return Conflict(new { message = "Pallet outbound không thuộc hub xuất phát của chuyến xe." });
+            if (!ZoneProcessRoles.IsDispatch(palletZone.ProcessRole))
+                return Conflict(new { message = "Chỉ pallet ở Zone B hoặc Zone C mới được chất lên chuyến outbound." });
+            if (palletZone.ProcessRole == ZoneProcessRoles.InterprovinceOutbound && string.IsNullOrWhiteSpace(sack.NextHopId))
+                return Conflict(new { message = "Bao Zone C chưa có next hop hợp lệ." });
 
             sack.TripId = id;
             sack.Status = "Loaded";
-
-            if (pallet != null)
-            {
-                var remainingSacks = await _db.Sacks.CountAsync(item =>
-                    item.PalletId == pallet.PalletId &&
-                    item.SackId != sack.SackId &&
-                    item.Status != "Loaded");
-
-                if (remainingSacks == 0)
-                {
-                    pallet.Status = "Empty";
-                }
-            }
 
             await _db.SaveChangesAsync();
 
@@ -635,6 +702,94 @@ namespace WMS_.Controllers
                 trip.TripId,
                 sack.SackId,
                 loadedCount));
+        }
+
+        [HttpPost("depart-by-qr")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
+        public async Task<ActionResult<DispatchTripByQrResponse>> DepartByQr([FromBody] DispatchTripByQrRequest request)
+        {
+            var locationId = User.FindFirstValue("location_id");
+            if (string.IsNullOrWhiteSpace(locationId))
+                return Forbid();
+
+            var qrValue = request.QrValue?.Trim() ?? string.Empty;
+            if (!qrValue.StartsWith(QrTokenPrefix, StringComparison.Ordinal))
+                return BadRequest(new { message = "QR không đúng định dạng token chuyến xe." });
+
+            var token = qrValue[QrTokenPrefix.Length..];
+            if (string.IsNullOrWhiteSpace(token))
+                return BadRequest(new { message = "QR thiếu token chuyến xe." });
+
+            var tokenHash = HashQrToken(token);
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+
+            var qrToken = await _db.TripQrTokens
+                .FromSqlInterpolated($"SELECT * FROM trip_qr_token WHERE token_hash = {tokenHash} FOR UPDATE")
+                .SingleOrDefaultAsync();
+            if (qrToken == null)
+                return NotFound(new { message = "Token QR không hợp lệ." });
+            if (qrToken.RevokedAt != null)
+                return Conflict(new { message = "Token QR đã bị thu hồi." });
+            if (qrToken.ExpiresAt < DateTime.UtcNow)
+                return Conflict(new { message = "Token QR đã hết hạn." });
+
+            var trip = await _db.Trips
+                .FromSqlInterpolated($"SELECT * FROM trip WHERE trip_id = {qrToken.TripId} FOR UPDATE")
+                .SingleOrDefaultAsync();
+            if (trip == null)
+                return NotFound(new { message = "Không tìm thấy chuyến xe của token QR." });
+            if (trip.Type != "Outbound")
+                return BadRequest(new { message = "QR này không phải QR xe outbound." });
+            if (trip.Origin != locationId)
+                return Forbid();
+            if (trip.Status != "Loading")
+                return Conflict(new { message = "Chuyến xe đã được xuất kho hoặc không còn ở bước chất hàng." });
+
+            var sacks = await _db.Sacks
+                .Where(sack => sack.TripId == trip.TripId)
+                .ToListAsync();
+            if (sacks.Count == 0)
+                return BadRequest(new { message = "Chưa có sack nào được chất lên xe." });
+            if (sacks.Any(sack => sack.Status != "Loaded"))
+                return Conflict(new { message = "Có sack chưa ở trạng thái đã chất lên xe." });
+
+            var palletIds = sacks
+                .Where(sack => !string.IsNullOrWhiteSpace(sack.PalletId))
+                .Select(sack => sack.PalletId!)
+                .Distinct()
+                .ToList();
+
+            foreach (var sack in sacks)
+            {
+                sack.Status = "InTransit";
+                sack.PalletId = null;
+                sack.ZoneId = null;
+            }
+
+            foreach (var palletId in palletIds)
+            {
+                var remainingSacks = await _db.Sacks.CountAsync(sack => sack.PalletId == palletId && sack.TripId != trip.TripId);
+                if (remainingSacks == 0)
+                {
+                    var pallet = await _db.Pallets.FindAsync(palletId);
+                    if (pallet != null) pallet.Status = "Empty";
+                }
+            }
+
+            var previousStatus = trip.Status;
+            trip.Status = "InProgress";
+            trip.UpdatedAt = DateTime.UtcNow;
+            AddAuditLog("DispatchOutboundByQr", "trip", trip.TripId, new { Status = previousStatus }, new
+            {
+                Status = trip.Status,
+                LoadedCount = sacks.Count,
+                QrTokenVersion = qrToken.ManifestVersion
+            });
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Ok(new DispatchTripByQrResponse(trip.TripId, trip.CarId, trip.Status, sacks.Count));
         }
 
         [HttpPost("{id}/check-in")]
@@ -819,6 +974,9 @@ namespace WMS_.Controllers
                 return Ok(new TripQrCheckInResponse(trip.TripId, trip.CarId, trip.Status, expectedIds.Count, arrivedIds.Count, 0, missingIds, [], inboundZone?.ZoneId, inboundZone?.ZoneName));
             }
 
+            if (trip.Type == "Outbound")
+                await _outboundService.CompleteOrdersForReceivedSacksAsync(dbSacks.Select(sack => sack.SackId));
+
             trip.UpdatedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
@@ -874,6 +1032,12 @@ namespace WMS_.Controllers
                 if (status == "Completed")
                     AddAuditLog("CompleteTripStatus", "trip", trip.TripId, new { Status = previousStatus }, new { Status = trip.Status, QrTokenPolicy = "Revoked", Source = "DispatchStatus" });
             }
+
+            if (status == "Completed" && trip.Type == "Outbound")
+            {
+                await _outboundService.CompleteOrderForCompletedTripAsync(id);
+            }
+
             await _db.SaveChangesAsync();
             return NoContent();
         }
@@ -917,8 +1081,15 @@ namespace WMS_.Controllers
         public async Task<ActionResult<IEnumerable<Trip>>> GetMyTrips()
         {
             var employeeId = User.FindFirstValue("employee_id");
-            if (employeeId == null) return Forbid();
-            var trips = await _db.Trips.Where(trip => trip.EmployeeId == employeeId).OrderByDescending(trip => trip.CreatedAt).ToListAsync();
+            var hubId = User.FindFirstValue("location_id");
+            if (employeeId == null || string.IsNullOrWhiteSpace(hubId)) return Forbid();
+            var trips = await _db.Trips
+                .Where(trip => trip.EmployeeId == employeeId &&
+                               (trip.Origin == hubId || trip.Destination == hubId) &&
+                               OperationalHubScope.HubIds.Contains(trip.Origin) &&
+                               OperationalHubScope.OutboundDestinationIds.Contains(trip.Destination))
+                .OrderByDescending(trip => trip.CreatedAt)
+                .ToListAsync();
             await PopulateSackCountsAsync(trips);
             return Ok(trips);
         }
@@ -928,8 +1099,11 @@ namespace WMS_.Controllers
         public async Task<ActionResult<IEnumerable<Sack>>> GetMyTripSacks(string id)
         {
             var employeeId = User.FindFirstValue("employee_id");
-            if (employeeId == null) return Forbid();
-            if (!await _db.Trips.AnyAsync(trip => trip.TripId == id && trip.EmployeeId == employeeId)) return NotFound();
+            var hubId = User.FindFirstValue("location_id");
+            if (employeeId == null || string.IsNullOrWhiteSpace(hubId)) return Forbid();
+            if (!await _db.Trips.AnyAsync(trip =>
+                    trip.TripId == id && trip.EmployeeId == employeeId &&
+                    (trip.Origin == hubId || trip.Destination == hubId))) return NotFound();
             return Ok(await _db.Sacks.Where(sack => sack.TripId == id).ToListAsync());
         }
 
@@ -938,9 +1112,10 @@ namespace WMS_.Controllers
         public async Task<IActionResult> UpdateMyTripStatus(string id, [FromBody] string status)
         {
             var employeeId = User.FindFirstValue("employee_id");
+            var hubId = User.FindFirstValue("location_id");
             var trip = await _db.Trips.FindAsync(id);
-            if (employeeId == null) return Forbid();
-            if (trip == null || trip.EmployeeId != employeeId) return NotFound();
+            if (employeeId == null || string.IsNullOrWhiteSpace(hubId)) return Forbid();
+            if (trip == null || trip.EmployeeId != employeeId || (trip.Origin != hubId && trip.Destination != hubId)) return NotFound();
             if (!((status == "InProgress" && trip.Status == "Pending") || (status == "Completed" && trip.Status == "InProgress"))) return BadRequest("Chuyen trang thai khong hop le.");
             var previousStatus = trip.Status;
             trip.Status = status; trip.UpdatedAt = DateTime.UtcNow;
@@ -953,13 +1128,34 @@ namespace WMS_.Controllers
             if (status == "InProgress" && trip.Type == "Outbound")
             {
                 var sacks = await _db.Sacks.Where(sack => sack.TripId == id).ToListAsync();
+                var palletIds = sacks
+                    .Where(sack => !string.IsNullOrWhiteSpace(sack.PalletId))
+                    .Select(sack => sack.PalletId!)
+                    .Distinct()
+                    .ToList();
                 foreach (var sack in sacks)
                 {
                     sack.Status = "InTransit";
                     sack.PalletId = null;
                     sack.ZoneId = null;
                 }
+                foreach (var palletId in palletIds)
+                {
+                    var remainingSacks = await _db.Sacks.CountAsync(sack => sack.PalletId == palletId && sack.TripId != id);
+                    if (remainingSacks == 0)
+                    {
+                        var pallet = await _db.Pallets.FindAsync(palletId);
+                        if (pallet != null) pallet.Status = "Empty";
+                    }
+                }
+
             }
+
+            if (status == "Completed" && trip.Type == "Outbound")
+            {
+                await _outboundService.CompleteOrderForCompletedTripAsync(id);
+            }
+
             await _db.SaveChangesAsync();
             return NoContent();
         }

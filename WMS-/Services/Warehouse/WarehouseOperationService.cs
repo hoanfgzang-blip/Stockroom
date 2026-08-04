@@ -345,16 +345,23 @@ namespace WMS_.Services.Warehouse
             return true;
         }
 
-        public async Task<bool> PreparePalletForOutboundAsync(string palletId, string outboundOrderId, string userId)
+        public async Task<bool> PreparePalletForOutboundAsync(string palletId, string outboundOrderId, string userId, string locationId)
         {
             if (string.IsNullOrWhiteSpace(outboundOrderId) || string.IsNullOrWhiteSpace(palletId))
                 throw new InvalidOperationException("Mã đơn xuất kho và mã pallet là bắt buộc.");
+            if (!OperationalHubScope.IsHub(locationId))
+                throw new InvalidOperationException("Tài khoản chưa được gán hub vận hành.");
 
             await using var transaction = await _db.Database.BeginTransactionAsync();
 
             try
             {
-                var order = await _db.OutboundOrders.FindAsync(outboundOrderId);
+                var currentHubId = locationId;
+                var order = string.IsNullOrWhiteSpace(currentHubId)
+                    ? null
+                    : await _db.OutboundOrders.FirstOrDefaultAsync(item =>
+                        item.OutboundOrderId == outboundOrderId &&
+                        (item.OriginLocationId == null || item.OriginLocationId == currentHubId));
                 if (order == null) throw new InvalidOperationException("Không tìm thấy đơn xuất kho.");
                 if (order.Status is "Completed" or "Cancelled" or "Fulfilled")
                     throw new InvalidOperationException("Đơn hàng này đã hoàn tất hoặc bị hủy, không thể chuẩn bị thêm pallet.");
@@ -364,10 +371,18 @@ namespace WMS_.Services.Warehouse
                 var zone = await _db.Zones.FindAsync(pallet.ZoneId);
                 if (zone == null || !OperationalHubScope.IsHub(zone.LocationId))
                     throw new InvalidOperationException("Pallet không thuộc hub vận hành.");
+                if (zone.LocationId != locationId)
+                    throw new InvalidOperationException("Pallet không thuộc hub của tài khoản.");
+                if (!OperationalHubScope.IsOutboundDestination(order.OutboundDestination))
+                    throw new InvalidOperationException("Điểm đến đơn xuất không hợp lệ.");
+                if (order.OriginLocationId != null && order.OriginLocationId != locationId)
+                    throw new InvalidOperationException("Đơn xuất thuộc hub khác.");
+                if (order.OriginLocationId == null)
+                    order.OriginLocationId = locationId;
                 if (zone.ProcessRole == ZoneProcessRoles.LocalSortBuffer)
                     throw new InvalidOperationException("Pallet ở Zone A phải được chia chọn sang Zone B trước khi chốt xuất.");
-                if (!ZoneProcessRoles.IsDispatch(zone.ProcessRole) && zone.ProcessRole != ZoneProcessRoles.General)
-                    throw new InvalidOperationException("Zone hiện tại không được phép chốt pallet outbound.");
+                if (!ZoneProcessRoles.IsDispatch(zone.ProcessRole))
+                    throw new InvalidOperationException("Chỉ pallet ở Zone B hoặc Zone C mới được chốt outbound.");
                 if (pallet.Status == "Empty") throw new InvalidOperationException("Pallet đang rỗng, không thể chốt.");
                 if (pallet.Status is "Finalized" or "Locked") throw new InvalidOperationException("Pallet đã chốt hoặc đang bị khóa.");
 
@@ -388,6 +403,15 @@ namespace WMS_.Services.Warehouse
                     throw new InvalidOperationException("Điểm đến đơn xuất không khớp với điểm xuất của pallet.");
                 if (zone.ProcessRole == ZoneProcessRoles.LocalOutbound && sacks.Any(sack => sack.SDestination != sack.NextHopId))
                     throw new InvalidOperationException("Pallet Zone B chỉ được chứa bao đi trực tiếp tới điểm phát nội tỉnh.");
+
+                var palletSackIds = sacks.Select(sack => sack.SackId).ToList();
+                var conflictingOrderIds = await _db.OutboundOrderItems
+                    .Where(item => palletSackIds.Contains(item.SackId) && item.OutboundOrderId != outboundOrderId)
+                    .Select(item => item.OutboundOrderId)
+                    .Distinct()
+                    .ToListAsync();
+                if (conflictingOrderIds.Count > 0)
+                    throw new InvalidOperationException($"Bao trên pallet đã thuộc đơn outbound khác: {string.Join(", ", conflictingOrderIds)}.");
 
                 var existingItems = await _db.OutboundOrderItems
                     .Where(item => item.OutboundOrderId == outboundOrderId)

@@ -32,6 +32,10 @@ namespace WMS_.Data.Entities
         [MaxLength(50)]
         public string Destination { get; set; } = null!;
 
+        [Column("outbound_order_id")]
+        [MaxLength(50)]
+        public string? OutboundOrderId { get; set; }
+
         [Required]
         [Column("type")]
         [MaxLength(50)]
@@ -75,7 +79,11 @@ namespace WMS_.Data.Entities
         [ForeignKey("Destination")]
         public virtual Location DestinationLocation { get; set; } = null!;
 
+        [ForeignKey("OutboundOrderId")]
+        public virtual OutboundOrder? OutboundOrder { get; set; }
+
         [ForeignKey("SealedBy")]
         public virtual UserAccount? SealedByUser { get; set; }
+
     }
 }

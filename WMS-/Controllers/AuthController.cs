@@ -105,7 +105,7 @@ public class AuthController : ControllerBase
         if (!string.IsNullOrWhiteSpace(locationId) && await FindHubAsync(locationId) == null)
             return BadRequest(new { message = "Hub không tồn tại hoặc không hợp lệ." });
 
-            var query = _db.UserAccounts
+        var query = _db.UserAccounts
             .Include(account => account.Employee)
                 .ThenInclude(employee => employee.Location)
             .AsQueryable();
@@ -230,7 +230,7 @@ public class AuthController : ControllerBase
         return _db.Locations.FirstOrDefaultAsync(location =>
             location.LocationId == normalizedLocationId &&
             location.LocationType == "Hub" &&
-            OperationalHubScope.IsHub(location.LocationId));
+            OperationalHubScope.HubIds.Contains(location.LocationId));
     }
 
     private async Task AssignEmployeeHubAsync(Employee employee, Location hub)

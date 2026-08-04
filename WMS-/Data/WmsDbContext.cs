@@ -81,6 +81,12 @@ namespace WMS_.Data
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Trip>()
+                .HasOne(t => t.OutboundOrder)
+                .WithMany()
+                .HasForeignKey(t => t.OutboundOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Trip>()
                 .HasIndex(t => t.SealCode)
                 .IsUnique();
 
@@ -136,6 +142,12 @@ namespace WMS_.Data
                 .HasOne(o => o.OutboundDestinationLocation)
                 .WithMany()
                 .HasForeignKey(o => o.OutboundDestination)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<OutboundOrder>()
+                .HasOne(o => o.OriginLocation)
+                .WithMany()
+                .HasForeignKey(o => o.OriginLocationId)
                 .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<InboundOrder>()
                 .HasIndex(e => e.InboundOrderNumber)

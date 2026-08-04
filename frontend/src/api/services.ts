@@ -61,6 +61,9 @@ export type PalletAssignmentResult = {
   classification?: 'IntraProvince' | 'InterProvince'
   destinationName?: string | null
   zoneName?: string | null
+  processRole?: string | null
+  nextHopId?: string | null
+  nextHopName?: string | null
 }
 
 export const accountsApi = {
@@ -88,6 +91,7 @@ export const locationsApi = {
   all: async () => (await api.get<Location[]>('/Locations')).filter((location) => isOperationalHub(location.locationId)),
   get: (id: string) => api.get<Location>(`/Locations/${id}`),
   byProvince: async (provinceId: string) => (await api.get<Location[]>(`/Locations/by-province/${provinceId}`)).filter((location) => isOperationalHub(location.locationId)),
+  dispatchDestinations: () => api.get<Location[]>('/Locations/dispatch-destinations'),
   create: (data: Location) => api.post<Location>('/Locations', data),
   update: (id: string, data: Location) => api.put<void>(`/Locations/${id}`, data),
   delete: (id: string) => api.delete(`/Locations/${id}`),
@@ -159,6 +163,7 @@ export type CreateTripRequest = {
   origin: string
   destination: string
   type: 'Inbound' | 'Outbound'
+  outboundOrderId?: string | null
   sackIds: string[]
 }
 export type TripCheckInResult = {
@@ -172,6 +177,12 @@ export type TripCheckInResult = {
 export type LoadTripSackResult = {
   tripId: string
   sackId: string
+  loadedCount: number
+}
+export type DispatchTripByQrResult = {
+  tripId: string
+  carId: string
+  status: string
   loadedCount: number
 }
 export type ScanTripSealResult = {
@@ -192,9 +203,9 @@ export type TripPalletsResult = {
 }
 export const tripsApi = {
   all: (status?: string) =>
-    api.get<Trip[]>(`/Trips${status ? `?status=${encodeURIComponent(status)}` : ''}`).then((trips) =>
-      trips.filter((trip) => isOperationalHub(trip.origin) && isOperationalHub(trip.destination)),
-    ),
+    api.get<Trip[]>(`/Trips${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+  allForDispatch: (status?: string) =>
+    api.get<Trip[]>(`/Trips${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Trip>(`/Trips/${id}`),
   sacks: (id: string) => api.get<Sack[]>(`/Trips/${id}/sacks`),
   pallets: (id: string) => api.get<TripPalletsResult>(`/Trips/${id}/pallets`),
@@ -204,12 +215,14 @@ export const tripsApi = {
   create: (data: CreateTripRequest) => api.post<Trip>('/Trips', data),
   loadSack: (tripId: string, sackId: string) =>
     api.post<LoadTripSackResult>(`/Trips/${tripId}/load-sack/${sackId}`, {}),
+  departByQr: (qrValue: string) =>
+    api.post<DispatchTripByQrResult>('/Trips/depart-by-qr', { qrValue }),
   scanSeal: (tripId: string, sealCode: string) =>
     api.post<ScanTripSealResult>(`/Trips/${tripId}/scan-seal`, { sealCode }),
   update: (id: string, data: Trip) => api.put<void>(`/Trips/${id}`, data),
   updateStatus: (id: string, status: string) => api.patch(`/Trips/${id}/status`, status),
   delete: (id: string) => api.delete(`/Trips/${id}`),
-  mine: () => api.get<Trip[]>('/Trips/my').then((trips) => trips.filter((trip) => isOperationalHub(trip.origin) && isOperationalHub(trip.destination))),
+  mine: () => api.get<Trip[]>('/Trips/my'),
   mySacks: (id: string) => api.get<Sack[]>(`/Trips/my/${id}/sacks`),
   updateMyStatus: (id: string, status: 'InProgress' | 'Completed') =>
     api.patch(`/Trips/my/${id}/status`, status),
@@ -233,9 +246,9 @@ export const inboundOrdersApi = {
 
 export const outboundOrdersApi = {
   all: (status?: string) =>
-    api.get<OutboundOrder[]>(`/OutboundOrders${status ? `?status=${encodeURIComponent(status)}` : ''}`).then((orders) =>
-      orders.filter((order) => isOperationalHub(order.outboundDestination)),
-    ),
+    api.get<OutboundOrder[]>(`/OutboundOrders${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+  allForDispatch: (status?: string) =>
+    api.get<OutboundOrder[]>(`/OutboundOrders${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<OutboundOrder>(`/OutboundOrders/${id}`),
   withItems: (id: string) =>
     api.get<{ order: OutboundOrder; items: OutboundOrderItem[] }>(`/OutboundOrders/${id}/items`),
@@ -248,9 +261,7 @@ export const outboundOrdersApi = {
 
 export const sacksApi = {
   all: (status?: string) =>
-    api.get<Sack[]>(`/Sacks${status ? `?status=${encodeURIComponent(status)}` : ''}`).then((sacks) =>
-      sacks.filter((sack) => isOperationalHub(sack.sDestination)),
-    ),
+    api.get<Sack[]>(`/Sacks${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Sack>(`/Sacks/${id}`),
   byPallet: (palletId: string) => api.get<Sack[]>(`/Sacks/by-pallet/${palletId}`),
   create: (data: Pick<Sack, 'sDestination'> & Partial<Pick<Sack, 'zoneId' | 'palletId'>>) =>

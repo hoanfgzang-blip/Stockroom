@@ -50,6 +50,10 @@ namespace WMS_.Controllers
             {
                 return BadRequest(ex.Message);
             }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(ex.Message);
+            }
         }
 
         /// <summary>Update outbound order</summary>

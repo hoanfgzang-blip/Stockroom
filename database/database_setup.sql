@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS zone (
     location_id VARCHAR(50) NOT NULL REFERENCES location(location_id) ON DELETE CASCADE,
     zone_name VARCHAR(100) NOT NULL,
     zone_type VARCHAR(50) NOT NULL,
+    process_role VARCHAR(50) NOT NULL DEFAULT 'General',
     capacity INTEGER NOT NULL DEFAULT 0 CONSTRAINT chk_zone_capacity CHECK (capacity >= 0)
 );
 
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS trip (
     car_id VARCHAR(50) NOT NULL REFERENCES car(car_id) ON DELETE RESTRICT,
     origin VARCHAR(50) NOT NULL REFERENCES location(location_id) ON DELETE RESTRICT,
     destination VARCHAR(50) NOT NULL REFERENCES location(location_id) ON DELETE RESTRICT,
+    outbound_order_id VARCHAR(50),
     type VARCHAR(50) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'Pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -119,6 +121,7 @@ CREATE TABLE IF NOT EXISTS sack (
     end_at TIMESTAMP,
     zone_id VARCHAR(50) REFERENCES zone(zone_id) ON DELETE SET NULL,
     s_destination VARCHAR(50) NOT NULL REFERENCES location(location_id) ON DELETE RESTRICT,
+    next_hop_id VARCHAR(50) REFERENCES location(location_id) ON DELETE RESTRICT,
     CONSTRAINT chk_sack_time CHECK (end_at IS NULL OR end_at >= created_at)
 );
 
@@ -152,9 +155,15 @@ CREATE TABLE IF NOT EXISTS outbound_order (
     order_number VARCHAR(50) UNIQUE NOT NULL,
     customer_name VARCHAR(255) NOT NULL,
     destination VARCHAR(50) NOT NULL REFERENCES location(location_id) ON DELETE RESTRICT,
+    origin_location_id VARCHAR(50) REFERENCES location(location_id) ON DELETE RESTRICT,
     status VARCHAR(50) NOT NULL DEFAULT 'Pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE trip
+    ADD CONSTRAINT fk_trip_outbound_order
+    FOREIGN KEY (outbound_order_id) REFERENCES outbound_order(outbound_order_id) ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS ix_trip_outbound_order_id ON trip(outbound_order_id);
 
 -- Bảng Chi tiết yêu cầu xuất kho
 CREATE TABLE IF NOT EXISTS outbound_order_item (
@@ -190,7 +199,9 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS idx_sack_status ON sack(status);
 CREATE INDEX IF NOT EXISTS idx_sack_zone ON sack(zone_id);
 CREATE INDEX IF NOT EXISTS idx_sack_pallet ON sack(pallet_id);
+CREATE INDEX IF NOT EXISTS idx_sack_next_hop ON sack(next_hop_id);
 CREATE INDEX IF NOT EXISTS idx_trip_status ON trip(status);
+CREATE INDEX IF NOT EXISTS idx_outbound_order_origin ON outbound_order(origin_location_id);
 CREATE INDEX IF NOT EXISTS idx_sack_trip ON sack(trip_id);
 CREATE INDEX IF NOT EXISTS idx_reservation_expires ON inventory_reservation(expires_at) WHERE status = 'Active';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_reservation ON inventory_reservation(sack_id) WHERE status = 'Active';

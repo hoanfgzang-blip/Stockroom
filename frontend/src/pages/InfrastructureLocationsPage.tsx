@@ -50,7 +50,7 @@ export default function InfrastructureLocationsPage() {
 
   const loadData = () => {
     setLoading(true)
-    Promise.all([provincesApi.all(), locationsApi.all()])
+    Promise.all([provincesApi.all(), locationsApi.dispatchDestinations()])
       .then(([p, l]) => {
         setProvinces(p)
         setLocations(l)
@@ -124,7 +124,7 @@ export default function InfrastructureLocationsPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger active={tab === 'locations'} onClick={() => setTab('locations')}>
-            Provinces & Hubs
+            Provinces & Locations
           </TabsTrigger>
           <TabsTrigger active={tab === 'provinces'} onClick={() => setTab('provinces')}>
             Province Registry
@@ -171,9 +171,11 @@ export default function InfrastructureLocationsPage() {
                       <TableCell className="font-mono text-xs">{loc.locationId}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(loc)} title="Sửa địa điểm">
-                            <Pencil className="h-4 w-4 text-slate-600" />
-                          </Button>
+                          {loc.locationType === 'Hub' && (
+                            <Button variant="ghost" size="sm" onClick={() => openEditDialog(loc)} title="Sửa địa điểm">
+                              <Pencil className="h-4 w-4 text-slate-600" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -202,7 +204,7 @@ export default function InfrastructureLocationsPage() {
                   <TableRow>
                     <TableHead>Tên tỉnh</TableHead>
                     <TableHead>Mã tỉnh</TableHead>
-                    <TableHead>Số hub</TableHead>
+                    <TableHead>Số địa điểm</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

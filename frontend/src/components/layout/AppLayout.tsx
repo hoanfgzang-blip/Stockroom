@@ -4,13 +4,13 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Building2,
-  Calendar,
   ChevronRight,
   ClipboardList,
   LayoutDashboard,
   LogOut,
   Menu,
   Package,
+  PackageCheck,
   PanelLeftClose,
   Route,
   ScanLine,
@@ -48,9 +48,10 @@ const navGroups: NavGroup[] = [
   },
   {
     label: 'Hàng hóa và đơn hàng',
-    items: [
-      { to: '/operations/barcode-scanner', label: 'Quét mã vạch', icon: ScanLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
-      { to: '/inventory/inbound', label: 'Đơn nhập kho', icon: ArrowDownToLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
+      items: [
+        { to: '/operations/barcode-scanner', label: 'Quét mã vạch', icon: ScanLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
+        { to: '/inventory/inbound', label: 'Đơn nhập kho', icon: ArrowDownToLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
+        { to: '/operations/sorting', label: 'Phân loại', icon: PackageCheck, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
       { to: '/inventory/outbound', label: 'Đơn xuất kho', icon: ArrowUpFromLine, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
       { to: '/inventory/sacks', label: 'Bao hàng', icon: Package, roles: ['Manager', 'Supervisor', 'WarehouseStaff', 'Operator'] },
     ],
@@ -259,16 +260,6 @@ export function Topbar({ onOpenMobile }: { onOpenMobile?: () => void }) {
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-sm md:flex">
-          <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
-          <span className="text-xs font-medium text-slate-500">Ca làm việc:</span>
-          <select className="bg-transparent text-xs font-semibold text-slate-700 outline-none cursor-pointer">
-            <option>Ca sáng (06:00–14:00)</option>
-            <option>Ca chiều (14:00–22:00)</option>
-            <option>Ca đêm (22:00–06:00)</option>
-          </select>
-        </div>
-
         <div className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-1.5 bg-white">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-sm">
             OP

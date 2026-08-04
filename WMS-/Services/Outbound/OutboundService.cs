@@ -25,11 +25,17 @@ namespace WMS_.Services
 
         public async Task<IReadOnlyList<OutboundOrder>> GetOrdersAsync(string? status = null)
         {
-            // Lấy mã Hub của nhân viên đang đăng nhập từ Token
-            var myLocationId = _httpContextAccessor.HttpContext?.User.FindFirstValue("location_id");
+            var hubId = _httpContextAccessor.HttpContext?.User.HubId();
+            if (string.IsNullOrWhiteSpace(hubId)) return Array.Empty<OutboundOrder>();
+
+            var currentSackIds = QuerySacksAtCurrentHub().Select(sack => sack.SackId);
 
             var query = _db.OutboundOrders
-                .Where(order => OperationalHubScope.HubIds.Contains(order.OutboundDestination));
+                .Where(order =>
+                    OperationalHubScope.OutboundDestinationIds.Contains(order.OutboundDestination) &&
+                    (order.OriginLocationId == hubId ||
+                     (order.OriginLocationId == null && _db.OutboundOrderItems.Any(item =>
+                         item.OutboundOrderId == order.OutboundOrderId && currentSackIds.Contains(item.SackId)))));
 
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(o => o.Status == status);
@@ -38,10 +44,18 @@ namespace WMS_.Services
         }
 
         public async Task<OutboundOrder?> GetOrderAsync(string id)
-            => await _db.OutboundOrders
-                .FirstOrDefaultAsync(order =>
-                    order.OutboundOrderId == id &&
-                    OperationalHubScope.HubIds.Contains(order.OutboundDestination));
+        {
+            var hubId = _httpContextAccessor.HttpContext?.User.HubId();
+            if (string.IsNullOrWhiteSpace(hubId)) return null;
+
+            var currentSackIds = QuerySacksAtCurrentHub().Select(sack => sack.SackId);
+            return await _db.OutboundOrders.FirstOrDefaultAsync(order =>
+                order.OutboundOrderId == id &&
+                OperationalHubScope.OutboundDestinationIds.Contains(order.OutboundDestination) &&
+                (order.OriginLocationId == hubId ||
+                 (order.OriginLocationId == null && _db.OutboundOrderItems.Any(item =>
+                     item.OutboundOrderId == order.OutboundOrderId && currentSackIds.Contains(item.SackId)))));
+        }
 
         public async Task<(OutboundOrder? Order, IReadOnlyList<OutboundOrderItem> Items)> GetOrderWithItemsAsync(string id)
         {
@@ -49,8 +63,9 @@ namespace WMS_.Services
             if (order == null)
                 return (null, Array.Empty<OutboundOrderItem>());
 
+            var currentSackIds = QuerySacksAtCurrentHub().Select(sack => sack.SackId);
             var items = await _db.OutboundOrderItems
-                .Where(i => i.OutboundOrderId == id)
+                .Where(i => i.OutboundOrderId == id && currentSackIds.Contains(i.SackId))
                 .ToListAsync();
 
             return (order, items);
@@ -58,8 +73,11 @@ namespace WMS_.Services
 
         public async Task<OutboundOrder> CreateOrderAsync(OutboundOrder order)
         {
-            if (!OperationalHubScope.IsHub(order.OutboundDestination))
-                throw new ArgumentException("Điểm đến đơn xuất phải thuộc 3 hub vận hành.");
+            var hubId = _httpContextAccessor.HttpContext?.User.HubId();
+            if (string.IsNullOrWhiteSpace(hubId))
+                throw new InvalidOperationException("Tài khoản chưa được gán hub.");
+            if (!OperationalHubScope.IsOutboundDestination(order.OutboundDestination))
+                throw new ArgumentException("Điểm đến đơn xuất phải là hub hoặc location phát nội tỉnh đã cấu hình.");
             if (string.IsNullOrWhiteSpace(order.OutboundOrderId))
                 order.OutboundOrderId = GenerateId("OUP");
 
@@ -80,6 +98,7 @@ namespace WMS_.Services
             {
                 throw new ArgumentException("Thiếu thông tin điểm đến (OutboundDestination).");
             }
+            order.OriginLocationId = hubId;
             _db.OutboundOrders.Add(order);
             await _db.SaveChangesAsync();
             return order;
@@ -89,10 +108,14 @@ namespace WMS_.Services
         {
             if (id != order.OutboundOrderId)
                 throw new ArgumentException("Route id must match outbound order id.");
-            if (!OperationalHubScope.IsHub(order.OutboundDestination))
-                throw new ArgumentException("Điểm đến đơn xuất phải thuộc 3 hub vận hành.");
+            if (!OperationalHubScope.IsOutboundDestination(order.OutboundDestination))
+                throw new ArgumentException("Điểm đến đơn xuất phải là hub hoặc location phát nội tỉnh đã cấu hình.");
 
-            _db.Entry(order).State = EntityState.Modified;
+            var existing = await GetOrderAsync(id);
+            if (existing == null) return false;
+            order.OriginLocationId = existing.OriginLocationId ?? _httpContextAccessor.HttpContext?.User.HubId();
+
+            _db.Entry(existing).CurrentValues.SetValues(order);
 
             try
             {
@@ -212,52 +235,101 @@ namespace WMS_.Services
             return true;
         }
 
-        public async Task<bool> FulfillOrderAsync(string outboundOrderId)
+        public Task<bool> FulfillOrderAsync(string outboundOrderId)
         {
-            await using var tx = await _db.Database.BeginTransactionAsync();
+            throw new InvalidOperationException("Không thể hoàn tất đơn xuất trực tiếp. Hãy chốt pallet, chất bao vào chuyến xe và cho xe xuất phát.");
+        }
 
-            var currentSackIds = await QuerySacksAtCurrentHub()
-                .Select(sack => sack.SackId)
+        public async Task<bool> CompleteOrderForCompletedTripAsync(string tripId)
+        {
+            var trip = await _db.Trips.FindAsync(tripId);
+            if (trip == null || trip.Type != "Outbound" || trip.Status != "Completed")
+                return false;
+
+            var orderIds = await _db.OutboundOrderItems
+                .Where(item => item.Sack.TripId == tripId)
+                .Select(item => item.OutboundOrderId)
+                .Distinct()
                 .ToListAsync();
-            var order = await _db.OutboundOrders.FirstOrDefaultAsync(item =>
-                item.OutboundOrderId == outboundOrderId &&
-                OperationalHubScope.HubIds.Contains(item.OutboundDestination) &&
-                _db.OutboundOrderItems.Any(orderItem =>
-                    orderItem.OutboundOrderId == item.OutboundOrderId &&
-                    currentSackIds.Contains(orderItem.SackId)));
-            if (order == null)
+            if (!string.IsNullOrWhiteSpace(trip.OutboundOrderId) && !orderIds.Contains(trip.OutboundOrderId))
+                orderIds.Add(trip.OutboundOrderId);
+            if (orderIds.Count == 0)
                 return false;
 
             var items = await _db.OutboundOrderItems
-                .Where(i => i.OutboundOrderId == outboundOrderId)
+                .Where(item => orderIds.Contains(item.OutboundOrderId))
+                .Include(item => item.Sack)
                 .ToListAsync();
-            if (items.Count == 0)
-                throw new InvalidOperationException("Outbound order has no items to fulfill.");
+            var completedOrderIds = items
+                .GroupBy(item => item.OutboundOrderId)
+                .Where(group => group.Any() && group.All(item => item.Sack.TripId == tripId))
+                .Select(group => group.Key)
+                .ToList();
 
-            var sackIds = items.Select(i => i.SackId).ToList();
+            return await MarkOrdersCompletedAsync(completedOrderIds) > 0;
+        }
+
+        public async Task<int> CompleteOrdersForReceivedSacksAsync(IEnumerable<string> sackIds)
+        {
+            var normalizedSackIds = sackIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct()
+                .ToList();
+            if (normalizedSackIds.Count == 0)
+                return 0;
+
+            var candidateOrderIds = await _db.OutboundOrderItems
+                .Where(item => normalizedSackIds.Contains(item.SackId))
+                .Select(item => item.OutboundOrderId)
+                .Distinct()
+                .ToListAsync();
+            if (candidateOrderIds.Count == 0)
+                return 0;
+
+            var items = await _db.OutboundOrderItems
+                .Where(item => candidateOrderIds.Contains(item.OutboundOrderId))
+                .Include(item => item.Sack)
+                .ToListAsync();
+
+            var completedOrderIds = items
+                .GroupBy(item => item.OutboundOrderId)
+                .Where(group => group.Any() && group.All(item => item.Sack.Status == "Received"))
+                .Select(group => group.Key)
+                .ToList();
+
+            return await MarkOrdersCompletedAsync(completedOrderIds);
+        }
+
+        private async Task<int> MarkOrdersCompletedAsync(IEnumerable<string> orderIds)
+        {
+            var normalizedOrderIds = orderIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct()
+                .ToList();
+            if (normalizedOrderIds.Count == 0)
+                return 0;
+
+            var orders = await _db.OutboundOrders
+                .Where(order => normalizedOrderIds.Contains(order.OutboundOrderId) &&
+                                order.Status != "Completed" &&
+                                order.Status != "Cancelled")
+                .ToListAsync();
+
+            foreach (var order in orders)
+                order.Status = "Completed";
+
+            var completedOrderIds = orders
+                .Select(order => order.OutboundOrderId)
+                .ToList();
             var activeReservations = await _db.InventoryReservations
-                .Where(r => r.OutboundOrderId == outboundOrderId && sackIds.Contains(r.SackId) && r.Status == "Active")
+                .Where(reservation => completedOrderIds.Contains(reservation.OutboundOrderId) &&
+                                      reservation.Status == "Active")
                 .ToListAsync();
-
             foreach (var reservation in activeReservations)
                 reservation.Status = "Fulfilled";
 
-            var sacks = await QuerySacksAtCurrentHub()
-                .Where(sack => sackIds.Contains(sack.SackId))
-                .ToListAsync();
-            if (sacks.Count != sackIds.Count)
-                throw new InvalidOperationException("Một số bao hàng không thuộc hub của tài khoản.");
-            foreach (var sack in sacks)
-            {
-                sack.Status = "InTransit";
-                sack.EndAt = DateTime.Now;
-            }
-
-            order.Status = "Completed";
-
-            await _db.SaveChangesAsync();
-            await tx.CommitAsync();
-            return true;
+            return orders.Count;
         }
 
         private async Task ValidateOrderAndSackAsync(string outboundOrderId, string sackId)
@@ -269,11 +341,19 @@ namespace WMS_.Services
                     .FirstOrDefaultAsync(item => item.SackId == sackId)
                 ?? throw new InvalidOperationException("Sack was not found.");
 
-            if (sack.SDestination != order.OutboundDestination)
-                throw new InvalidOperationException("Sack destination does not match outbound order destination.");
+            var dispatchDestination = sack.NextHopId ?? sack.SDestination;
+            if (dispatchDestination != order.OutboundDestination)
+                throw new InvalidOperationException("Điểm xuất hoặc next hop của bao không khớp với đơn xuất.");
 
-            if (sack.Status == "InTransit" || sack.Status == "Received")
-                throw new InvalidOperationException("Sack is no longer available for outbound reservation.");
+            if (sack.Status != "ReadyForOutbound")
+                throw new InvalidOperationException("Bao phải được chốt pallet trước khi giữ cho đơn xuất.");
+
+            var otherOrderId = await _db.OutboundOrderItems
+                .Where(item => item.SackId == sackId && item.OutboundOrderId != outboundOrderId)
+                .Select(item => item.OutboundOrderId)
+                .FirstOrDefaultAsync();
+            if (otherOrderId != null)
+                throw new InvalidOperationException($"Bao đã thuộc đơn outbound {otherOrderId}.");
         }
 
         private IQueryable<Sack> QuerySacksAtCurrentHub()
@@ -283,7 +363,7 @@ namespace WMS_.Services
                 return _db.Sacks.Where(_ => false);
 
             return _db.Sacks.Where(sack =>
-                OperationalHubScope.HubIds.Contains(sack.SDestination) &&
+                OperationalHubScope.OutboundDestinationIds.Contains(sack.SDestination) &&
                 ((sack.ZoneId != null && sack.Zone.LocationId == hubId) ||
                  (sack.PalletId != null && sack.Pallet.Zone.LocationId == hubId) ||
                  (sack.TripId != null && (sack.Trip.Origin == hubId || sack.Trip.Destination == hubId))));

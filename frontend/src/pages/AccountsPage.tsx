@@ -55,6 +55,7 @@ export default function AccountsPage() {
   }
 
   const openEdit = (account: ManagedAccount) => {
+    const employee = employees.find((item) => item.employeeId === account.employeeId)
     setForm({
       userId: account.userId,
       employeeId: account.employeeId,
@@ -62,7 +63,7 @@ export default function AccountsPage() {
       password: '',
       roleName: account.roleName,
       isActive: account.isActive,
-      locationId: account.locationId ?? '',
+      locationId: account.locationId ?? employee?.locationId ?? '',
     })
     setDialogOpen(true)
   }
@@ -107,6 +108,11 @@ export default function AccountsPage() {
   const visibleAccounts = locationFilter
     ? accounts.filter((account) => account.locationId === locationFilter)
     : accounts
+  const getAccountHubName = (account: ManagedAccount) => {
+    const employee = employees.find((item) => item.employeeId === account.employeeId)
+    const locationId = account.locationId ?? employee?.locationId
+    return account.locationName || locations.find((location) => location.locationId === locationId)?.locationName || locationId || 'Chưa gán hub'
+  }
 
   if (loading && accounts.length === 0) return <LoadingState />
   if (error && accounts.length === 0) return <ErrorState message={error} />
@@ -141,7 +147,7 @@ export default function AccountsPage() {
               {visibleAccounts.map((account) => (
                 <TableRow key={account.userId}>
                    <TableCell><p className="font-medium">{account.employeeName}</p><p className="font-mono text-xs text-slate-500">{account.employeeId}</p></TableCell>
-                   <TableCell>{account.locationName ?? account.locationId ?? 'Chưa gán hub'}</TableCell>
+                    <TableCell>{getAccountHubName(account)}</TableCell>
                    <TableCell className="font-mono">{account.username}</TableCell>
                   <TableCell><Badge status={account.roleName}>{roleLabel(account.roleName)}</Badge></TableCell>
                   <TableCell><Badge status={account.isActive ? 'Active' : 'Inactive'}>{account.isActive ? 'Đang hoạt động' : 'Đã vô hiệu hóa'}</Badge></TableCell>

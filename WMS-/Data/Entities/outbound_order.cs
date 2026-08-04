@@ -27,6 +27,10 @@ namespace WMS_.Data.Entities
         [MaxLength(50)]
         public string OutboundDestination { get; set; } = null!;
 
+        [Column("origin_location_id")]
+        [MaxLength(50)]
+        public string? OriginLocationId { get; set; }
+
         [Required]
         [Column("status")]
         [MaxLength(50)]
@@ -38,5 +42,8 @@ namespace WMS_.Data.Entities
 
         [ForeignKey("OutboundDestination")]
         public virtual Location OutboundDestinationLocation { get; set; } = null!;
+
+        [ForeignKey("OriginLocationId")]
+        public virtual Location? OriginLocation { get; set; }
     }
 }

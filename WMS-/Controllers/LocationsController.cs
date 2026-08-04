@@ -30,6 +30,16 @@ namespace WMS_.Controllers
                 .Include(l => l.Province)
                 .ToListAsync();
 
+        /// <summary>Get hub and configured local dispatch destinations for outbound operations.</summary>
+        [HttpGet("dispatch-destinations")]
+        public async Task<ActionResult<IEnumerable<Location>>> GetDispatchDestinations()
+            => await _db.Locations
+                .Where(location => OperationalHubScope.OutboundDestinationIds.Contains(location.LocationId))
+                .Include(location => location.Province)
+                .OrderBy(location => location.ProvinceId)
+                .ThenBy(location => location.LocationName)
+                .ToListAsync();
+
         /// <summary>Get location by ID</summary>
         [HttpGet("{id}")]
         public async Task<ActionResult<Location>> GetById(string id)
@@ -42,7 +52,9 @@ namespace WMS_.Controllers
         /// <summary>Get locations by province</summary>
         [HttpGet("by-province/{provinceId}")]
         public async Task<ActionResult<IEnumerable<Location>>> GetByProvince(string provinceId)
-            => await _db.Locations.Where(l => l.ProvinceId == provinceId).ToListAsync();
+            => await _db.Locations
+                .Where(l => l.ProvinceId == provinceId && OperationalHubScope.HubIds.Contains(l.LocationId))
+                .ToListAsync();
 
         /// <summary>Create location</summary>
         [HttpPost]

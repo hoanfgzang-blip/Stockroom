@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table'
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
 import { statusLabel } from '@/lib/utils'
+import { isDispatchProcessRole, zoneProcessRoleLabel } from '@/lib/zoneFlow'
 import type { OutboundOrder, Pallet, Sack, Zone } from '@/types'
 
 const statusOptions = ['Empty', 'Occupied', 'In Transit to Zone', 'Finalized', 'Locked']
@@ -46,6 +47,7 @@ export default function PalletsPage() {
   const [selectedOutboundOrderId, setSelectedOutboundOrderId] = useState('')
   const [outboundLoading, setOutboundLoading] = useState(false)
   const [finalizeError, setFinalizeError] = useState<string | null>(null)
+  const [finalizeDestination, setFinalizeDestination] = useState<string | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -66,6 +68,7 @@ export default function PalletsPage() {
   }, [statusFilter])
 
   const zoneName = (id: string) => zones.find((z) => z.zoneId === id)?.zoneName ?? id
+  const zoneRole = (pallet: Pallet) => pallet.zone?.processRole ?? zones.find((zone) => zone.zoneId === pallet.zoneId)?.processRole
 
   const filteredPallets = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -150,11 +153,24 @@ export default function PalletsPage() {
     setSelectedOutboundOrderId('')
     setOutboundOrders([])
     setFinalizeError(null)
+    setFinalizeDestination(null)
     setOutboundLoading(true)
 
     try {
-      const orders = await outboundOrdersApi.all()
-      setOutboundOrders(orders.filter((order) => !['Completed', 'Cancelled', 'Fulfilled'].includes(order.status)))
+      const [orders, sacks] = await Promise.all([
+        outboundOrdersApi.allForDispatch(),
+        sacksApi.byPallet(pallet.palletId),
+      ])
+      const destinations = [...new Set(sacks.map((sack) => sack.nextHopId ?? sack.sDestination).filter(Boolean))]
+      if (destinations.length !== 1) {
+        setFinalizeError('Pallet outbound phải có đúng một điểm xuất hoặc next hop trước khi chốt.')
+        return
+      }
+      setFinalizeDestination(destinations[0])
+      setOutboundOrders(orders.filter((order) =>
+        !['Completed', 'Cancelled', 'Fulfilled'].includes(order.status) &&
+        order.outboundDestination === destinations[0],
+      ))
     } catch (err) {
       setFinalizeError((err as Error).message)
     } finally {
@@ -266,6 +282,7 @@ export default function PalletsPage() {
               <TableRow>
                 <TableHead>Mã pallet</TableHead>
                 <TableHead>Zone</TableHead>
+                <TableHead>Luồng</TableHead>
                 <TableHead>Sức chứa</TableHead>
                 <TableHead>Trạng thái</TableHead>
                 <TableHead>Chuyển zone</TableHead>
@@ -277,10 +294,11 @@ export default function PalletsPage() {
                 <TableRow key={pallet.palletId}>
                   <TableCell className="font-mono font-medium">{pallet.palletId}</TableCell>
                   <TableCell>{zoneName(pallet.zoneId)}</TableCell>
+                  <TableCell>{zoneProcessRoleLabel(zoneRole(pallet))}</TableCell>
                   <TableCell>{pallet.capacity}</TableCell>
                   <TableCell><Badge status={pallet.status}>{statusLabel(pallet.status)}</Badge></TableCell>
                   <TableCell>
-                    <Select value={pallet.zoneId} onChange={(event) => void movePallet(pallet, event.target.value)} disabled={saving || pallet.status === 'Finalized' || pallet.status === 'Locked'}>
+                    <Select value={pallet.zoneId} onChange={(event) => void movePallet(pallet, event.target.value)} disabled={saving || pallet.status !== 'Empty'}>
                       {zones.map((zone) => <option key={zone.zoneId} value={zone.zoneId}>{zone.zoneName}</option>)}
                     </Select>
                   </TableCell>
@@ -289,7 +307,7 @@ export default function PalletsPage() {
                       <Button type="button" size="sm" variant="outline" onClick={() => void openDetails(pallet)} disabled={saving} title="Xem bao hàng trên pallet">
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button type="button" size="sm" variant="secondary" onClick={() => void openFinalize(pallet)} disabled={saving || pallet.status === 'Finalized' || pallet.status === 'Empty' || pallet.status === 'Locked'} title="Chốt pallet cho đơn xuất kho">
+                      <Button type="button" size="sm" variant="secondary" onClick={() => void openFinalize(pallet)} disabled={saving || pallet.status === 'Finalized' || pallet.status === 'Empty' || pallet.status === 'Locked' || !isDispatchProcessRole(zoneRole(pallet))} title="Chỉ chốt pallet ở Zone B hoặc Zone C">
                         <CheckCircle2 className="h-4 w-4" />
                       </Button>
                       <Button type="button" size="sm" variant="destructive" onClick={() => void deletePallet(pallet)} disabled={saving || pallet.status !== 'Empty'} title="Chỉ xóa pallet trống">
@@ -301,7 +319,7 @@ export default function PalletsPage() {
               ))}
               {filteredPallets.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">Không có pallet phù hợp với bộ lọc hiện tại.</TableCell>
+                  <TableCell colSpan={7} className="py-10 text-center text-sm text-slate-500">Không có pallet phù hợp với bộ lọc hiện tại.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -388,6 +406,7 @@ export default function PalletsPage() {
                       <TableHead>Mã bao</TableHead>
                       <TableHead>Trạng thái</TableHead>
                       <TableHead>Điểm đến</TableHead>
+                      <TableHead>Điểm xuất</TableHead>
                       <TableHead>Zone</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -397,6 +416,7 @@ export default function PalletsPage() {
                         <TableCell className="font-mono text-xs font-medium">{sack.sackId}</TableCell>
                         <TableCell><Badge status={sack.status}>{statusLabel(sack.status)}</Badge></TableCell>
                         <TableCell>{sack.sDestination}</TableCell>
+                        <TableCell>{sack.nextHopId ?? sack.sDestination}</TableCell>
                         <TableCell>{sack.zoneId ?? '—'}</TableCell>
                       </TableRow>
                     ))}
@@ -414,11 +434,12 @@ export default function PalletsPage() {
         open={finalizeTarget !== null}
         onClose={() => setFinalizeTarget(null)}
         title={finalizeTarget ? `Chốt pallet ${finalizeTarget.palletId}` : 'Chốt pallet'}
-        description="Chọn đơn xuất kho có cùng điểm đến với các bao trên pallet."
+        description={finalizeTarget ? `Chỉ chốt ${zoneProcessRoleLabel(zoneRole(finalizeTarget))}; đơn xuất phải khớp điểm xuất của pallet.` : 'Chọn đơn xuất kho phù hợp.'}
       >
         <form className="space-y-4" onSubmit={handleFinalize}>
           <div>
             <Label htmlFor="outbound-order">Đơn xuất kho</Label>
+            {finalizeDestination && <p className="mt-1 text-xs text-slate-500">Điểm xuất yêu cầu: <span className="font-mono font-semibold text-slate-700">{finalizeDestination}</span></p>}
             {outboundLoading ? (
               <LoadingState message="Đang tải đơn xuất kho..." />
             ) : (

@@ -77,7 +77,8 @@ namespace WMS_.Services.Warehouse
             var user = _httpContextAccessor.HttpContext?.User;
             if (user == null || !OperationalHubScope.IsHub(zone.LocationId) || !user.CanAccessHub(zone.LocationId))
                 throw new InvalidOperationException("Zone phải thuộc hub của tài khoản.");
-            if (!await _db.Zones.AnyAsync(item => item.ZoneId == id && item.LocationId == user.HubId()))
+            var hubId = user.HubId();
+            if (!await _db.Zones.AnyAsync(item => item.ZoneId == id && item.LocationId == hubId))
                 return false;
             if (string.IsNullOrWhiteSpace(zone.ProcessRole))
                 zone.ProcessRole = ZoneProcessRoles.General;

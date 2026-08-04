@@ -15,5 +15,7 @@ namespace WMS_.Services
         Task<InventoryReservation> ReserveSackAsync(string outboundOrderId, string sackId, int reservationHours = 12);
         Task<bool> ReleaseReservationAsync(string reservationId);
         Task<bool> FulfillOrderAsync(string outboundOrderId);
+        Task<int> CompleteOrdersForReceivedSacksAsync(IEnumerable<string> sackIds);
+        Task<bool> CompleteOrderForCompletedTripAsync(string tripId);
     }
 }

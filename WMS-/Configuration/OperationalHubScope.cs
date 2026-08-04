@@ -23,8 +23,16 @@ public static class OperationalHubScope
         "DEMO-LOC-HCM-01", "DEMO-LOC-HCM-02", "DEMO-LOC-HCM-03", "DEMO-LOC-HCM-04"
     ];
 
+    public static readonly string[] OutboundDestinationIds =
+    [
+        "DEMO-HUB-HN", "DEMO-HUB-HCM", "DEMO-HUB-DN",
+        "DEMO-LOC-HN-01", "DEMO-LOC-HN-02", "DEMO-LOC-HN-03", "DEMO-LOC-HN-04",
+        "DEMO-LOC-DN-01", "DEMO-LOC-DN-02", "DEMO-LOC-DN-03", "DEMO-LOC-DN-04",
+        "DEMO-LOC-HCM-01", "DEMO-LOC-HCM-02", "DEMO-LOC-HCM-03", "DEMO-LOC-HCM-04"
+    ];
+
     public static bool IsHub(string? locationId) => locationId != null && HubIds.Contains(locationId);
     public static bool IsProvince(string? provinceId) => provinceId != null && ProvinceIds.Contains(provinceId);
     public static bool IsLocalDispatchLocation(string? locationId) => locationId != null && LocalDispatchLocationIds.Contains(locationId);
-    public static bool IsOutboundDestination(string? locationId) => IsHub(locationId) || IsLocalDispatchLocation(locationId);
+    public static bool IsOutboundDestination(string? locationId) => locationId != null && OutboundDestinationIds.Contains(locationId);
 }

@@ -6,6 +6,7 @@ using WMS_.Configuration;
 
 namespace WMS_.Controllers
 {
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOnly")]
     [ApiController]
     [Route("api/[controller]")]
     public class ProvincesController : ControllerBase

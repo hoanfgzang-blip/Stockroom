@@ -39,14 +39,6 @@ namespace WMS_.Controllers
             return log == null ? NotFound() : Ok(log);
         }
 
-        /// <summary>Create audit log entry</summary>
-        [HttpPost]
-        public async Task<ActionResult<AuditLog>> Create([FromBody] AuditLog log)
-        {
-            var createdLog = await _trackingService.CreateLogAsync(log);
-            return CreatedAtAction(nameof(GetById), new { id = createdLog.AuditLogId }, createdLog);
-        }
-
         /// <summary>Truy vết Realtime: Tìm vị trí hiện tại của Sack (Dành cho Trưởng Kho)</summary>
         [HttpGet("realtime-location/{sackId}")]
         public async Task<IActionResult> GetSackLocation(string sackId)

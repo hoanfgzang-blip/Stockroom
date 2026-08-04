@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS zone (
 CREATE TABLE IF NOT EXISTS pallet (
     pallet_id VARCHAR(50) PRIMARY KEY,
     zone_id VARCHAR(50) NOT NULL REFERENCES zone(zone_id) ON DELETE CASCADE,
+    destination_location_id VARCHAR(50) REFERENCES location(location_id) ON DELETE RESTRICT,
     status VARCHAR(50) NOT NULL DEFAULT 'Empty',
     capacity DECIMAL(10,2) NOT NULL DEFAULT 1000.00 CONSTRAINT chk_pallet_capacity CHECK (capacity > 0)
 );
@@ -199,6 +200,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS idx_sack_status ON sack(status);
 CREATE INDEX IF NOT EXISTS idx_sack_zone ON sack(zone_id);
 CREATE INDEX IF NOT EXISTS idx_sack_pallet ON sack(pallet_id);
+CREATE INDEX IF NOT EXISTS idx_pallet_destination ON pallet(destination_location_id);
 CREATE INDEX IF NOT EXISTS idx_sack_next_hop ON sack(next_hop_id);
 CREATE INDEX IF NOT EXISTS idx_trip_status ON trip(status);
 CREATE INDEX IF NOT EXISTS idx_outbound_order_origin ON outbound_order(origin_location_id);

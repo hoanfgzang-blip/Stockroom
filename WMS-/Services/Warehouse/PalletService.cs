@@ -59,6 +59,7 @@ namespace WMS_.Services.Warehouse
 
             if (!await _db.Zones.AnyAsync(zone => zone.ZoneId == pallet.ZoneId && zone.LocationId == myLocationId))
                 throw new InvalidOperationException("Zone đặt pallet không tồn tại.");
+            await ValidateDestinationAsync(pallet.DestinationLocationId, myLocationId);
 
             if (!string.IsNullOrWhiteSpace(pallet.PalletId) && await _db.Pallets.AnyAsync(item => item.PalletId == pallet.PalletId))
                 throw new InvalidOperationException("Mã pallet đã tồn tại.");
@@ -71,6 +72,39 @@ namespace WMS_.Services.Warehouse
             await _db.SaveChangesAsync();
             return pallet;
         }
+
+        public async Task<Pallet> SetPalletDestinationAsync(string id, string destinationLocationId)
+        {
+            var myLocationId = _httpContextAccessor.HttpContext?.User.HubId();
+            if (string.IsNullOrWhiteSpace(myLocationId))
+                throw new InvalidOperationException("Tài khoản chưa được gán hub.");
+
+            var pallet = await _db.Pallets
+                .Include(item => item.Zone)
+                .Include(item => item.DestinationLocation)
+                .FirstOrDefaultAsync(item => item.PalletId == id && item.Zone.LocationId == myLocationId);
+            if (pallet == null)
+                throw new InvalidOperationException("Không tìm thấy pallet tại hub hiện tại.");
+            if (pallet.Status is "Finalized" or "Locked")
+                throw new InvalidOperationException("Pallet đã chốt hoặc đang bị khóa.");
+
+            await ValidateDestinationAsync(destinationLocationId, myLocationId);
+
+            var sackDestinations = await _db.Sacks
+                .Where(sack => sack.PalletId == id)
+                .Select(sack => sack.NextHopId ?? sack.SDestination)
+                .Distinct()
+                .ToListAsync();
+            if (sackDestinations.Count > 0 &&
+                (sackDestinations.Count != 1 || sackDestinations[0] != destinationLocationId))
+            {
+                throw new InvalidOperationException("Đích pallet phải khớp với toàn bộ bao đang nằm trên pallet.");
+            }
+
+            pallet.DestinationLocationId = destinationLocationId;
+            await _db.SaveChangesAsync();
+            return pallet;
+        }
         private async Task<string> GeneratePalletIdAsync()
         {
             string palletId;
@@ -80,6 +114,24 @@ namespace WMS_.Services.Warehouse
             } while (await _db.Pallets.AnyAsync(p => p.PalletId == palletId));
 
             return palletId;
+        }
+
+        private async Task ValidateDestinationAsync(string? destinationLocationId, string hubId)
+        {
+            if (!OperationalHubScope.IsOutboundDestination(destinationLocationId))
+                throw new InvalidOperationException("Điểm đến pallet không thuộc phạm vi outbound đã cấu hình.");
+
+            var destination = await _db.Locations
+                .FirstOrDefaultAsync(location => location.LocationId == destinationLocationId);
+            var hubProvinceId = await _db.Locations
+                .Where(location => location.LocationId == hubId)
+                .Select(location => location.ProvinceId)
+                .FirstOrDefaultAsync();
+            if (destination == null || string.IsNullOrWhiteSpace(hubProvinceId))
+                throw new InvalidOperationException("Không tìm thấy điểm đến hoặc hub hiện tại.");
+
+            if (!OperationalHubScope.IsHub(destination.LocationId) && destination.ProvinceId != hubProvinceId)
+                throw new InvalidOperationException("Pallet chỉ được gán location trong tỉnh của hub hoặc một hub trung chuyển.");
         }
 
         public async Task<bool> UpdatePalletAsync(string id, Pallet pallet)

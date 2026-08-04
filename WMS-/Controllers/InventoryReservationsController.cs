@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 using WMS_.Data;
 using WMS_.Data.Entities;
 using WMS_.Security;
@@ -11,6 +12,18 @@ namespace WMS_.Controllers
     [Route("api/[controller]")]
     public class InventoryReservationsController : ControllerBase
     {
+        public sealed class CreateReservationRequest
+        {
+            [Required] public string OutboundOrderId { get; set; } = string.Empty;
+            [Required] public string SackId { get; set; } = string.Empty;
+            [Range(1, 168)] public int ReservationHours { get; set; } = 12;
+        }
+
+        public sealed class UpdateReservationStatusRequest
+        {
+            [Required] public string Status { get; set; } = string.Empty;
+        }
+
         private readonly WmsDbContext _db;
         public InventoryReservationsController(WmsDbContext db) => _db = db;
 
@@ -28,7 +41,7 @@ namespace WMS_.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<InventoryReservation>> GetById(string id)
         {
-            var res = await QueryReservationsAtCurrentHub().FirstOrDefaultAsync(item => item.ReservationId == id);
+            var res = await QueryReservationsAtCurrentHub().Include(item => item.Sack).FirstOrDefaultAsync(item => item.ReservationId == id);
             return res == null ? NotFound() : Ok(res);
         }
 
@@ -51,11 +64,30 @@ namespace WMS_.Controllers
 
         /// <summary>Create reservation (lock sack for outbound order)</summary>
         [HttpPost]
-        public async Task<ActionResult<InventoryReservation>> Create([FromBody] InventoryReservation reservation)
+        public async Task<ActionResult<InventoryReservation>> Create([FromBody] CreateReservationRequest request)
         {
-            if (!await QuerySacksAtCurrentHub().AnyAsync(sack => sack.SackId == reservation.SackId))
-                return Forbid();
+            var hubId = User.HubId();
+            if (string.IsNullOrWhiteSpace(hubId)) return Forbid();
+            var sack = await QuerySacksAtCurrentHub().FirstOrDefaultAsync(item => item.SackId == request.SackId);
+            var order = await _db.OutboundOrders.FirstOrDefaultAsync(item =>
+                item.OutboundOrderId == request.OutboundOrderId && item.OriginLocationId == hubId);
+            if (sack == null || order == null) return Forbid();
+            if (order.Status is "Completed" or "Cancelled" or "Fulfilled")
+                return Conflict(new { message = "Đơn xuất đã kết thúc, không thể giữ hàng." });
+            if (sack.Status is "InTransit" or "Received")
+                return Conflict(new { message = "Bao hàng đã rời kho hoặc đã nhận, không thể giữ hàng." });
+            if (await _db.InventoryReservations.AnyAsync(item => item.SackId == request.SackId && item.Status == "Active" && item.ExpiresAt > DateTime.UtcNow))
+                return Conflict(new { message = "Bao hàng đang có một lượt giữ hàng còn hiệu lực." });
 
+            var reservation = new InventoryReservation
+            {
+                ReservationId = $"RES-{Guid.NewGuid():N}"[..20].ToUpperInvariant(),
+                OutboundOrderId = request.OutboundOrderId,
+                SackId = request.SackId,
+                ReservedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddHours(request.ReservationHours),
+                Status = "Active"
+            };
             _db.InventoryReservations.Add(reservation);
             await _db.SaveChangesAsync();
             return CreatedAtAction(nameof(GetById), new { id = reservation.ReservationId }, reservation);
@@ -63,11 +95,15 @@ namespace WMS_.Controllers
 
         /// <summary>Update reservation status (Active → Released / Fulfilled)</summary>
         [HttpPatch("{id}/status")]
-        public async Task<IActionResult> UpdateStatus(string id, [FromBody] string status)
+        public async Task<IActionResult> UpdateStatus(string id, [FromBody] UpdateReservationStatusRequest request)
         {
-            var res = await QueryReservationsAtCurrentHub().FirstOrDefaultAsync(item => item.ReservationId == id);
+            var res = await QueryReservationsAtCurrentHub().Include(item => item.Sack).FirstOrDefaultAsync(item => item.ReservationId == id);
             if (res == null) return NotFound();
-            res.Status = status;
+            if (request.Status is not ("Active" or "Released" or "Fulfilled"))
+                return BadRequest(new { message = "Trạng thái giữ hàng không hợp lệ." });
+            if (request.Status == "Fulfilled" && res.Sack.Status != "Received")
+                return Conflict(new { message = "Chỉ được hoàn tất giữ hàng sau khi bao đã nhận." });
+            res.Status = request.Status;
             await _db.SaveChangesAsync();
             return NoContent();
         }

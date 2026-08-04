@@ -31,6 +31,7 @@ type InboundCheckInResult = Partial<TripCheckInResult> & Partial<TripQrCheckInRe
 
 type TripCheckInSession = {
   manifest: TripQrManifest
+  qrValue: string
   arrivedSackIds: string[]
   unexpectedSackIds: string[]
 }
@@ -240,7 +241,7 @@ export default function BarcodeScannerPage() {
     const previouslyReceivedSackIds = manifest.status === 'CompletedWithMissing'
       ? manifest.sacks.filter((sack) => sack.status !== 'Missing').map((sack) => sack.sackId)
       : []
-    setTripSession({ manifest, arrivedSackIds: previouslyReceivedSackIds, unexpectedSackIds: [] })
+    setTripSession({ manifest, qrValue: scannedValue, arrivedSackIds: previouslyReceivedSackIds, unexpectedSackIds: [] })
     setLastTrip(null)
     setLastSack(null)
     addResult(
@@ -320,7 +321,7 @@ export default function BarcodeScannerPage() {
 
     setTripConfirming(true)
     try {
-      const trip = await tripsApi.checkInByQr(tripSession.manifest.tripId, tripSession.arrivedSackIds)
+      const trip = await tripsApi.checkInByQr(tripSession.manifest.tripId, tripSession.qrValue, tripSession.arrivedSackIds)
       setLastTrip(trip)
       setLastSack(null)
       addResult(trip.tripId, formatTripQrResult(trip, tripSession.manifest), true)

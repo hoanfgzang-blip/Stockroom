@@ -15,6 +15,7 @@ public sealed class CreateLocationRequest
 
 namespace WMS_.Controllers
 {
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOnly")]
     [ApiController]
     [Route("api/[controller]")]
     public class LocationsController : ControllerBase

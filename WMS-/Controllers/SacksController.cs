@@ -166,7 +166,11 @@ namespace WMS_.Controllers
         [HttpPost("{id}/confirm-received")]
         public async Task<IActionResult> ConfirmReceived(string id)
         {
-            var sack = await QuerySacksAtCurrentHub().FirstOrDefaultAsync(item => item.SackId == id);
+            var destinationHubId = User.HubId();
+            if (string.IsNullOrWhiteSpace(destinationHubId)) return Forbid();
+            var sack = await _db.Sacks
+                .Include(item => item.Trip)
+                .FirstOrDefaultAsync(item => item.SackId == id && item.Trip != null && item.Trip.Destination == destinationHubId);
             if (sack == null) return NotFound();
             if (sack.Status != "InTransit") return Conflict(new { message = "Chỉ bao đang vận chuyển mới được xác nhận đã giao." });
 

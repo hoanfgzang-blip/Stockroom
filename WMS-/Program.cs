@@ -1,14 +1,21 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using System.Threading.RateLimiting;
 using WMS_.Data;
 using WMS_.Services;
 using WMS_.Services.Warehouse;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<WmsDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+var connectionString = builder.Configuration["WMS_DB_CONNECTION"]
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+    throw new InvalidOperationException("WMS_DB_CONNECTION or ConnectionStrings:DefaultConnection is required.");
+builder.Services.AddDbContext<WmsDbContext>(options => options.UseNpgsql(connectionString));
 
 builder.Services.AddControllers();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -18,6 +25,22 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.SlidingExpiration = true;
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+            var db = context.HttpContext.RequestServices.GetRequiredService<WmsDbContext>();
+            var account = string.IsNullOrWhiteSpace(userId)
+                ? null
+                : await db.UserAccounts.Include(item => item.Employee)
+                    .SingleOrDefaultAsync(item => item.UserId == userId);
+            if (account?.IsActive != true || account.Employee == null)
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+        };
         options.Events.OnRedirectToLogin = context =>
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -35,10 +58,22 @@ builder.Services.AddAuthorization(options =>
         .RequireAuthenticatedUser()
         .Build();
     options.AddPolicy("WarehouseOperations", policy =>
+        policy.RequireRole("Manager", "Supervisor", "WarehouseStaff", "Operator"));
+    options.AddPolicy("ReadOnlyOperations", policy =>
         policy.RequireRole("Manager", "Supervisor", "WarehouseStaff", "Operator", "Driver"));
     options.AddPolicy("DispatchOperations", policy =>
         policy.RequireRole("Manager", "Supervisor"));
     options.AddPolicy("ManagerOnly", policy => policy.RequireRole("Manager"));
+});
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("login", limiter =>
+    {
+        limiter.PermitLimit = 10;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+    });
 });
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IInboundService, InboundService>();
@@ -69,6 +104,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("Frontend");
+app.UseRateLimiter();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseHttpsRedirection();

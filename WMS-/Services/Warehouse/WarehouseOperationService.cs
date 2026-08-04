@@ -25,13 +25,14 @@ namespace WMS_.Services.Warehouse
         }
 
         public Task<PalletAssignmentResult> AssignSackToPalletAsync(string sackId, string palletId, string userId, string locationId)
-            => PlaceSackOnPalletAsync(sackId, palletId, userId, locationId, allowReassignment: false);
+            => PlaceSackOnPalletAsync(sackId, palletId, userId, locationId, allowReassignment: true);
 
         public Task<PalletAssignmentResult> ReassignSackToPalletAsync(string sackId, string palletId, string userId, string locationId)
             => PlaceSackOnPalletAsync(sackId, palletId, userId, locationId, allowReassignment: true);
 
-        public async Task<PalletAssignmentResult> RemoveSackFromPalletAsync(string sackId, string palletId, string userId)
+        public async Task<PalletAssignmentResult> RemoveSackFromPalletAsync(string sackId, string palletId, string userId, string locationId)
         {
+            if (!OperationalHubScope.IsHub(locationId)) return new(false, "Tài khoản chưa được gán hub vận hành.");
             await using var transaction = await _db.Database.BeginTransactionAsync();
             var sack = await LoadSackForUpdateAsync(sackId);
             if (sack == null) return new(false, "Không tìm thấy bao hàng.");
@@ -41,6 +42,9 @@ namespace WMS_.Services.Warehouse
             var pallet = await LoadPalletForUpdateAsync(palletId);
             if (pallet == null || sack.PalletId != palletId)
                 return new(false, "Bao hàng không nằm trên pallet đã quét.");
+            var palletZoneLocation = await _db.Zones.Where(zone => zone.ZoneId == pallet.ZoneId).Select(zone => zone.LocationId).SingleOrDefaultAsync();
+            if (palletZoneLocation != locationId)
+                return new(false, "Pallet không thuộc hub của tài khoản.");
             if (pallet.Status is "Finalized" or "Locked")
                 return new(false, "Pallet đã chốt hoặc đang bị khóa.");
 
@@ -112,6 +116,8 @@ namespace WMS_.Services.Warehouse
                 return new(false, "Zone chưa được cấu hình vai trò nghiệp vụ hợp lệ.");
             if (targetPallet.Status is "Finalized" or "Locked")
                 return new(false, "Pallet đã chốt hoặc đang bị khóa.");
+            if (previousPalletId != null && pallets.TryGetValue(previousPalletId, out var sourcePallet) && sourcePallet.Status is ("Finalized" or "Locked"))
+                return new(false, "Pallet cũ đã chốt hoặc đang bị khóa, không thể tháo sack.");
             if (sack.Status is "InTransit" or "Received")
                 return new(false, "Bao hàng đang vận chuyển hoặc đã giao, không thể phân loại lại.");
 
@@ -130,6 +136,13 @@ namespace WMS_.Services.Warehouse
                 var flowError = await ValidateTargetZoneFlowAsync(sack, targetPallet, targetZone, route);
                 if (flowError != null) return new(false, flowError);
             }
+
+            if (string.IsNullOrWhiteSpace(targetPallet.DestinationLocationId))
+                return new(false, "Pallet chưa được gán điểm đến. Hãy chọn location cho pallet trước khi quét bao.");
+
+            var sackDispatchDestination = route?.NextHopId ?? sack.NextHopId ?? sack.SDestination;
+            if (!string.Equals(targetPallet.DestinationLocationId, sackDispatchDestination, StringComparison.OrdinalIgnoreCase))
+                return new(false, $"Pallet {targetPallet.PalletId} đã gán cho {targetPallet.DestinationLocationId}, bao này đi {sackDispatchDestination}.");
 
             var classification = route?.Classification;
             var destinationName = route?.DestinationName;
@@ -188,7 +201,9 @@ namespace WMS_.Services.Warehouse
             await transaction.CommitAsync();
             return new(
                 true,
-                allowReassignment ? "Đã chuyển bao hàng sang pallet mới." : "Đã gán bao hàng vào pallet và khu phân loại.",
+                previousPalletId != null
+                    ? "Đã gỡ bao hàng khỏi pallet cũ và gắn vào pallet mới."
+                    : "Đã gán bao hàng vào pallet và khu phân loại.",
                 sack.SackId,
                 palletId,
                 targetPallet.ZoneId,
@@ -297,16 +312,17 @@ namespace WMS_.Services.Warehouse
             });
         }
 
-        public async Task<bool> MovePalletToZoneAsync(string palletId, string newZoneId, string userId)
+        public async Task<bool> MovePalletToZoneAsync(string palletId, string newZoneId, string userId, string locationId)
         {
+            if (!OperationalHubScope.IsHub(locationId)) return false;
             await using var transaction = await _db.Database.BeginTransactionAsync();
             var pallet = await LoadPalletForUpdateAsync(palletId);
             var zone = await _db.Zones
-                .FirstOrDefaultAsync(item => item.ZoneId == newZoneId && OperationalHubScope.HubIds.Contains(item.LocationId));
+                .FirstOrDefaultAsync(item => item.ZoneId == newZoneId && item.LocationId == locationId && OperationalHubScope.HubIds.Contains(item.LocationId));
             if (pallet == null || zone == null || pallet.Status is "Finalized" or "Locked") return false;
 
             var sourceZone = await _db.Zones.FindAsync(pallet.ZoneId);
-            if (sourceZone == null || !OperationalHubScope.IsHub(sourceZone.LocationId)) return false;
+            if (sourceZone == null || sourceZone.LocationId != locationId || !OperationalHubScope.IsHub(sourceZone.LocationId)) return false;
 
             var sacks = await LoadSacksOnPalletForUpdateAsync(palletId);
             if (sacks.Count > 0 && sourceZone.ProcessRole != zone.ProcessRole)
@@ -404,6 +420,10 @@ namespace WMS_.Services.Warehouse
                     throw new InvalidOperationException("Pallet outbound phải có đúng một điểm xuất hoặc next hop.");
                 if (dispatchDestinations[0] != order.OutboundDestination)
                     throw new InvalidOperationException("Điểm đến đơn xuất không khớp với điểm xuất của pallet.");
+                if (string.IsNullOrWhiteSpace(pallet.DestinationLocationId))
+                    throw new InvalidOperationException("Pallet chưa được gán điểm đến trước khi chốt outbound.");
+                if (!string.Equals(pallet.DestinationLocationId, dispatchDestinations[0], StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Điểm đến pallet không khớp với điểm xuất hoặc next hop của bao.");
                 if (zone.ProcessRole == ZoneProcessRoles.LocalOutbound && sacks.Any(sack => sack.SDestination != sack.NextHopId))
                     throw new InvalidOperationException("Pallet Zone B chỉ được chứa bao đi trực tiếp tới điểm phát nội tỉnh.");
 

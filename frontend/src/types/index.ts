@@ -24,6 +24,7 @@ export interface Zone {
 export interface Pallet {
   palletId: string
   zoneId: string
+  destinationLocationId?: string | null
   status: string
   capacity: number
   zone?: Zone
@@ -105,6 +106,7 @@ export interface TripQrManifest {
 
 export interface TripQrCheckInRequest {
   tripId: string
+  qrValue: string
   arrivedSackIds: string[]
 }
 

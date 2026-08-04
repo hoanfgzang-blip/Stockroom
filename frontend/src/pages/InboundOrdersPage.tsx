@@ -124,6 +124,7 @@ export default function InboundOrdersPage() {
   /* ── Inbound wizard */
   const [inboundStep, setInboundStep] = useState<InboundStep>('idle')
   const [tripManifest, setTripManifest] = useState<TripQrManifest | null>(null)
+  const [tripQrValue, setTripQrValue] = useState('')
   const [vehicleInput, setVehicleInput] = useState('')
   const [palletInput, setPalletInput] = useState('')
   const [selectedPalletId, setSelectedPalletId] = useState('')
@@ -229,6 +230,7 @@ export default function InboundOrdersPage() {
   const resetWizard = () => {
     setInboundStep('idle')
     setTripManifest(null)
+    setTripQrValue('')
     setVehicleInput('')
     setPalletInput('')
     setSelectedPalletId('')
@@ -262,6 +264,7 @@ export default function InboundOrdersPage() {
         throw new Error('Mã vừa quét không hợp lệ. Hãy quét mã QR từ tờ manifest của xe.')
       }
       setTripManifest(manifest)
+      setTripQrValue(scannedCode)
       setScannedSackIds([])
       setWrongSackIds([])
       setPalletInput('')
@@ -358,7 +361,7 @@ export default function InboundOrdersPage() {
     if (!tripManifest || !selectedPalletId || checkingIn) return
     setCheckingIn(true)
     try {
-      const result = await tripsApi.checkInByQr(tripManifest.tripId, scannedSackIds)
+      const result = await tripsApi.checkInByQr(tripManifest.tripId, tripQrValue, scannedSackIds)
       const checkInResult: InboundCheckInResult = {
         tripId: result.tripId, carId: result.carId, status: result.status,
         receivedCount: result.receivedCount, sackCount: result.receivedCount,

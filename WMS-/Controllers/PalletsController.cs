@@ -11,8 +11,13 @@ namespace WMS_.Controllers
     public sealed class CreatePalletRequest
     {
         public string ZoneId { get; set; } = string.Empty;
+        public string DestinationLocationId { get; set; } = string.Empty;
         public decimal? Capacity { get; set; }
         public string? PalletId { get; set; }
+    }
+    public sealed class SetPalletDestinationRequest
+    {
+        public string DestinationLocationId { get; set; } = string.Empty;
     }
     public sealed class FinalizePalletRequest
     {
@@ -54,6 +59,8 @@ namespace WMS_.Controllers
         {
             if (string.IsNullOrWhiteSpace(request.ZoneId))
                 return BadRequest("Zone đặt pallet là bắt buộc.");
+            if (string.IsNullOrWhiteSpace(request.DestinationLocationId))
+                return BadRequest("Điểm đến của pallet là bắt buộc.");
             if (request.Capacity is <= 0)
                 return BadRequest("Sức chứa pallet phải lớn hơn 0.");
 
@@ -62,6 +69,7 @@ namespace WMS_.Controllers
             {
                 PalletId = request.PalletId?.Trim() ?? string.Empty,
                 ZoneId = request.ZoneId.Trim(),
+                DestinationLocationId = request.DestinationLocationId.Trim(),
                 Status = "Empty",
                 Capacity = request.Capacity ?? 1000
             };
@@ -69,6 +77,19 @@ namespace WMS_.Controllers
             {
                 var createdPallet = await _palletService.CreatePalletAsync(pallet);
                 return CreatedAtAction(nameof(GetById), new { id = createdPallet.PalletId }, createdPallet);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
+        }
+
+        [HttpPatch("{id}/destination")]
+        public async Task<ActionResult<Pallet>> SetDestination(string id, [FromBody] SetPalletDestinationRequest request)
+        {
+            try
+            {
+                return Ok(await _palletService.SetPalletDestinationAsync(id, request.DestinationLocationId.Trim()));
             }
             catch (InvalidOperationException ex)
             {
@@ -120,9 +141,10 @@ namespace WMS_.Controllers
         public async Task<IActionResult> RemoveSackFromPallet(string palletId, string sackId)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (userId == null) return Forbid();
+            var locationId = User.FindFirstValue("location_id");
+            if (userId == null || string.IsNullOrWhiteSpace(locationId)) return Forbid();
 
-            var result = await _operationService.RemoveSackFromPalletAsync(sackId, palletId, userId);
+            var result = await _operationService.RemoveSackFromPalletAsync(sackId, palletId, userId, locationId);
             return result.Succeeded ? Ok(result) : Conflict(new { message = result.Message });
         }
 
@@ -131,9 +153,10 @@ namespace WMS_.Controllers
         public async Task<IActionResult> MovePallet(string palletId, string zoneId)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (userId == null) return Forbid();
+            var locationId = User.FindFirstValue("location_id");
+            if (userId == null || string.IsNullOrWhiteSpace(locationId)) return Forbid();
 
-            var success = await _operationService.MovePalletToZoneAsync(palletId, zoneId, userId);
+            var success = await _operationService.MovePalletToZoneAsync(palletId, zoneId, userId, locationId);
             return success ? Ok(new { message = "Di chuyển Pallet thành công!" }) : BadRequest("Lỗi khi di chuyển Pallet.");
         }
 

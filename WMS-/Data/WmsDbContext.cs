@@ -126,6 +126,12 @@ namespace WMS_.Data
                 .HasForeignKey(s => s.NextHopId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<Pallet>()
+                .HasOne(p => p.DestinationLocation)
+                .WithMany()
+                .HasForeignKey(p => p.DestinationLocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<InboundOrderItem>()
                 .HasOne(i => i.Sack)
                 .WithMany()

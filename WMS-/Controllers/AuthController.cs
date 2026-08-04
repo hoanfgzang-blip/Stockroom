@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using WMS_.Configuration;
 using WMS_.Data;
@@ -21,6 +22,7 @@ public class AuthController : ControllerBase
     public AuthController(WmsDbContext db) => _db = db;
 
     [AllowAnonymous]
+    [EnableRateLimiting("login")]
     [HttpPost("login")]
     public async Task<ActionResult<AuthUserResponse>> Login([FromBody] LoginRequest request)
     {

@@ -110,7 +110,9 @@ export const palletsApi = {
   all: (status?: string) =>
     api.get<Pallet[]>(`/Pallets${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Pallet>(`/Pallets/${id}`),
-  create: (data: Pick<Pallet, 'zoneId'> & { capacity?: number; palletId?: string }) => api.post<Pallet>('/Pallets', data),
+  create: (data: Pick<Pallet, 'zoneId' | 'destinationLocationId'> & { capacity?: number; palletId?: string }) => api.post<Pallet>('/Pallets', data),
+  setDestination: (id: string, destinationLocationId: string) =>
+    api.patch(`/Pallets/${id}/destination`, { destinationLocationId }),
   delete: (id: string) => api.delete(`/Pallets/${id}`),
   assignSack: (palletId: string, sackId: string) =>
     api.post<PalletAssignmentResult>(`/Pallets/${palletId}/assign-sack/${sackId}`, {}),
@@ -227,8 +229,8 @@ export const tripsApi = {
   updateMyStatus: (id: string, status: 'InProgress' | 'Completed') =>
     api.patch(`/Trips/my/${id}/status`, status),
   checkIn: (id: string) => api.post<TripCheckInResult>(`/Trips/${id}/check-in`, {}),
-  checkInByQr: (tripId: string, arrivedSackIds: string[]) => {
-    const request: TripQrCheckInRequest = { tripId, arrivedSackIds }
+  checkInByQr: (tripId: string, qrValue: string, arrivedSackIds: string[]) => {
+    const request: TripQrCheckInRequest = { tripId, qrValue, arrivedSackIds }
     return api.post<TripQrCheckInResult>('/Trips/check-in-by-qr', request)
   },
 }

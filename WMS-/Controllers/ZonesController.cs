@@ -6,6 +6,7 @@ using WMS_.Services.Warehouse; // Khai báo dùng Service của Khải
 
 namespace WMS_.Controllers
 {
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOnly")]
     [ApiController]
     [Route("api/[controller]")]
     public class ZonesController : ControllerBase

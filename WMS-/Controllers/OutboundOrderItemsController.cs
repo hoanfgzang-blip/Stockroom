@@ -8,10 +8,19 @@ using WMS_.Security;
 
 namespace WMS_.Controllers
 {
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
     [ApiController]
     [Route("api/[controller]")]
     public class OutboundOrderItemsController : ControllerBase
     {
+        public sealed class UpdateOutboundOrderItemRequest
+        {
+            [System.ComponentModel.DataAnnotations.Required]
+            public string OutboundOrderId { get; set; } = string.Empty;
+            [System.ComponentModel.DataAnnotations.Required]
+            public string SackId { get; set; } = string.Empty;
+        }
+
         private readonly WmsDbContext _db;
         private readonly IOutboundService _outboundService;
 
@@ -61,13 +70,19 @@ namespace WMS_.Controllers
 
         /// <summary>Update item</summary>
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(string id, [FromBody] OutboundOrderItem item)
+        public async Task<IActionResult> Update(string id, [FromBody] UpdateOutboundOrderItemRequest request)
         {
-            if (id != item.OutboundOrderItemId) return BadRequest();
-            if (await _outboundService.GetOrderAsync(item.OutboundOrderId) == null ||
-                !await QuerySacksAtCurrentHub().AnyAsync(sack => sack.SackId == item.SackId))
+            var currentSackIds = QuerySacksAtCurrentHub().Select(sack => sack.SackId);
+            var existing = await _db.OutboundOrderItems
+                .FirstOrDefaultAsync(item => item.OutboundOrderItemId == id && currentSackIds.Contains(item.SackId));
+            if (existing == null) return NotFound();
+            if (await _outboundService.GetOrderAsync(request.OutboundOrderId) == null ||
+                !await QuerySacksAtCurrentHub().AnyAsync(sack => sack.SackId == request.SackId))
                 return Forbid();
-            _db.Entry(item).State = EntityState.Modified;
+            if (await _db.OutboundOrderItems.AnyAsync(item => item.OutboundOrderItemId != id && item.OutboundOrderId == request.OutboundOrderId && item.SackId == request.SackId))
+                return Conflict(new { message = "Bao hàng đã có trong đơn xuất này." });
+            existing.OutboundOrderId = request.OutboundOrderId;
+            existing.SackId = request.SackId;
             try { await _db.SaveChangesAsync(); }
             catch (DbUpdateConcurrencyException)
             { if (!_db.OutboundOrderItems.Any(i => i.OutboundOrderItemId == id)) return NotFound(); throw; }

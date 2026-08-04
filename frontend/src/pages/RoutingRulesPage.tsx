@@ -20,10 +20,17 @@ export default function RoutingRulesPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([routingRulesApi.all(), locationsApi.all()])
-      .then(([r, l]) => {
-        setRules(r)
-        setLocations(l)
+    Promise.allSettled([
+      routingRulesApi.all(),
+      locationsApi.all()
+    ])
+      .then((results) => {
+        const rules =
+        results[0].status === "fulfilled" ? results[0].value : [];
+        const locations =
+        results[1].status === "fulfilled" ? results[1].value : [];
+        setRules(rules)
+        setLocations(locations)
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))

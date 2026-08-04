@@ -70,7 +70,6 @@ const navGroups: NavGroup[] = [
     label: 'Nhân sự',
     items: [
       { to: '/hr/employees', label: 'Danh sách nhân viên', icon: Users, roles: ['Manager'] },
-      { to: '/hr/shifts', label: 'Quản lý ca làm việc', icon: Calendar, roles: ['Manager'] },
     ],
   },
   {

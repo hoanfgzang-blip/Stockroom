@@ -555,6 +555,20 @@ namespace WMS_.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("origin");
 
+                    b.Property<string>("SealCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("seal_code");
+
+                    b.Property<DateTime?>("SealedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sealed_at");
+
+                    b.Property<string>("SealedBy")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("sealed_by");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -580,6 +594,11 @@ namespace WMS_.Migrations
                     b.HasIndex("EmployeeId");
 
                     b.HasIndex("Origin");
+
+                    b.HasIndex("SealCode")
+                        .IsUnique();
+
+                    b.HasIndex("SealedBy");
 
                     b.ToTable("trip");
                 });
@@ -871,6 +890,11 @@ namespace WMS_.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("WMS_.Data.Entities.UserAccount", "SealedByUser")
+                        .WithMany()
+                        .HasForeignKey("SealedBy")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Car");
 
                     b.Navigation("DestinationLocation");
@@ -878,6 +902,8 @@ namespace WMS_.Migrations
                     b.Navigation("Employee");
 
                     b.Navigation("OriginLocation");
+
+                    b.Navigation("SealedByUser");
                 });
 
             modelBuilder.Entity("WMS_.Data.Entities.UserAccount", b =>

@@ -13,6 +13,10 @@ namespace WMS_.Controllers
         public decimal? Capacity { get; set; }
         public string? PalletId { get; set; }
     }
+    public sealed class FinalizePalletRequest
+    {
+        public string OutboundOrderId { get; set; } = string.Empty;
+    }
     [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
     [ApiController]
     [Route("api/[controller]")]
@@ -114,12 +118,22 @@ namespace WMS_.Controllers
             return success ? Ok(new { message = "Di chuyển Pallet thành công!" }) : BadRequest("Lỗi khi di chuyển Pallet.");
         }
 
-        /// <summary>Nghiệp vụ: Chốt lồng hàng, sẵn sàng xuất kho</summary>
+        /// <summary>Nghiệp vụ: Chốt lồng hàng, sẵn sàng xuất kho và nối thẳng vào Đơn xuất</summary>
         [HttpPost("{palletId}/finalize")]
-        public async Task<IActionResult> FinalizePallet(string palletId)
+        public async Task<IActionResult> FinalizePallet(string palletId, [FromBody] FinalizePalletRequest request)
         {
-            var success = await _operationService.FinalizePalletAsync(palletId);
-            return success ? Ok(new { message = "Đã chốt Pallet. Sẵn sàng xuất kho!" }) : BadRequest("Pallet trống hoặc không tồn tại.");
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "SYSTEM";
+            try
+            {
+                var success = await _operationService.FinalizePalletAsync(palletId, request.OutboundOrderId, userId);
+                return success
+                    ? Ok(new { message = "Đã chốt Pallet và gán vào đơn xuất kho thành công!" })
+                    : BadRequest(new { message = "Pallet trống hoặc không tồn tại." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         /// <summary>Nghiệp vụ: Quét mã vạch lấy hàng và đóng gói (Picking & Packing)</summary>

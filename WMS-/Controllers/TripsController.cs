@@ -19,6 +19,24 @@ namespace WMS_.Controllers
     }
 
     public sealed record TripCheckInResponse(string TripId, string CarId, string Status, int SackCount, string? ZoneId, string? ZoneName);
+    public sealed record LoadTripSackResponse(
+        string TripId,
+        string SackId,
+        int LoadedCount);
+
+    public sealed class ScanTripSealRequest
+    {
+        [Required]
+        [MaxLength(100)]
+        public string SealCode { get; set; } = string.Empty;
+    }
+
+    public sealed record ScanTripSealResponse(
+        string TripId,
+        string Status,
+        string Phase,
+        int LoadedCount,
+        DateTime? SealedAt);
 
     public sealed record TripQrParty(string Id, string Name);
     public sealed record TripQrVehicle(string Id, string Type, decimal Capacity);
@@ -109,12 +127,29 @@ namespace WMS_.Controllers
         [HttpGet("{id}/sacks")]
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
         public async Task<ActionResult<IEnumerable<Sack>>> GetSacks(string id)
-            => Ok(await _db.Sacks.Where(sack => sack.TripId == id).OrderBy(sack => sack.SackId).ToListAsync());
+        {
+            var locationId = User.FindFirstValue("location_id");
+            var trip = await _db.Trips.FindAsync(id);
+            if (trip == null) return NotFound();
+            if (string.IsNullOrWhiteSpace(locationId) || (trip.Origin != locationId && trip.Destination != locationId))
+                return Forbid();
+            return Ok(await _db.Sacks.Where(sack => sack.TripId == id).OrderBy(sack => sack.SackId).ToListAsync());
+        }
 
         [HttpGet("{id}/qr-manifest")]
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
         public async Task<ActionResult<TripQrManifest>> GetQrManifest(string id)
         {
+            var locationId = User.FindFirstValue("location_id");
+            var trip = await _db.Trips.FindAsync(id);
+            if (trip == null) return NotFound();
+            if (string.IsNullOrWhiteSpace(locationId) || (trip.Origin != locationId && trip.Destination != locationId))
+                return Forbid();
+            if (trip.Type == "Outbound" && (trip.Status == "Loading" || trip.SealedAt == null))
+                return Conflict(new
+                {
+                    message = "Chuyến outbound phải chốt seal xong mới được tạo QR manifest."
+                });
             var manifest = await BuildQrManifestAsync(id);
             return manifest == null ? NotFound() : Ok(manifest);
         }
@@ -123,7 +158,18 @@ namespace WMS_.Controllers
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
         public async Task<ActionResult<Trip>> Create([FromBody] CreateTripRequest request)
         {
+            var locationId = User.FindFirstValue("location_id");
+            if (string.IsNullOrWhiteSpace(locationId)) return Forbid();
+            if (request.Type == "Outbound" && request.Origin != locationId) return Forbid();
             if (request.Type is not ("Inbound" or "Outbound")) return BadRequest("Loai chuyen chi co the la Inbound hoac Outbound.");
+            if (request.Type == "Outbound" &&
+                request.SackIds.Any(id => !string.IsNullOrWhiteSpace(id)))
+            {
+                return BadRequest(new
+                {
+                    message = "Chuyến outbound phải gán bao bằng quét mã khi chất hàng."
+                });
+            }
             if (request.Origin == request.Destination) return BadRequest("Diem di va diem den phai khac nhau.");
             if (!await _db.Employees.AnyAsync(employee => employee.EmployeeId == request.EmployeeId) ||
                 !await _db.Cars.AnyAsync(car => car.CarId == request.CarId) ||
@@ -141,7 +187,7 @@ namespace WMS_.Controllers
             var trip = new Trip
             {
                 TripId = await GenerateTripIdAsync(request.Type), EmployeeId = request.EmployeeId, CarId = request.CarId,
-                Origin = request.Origin, Destination = request.Destination, Type = request.Type, Status = "Pending",
+                Origin = request.Origin, Destination = request.Destination, Type = request.Type, Status = request.Type == "Outbound" ? "Loading" : "Pending",
                 CreatedAt = DateTime.UtcNow, SackCount = sacks.Count
             };
             _db.Trips.Add(trip);
@@ -149,6 +195,156 @@ namespace WMS_.Controllers
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
             return CreatedAtAction(nameof(GetById), new { id = trip.TripId }, trip);
+        }
+
+        [HttpPost("{id}/scan-seal")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
+        public async Task<ActionResult<ScanTripSealResponse>> ScanSeal(
+            string id,
+            [FromBody] ScanTripSealRequest request)
+        {
+            var locationId = User.FindFirstValue("location_id");
+            if (string.IsNullOrWhiteSpace(locationId))
+                return Forbid();
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var sealCode = request.SealCode.Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(sealCode))
+                return BadRequest(new { message = "Mã seal không được để trống." });
+
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+
+            var trip = await _db.Trips
+                .FromSqlInterpolated($"SELECT * FROM trip WHERE trip_id = {id} FOR UPDATE")
+                .SingleOrDefaultAsync();
+
+            if (trip == null)
+                return NotFound(new { message = "Không tìm thấy chuyến xe." });
+
+            if (trip.Type != "Outbound")
+                return BadRequest(new { message = "Chỉ chuyến outbound mới được kẹp seal." });
+
+            if (trip.Status != "Loading")
+                return Conflict(new { message = "Chuyến xe phải ở trạng thái đang chất hàng mới được kẹp seal." });
+
+            if (trip.Origin != locationId)
+                return Forbid();
+
+            if (trip.SealCode == null)
+            {
+                if (await _db.Trips.AnyAsync(t => t.SealCode == sealCode))
+                    return Conflict(new { message = "Mã seal đã được sử dụng cho chuyến xe khác." });
+
+                trip.SealCode = sealCode;
+                trip.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new ScanTripSealResponse(
+                    trip.TripId,
+                    trip.Status,
+                    "LoadingStarted",
+                    0,
+                    null));
+            }
+            else
+            {
+                if (!string.Equals(trip.SealCode, sealCode, StringComparison.OrdinalIgnoreCase))
+                    return Conflict(new { message = "Mã seal không khớp với mã seal đã gắn ban đầu." });
+
+                if (trip.SealedAt != null)
+                    return Conflict(new { message = "Chuyến xe đã được chốt seal rồi." });
+
+                var loadedCount = await _db.Sacks.CountAsync(s => s.TripId == id);
+                if (loadedCount == 0)
+                    return BadRequest(new { message = "Chuyến xe chưa có bao hàng để chốt seal." });
+
+                trip.SealedAt = DateTime.UtcNow;
+                trip.SealedBy = userId;
+                trip.Status = "Pending";
+                trip.UpdatedAt = DateTime.UtcNow;
+
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new ScanTripSealResponse(
+                    trip.TripId,
+                    trip.Status,
+                    "Sealed",
+                    loadedCount,
+                    trip.SealedAt));
+            }
+        }
+
+        [HttpPost("{id}/load-sack/{sackId}")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "WarehouseOperations")]
+        public async Task<ActionResult<LoadTripSackResponse>> LoadSack(
+            string id,
+            string sackId)
+        {
+            var locationId = User.FindFirstValue("location_id");
+            if (string.IsNullOrWhiteSpace(locationId))
+                return Forbid();
+
+            await using var transaction =
+                await _db.Database.BeginTransactionAsync();
+
+            var trip = await _db.Trips
+                .FromSqlInterpolated(
+                    $"SELECT * FROM trip WHERE trip_id = {id} FOR UPDATE")
+                .SingleOrDefaultAsync();
+            if (trip == null)
+                return NotFound(new { message = "Không tìm thấy chuyến xe." });
+
+            if (trip.Type != "Outbound")
+                return BadRequest(new { message = "Chỉ chuyến outbound mới được chất hàng bằng quét mã." });
+
+            if (trip.Status != "Loading")
+                return Conflict(new { message = "Chuyến xe không còn ở trạng thái đang chất hàng." });
+
+            if (trip.Origin != locationId)
+                return Forbid();
+
+            if (trip.SealCode == null)
+                return BadRequest(new { message = "Chuyến xe chưa được mở seal chất hàng." });
+
+            if (trip.SealedAt != null)
+                return Conflict(new { message = "Chuyến xe đã chốt seal." });
+
+            var sack = await _db.Sacks
+                .FromSqlInterpolated(
+                    $"SELECT * FROM sack WHERE sack_id = {sackId} FOR UPDATE")
+                .SingleOrDefaultAsync();
+
+            if (sack == null)
+                return NotFound(new { message = "Không tìm thấy bao hàng." });
+
+            if (sack.TripId == id)
+                return Conflict(new { message = "Bao hàng đã được quét vào chuyến này." });
+
+            if (sack.TripId != null)
+                return Conflict(new { message = "Bao hàng đã thuộc chuyến xe khác." });
+
+            if (sack.Status != "ReadyForOutbound")
+                return Conflict(new { message = "Bao hàng chưa sẵn sàng xuất kho." });
+
+            if (sack.SDestination != trip.Destination)
+                return BadRequest(new { message = "Bao hàng có điểm đến không khớp với điểm đến của chuyến xe." });
+
+            sack.TripId = id;
+            sack.Status = "Loaded";
+
+            await _db.SaveChangesAsync();
+
+            var loadedCount = await _db.Sacks
+                .CountAsync(item => item.TripId == id);
+
+            await transaction.CommitAsync();
+
+            return Ok(new LoadTripSackResponse(
+                trip.TripId,
+                sack.SackId,
+                loadedCount));
         }
 
         [HttpPost("{id}/check-in")]
@@ -206,7 +402,7 @@ namespace WMS_.Controllers
             var trip = await _db.Trips.FindAsync(tripId);
             if (trip == null) return NotFound(new { message = "Khong tim thay ma chuyen xe trong QR." });
 
-            if (trip.Type == "Inbound" && trip.Destination != myLocationId)
+            if (trip.Destination != myLocationId)
                 return BadRequest(new { message = "Chuyen xe khong co diem den la hub cua ban. Khong the check-in bang QR!" });
 
             if (trip.Type is not ("Inbound" or "Outbound")) return BadRequest(new { message = "Loai chuyen xe khong hop le." });
@@ -222,15 +418,17 @@ namespace WMS_.Controllers
             var dbSacks = await _db.Sacks.Where(sack => sack.TripId == tripId).ToListAsync();
             var expectedIds = dbSacks.Select(sack => sack.SackId).OrderBy(id => id).ToList();
             var manifestIds = request.Manifest.Sacks.Select(sack => sack.SackId.Trim()).Where(id => id.Length > 0).Distinct().OrderBy(id => id).ToList();
-            var arrivedIds = (request.ArrivedSackIds.Count > 0 ? request.ArrivedSackIds : manifestIds)
-                .Select(id => id.Trim()).Where(id => id.Length > 0).Distinct().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var arrivedIds = request.ArrivedSackIds
+                 .Select(id => id.Trim()).Where(id => id.Length > 0).Distinct().ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             var missingIds = expectedIds.Where(id => !arrivedIds.Contains(id)).ToList();
             var unexpectedIds = arrivedIds.Where(id => !expectedIds.Contains(id, StringComparer.OrdinalIgnoreCase)).OrderBy(id => id).ToList();
+
             if (unexpectedIds.Count > 0)
                 return Conflict(new TripQrCheckInResponse(trip.TripId, trip.CarId, trip.Status, expectedIds.Count, arrivedIds.Count, 0, missingIds, unexpectedIds, inboundZone?.ZoneId, inboundZone?.ZoneName));
 
             var received = 0;
+
             foreach (var sack in dbSacks.Where(sack => arrivedIds.Contains(sack.SackId)))
             {
                 if (trip.Type == "Inbound")
@@ -247,15 +445,25 @@ namespace WMS_.Controllers
                 received++;
             }
 
-            if (missingIds.Count == 0)
+            foreach (var sack in dbSacks.Where(sack => missingIds.Contains(sack.SackId)))
             {
-                trip.Status = "Completed";
-                trip.UpdatedAt = DateTime.UtcNow;
+                sack.Status = "Missing"; 
+            }
+
+            if (missingIds.Count == 0 && expectedIds.Count > 0)
+            {
+                trip.Status = "Completed"; 
+            }
+            else if (received > 0)
+            {
+                trip.Status = "CompletedWithMissing";
             }
             else
             {
-                trip.Status = "InProgress";
+                return BadRequest(new { message = "Khong co bao hang nao duoc xac nhan den. Vui long quet it nhat 1 bao hang." });
             }
+
+            trip.UpdatedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -267,9 +475,29 @@ namespace WMS_.Controllers
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
         public async Task<IActionResult> UpdateStatus(string id, [FromBody] string status)
         {
+            var locationId = User.FindFirstValue("location_id");
             var trip = await _db.Trips.FindAsync(id);
             if (trip == null) return NotFound();
+            if (string.IsNullOrWhiteSpace(locationId) || (trip.Origin != locationId && trip.Destination != locationId))
+                return Forbid();
+            if (trip.Type == "Outbound" && trip.Origin != locationId)
+                return Forbid();
+
             if (status is not ("Pending" or "InProgress" or "Completed" or "Cancelled")) return BadRequest("Trang thai chuyen khong hop le.");
+
+            if (trip.Type == "Outbound" && trip.Status == "Loading" && status != "Cancelled")
+                return BadRequest("Chuyến outbound đang ở trạng thái chất hàng chỉ có thể hủy hoặc quét chốt seal.");
+
+            if (status == "Cancelled" && trip.Type == "Outbound" && trip.Status is ("Loading" or "Pending"))
+            {
+                var sacksToRestore = await _db.Sacks.Where(sack => sack.TripId == id).ToListAsync();
+                foreach (var sack in sacksToRestore)
+                {
+                    sack.TripId = null;
+                    sack.Status = "ReadyForOutbound";
+                }
+            }
+
             trip.Status = status;
             if (status == "Completed") trip.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
@@ -280,10 +508,23 @@ namespace WMS_.Controllers
         [Microsoft.AspNetCore.Authorization.Authorize(Policy = "DispatchOperations")]
         public async Task<IActionResult> Delete(string id)
         {
+            var locationId = User.FindFirstValue("location_id");
             var trip = await _db.Trips.FindAsync(id);
             if (trip == null) return NotFound();
+            if (string.IsNullOrWhiteSpace(locationId) || (trip.Origin != locationId && trip.Destination != locationId))
+                return Forbid();
+            if (trip.Type == "Outbound" && trip.Origin != locationId)
+                return Forbid();
+
             var sacks = await _db.Sacks.Where(sack => sack.TripId == id).ToListAsync();
-            foreach (var sack in sacks) sack.TripId = null;
+            foreach (var sack in sacks)
+            {
+                sack.TripId = null;
+                if (trip.Type == "Outbound" && trip.Status is ("Loading" or "Pending"))
+                {
+                    sack.Status = "ReadyForOutbound";
+                }
+            }
             _db.Trips.Remove(trip);
             await _db.SaveChangesAsync();
             return NoContent();
@@ -323,7 +564,12 @@ namespace WMS_.Controllers
             if (status == "InProgress" && trip.Type == "Outbound")
             {
                 var sacks = await _db.Sacks.Where(sack => sack.TripId == id).ToListAsync();
-                foreach (var sack in sacks) sack.Status = "InTransit";
+                foreach (var sack in sacks)
+                {
+                    sack.Status = "InTransit";
+                    sack.PalletId = null;
+                    sack.ZoneId = null;
+                }
             }
             await _db.SaveChangesAsync();
             return NoContent();

@@ -41,15 +41,16 @@ export function formatTimeSpan(value?: string | null): string {
 
 export function getStatusVariant(status: string): 'success' | 'warning' | 'danger' | 'neutral' {
   const s = status.toLowerCase().replace(/[\s_-]/g, '')
-  if (['completed', 'active', 'available', 'intransit', 'inprogress', 'fulfilled', 'arrived'].includes(s))
+  if (['completed', 'active', 'available', 'intransit', 'inprogress', 'fulfilled', 'arrived', 'loaded'].includes(s))
     return 'success'
-  if (['pending', 'processing', 'reserved', 'sorting', 'scheduled'].includes(s)) return 'warning'
+  if (['loading', 'pending', 'processing', 'reserved', 'sorting', 'scheduled'].includes(s)) return 'warning'
   if (['cancelled', 'expired', 'inactive', 'full', 'locked'].includes(s)) return 'danger'
   return 'neutral'
 }
 
 export function tripColumnLabel(status: string): string {
   const map: Record<string, string> = {
+    Loading: 'Đang chất hàng',
     Pending: 'Đã lên lịch',
     InProgress: 'Đang vận chuyển',
     Completed: 'Đã đến',
@@ -58,7 +59,7 @@ export function tripColumnLabel(status: string): string {
   return map[status] ?? status
 }
 
-export const TRIP_COLUMNS = ['Pending', 'InProgress', 'Completed', 'Cancelled'] as const
+export const TRIP_COLUMNS = ['Loading', 'Pending', 'InProgress', 'Completed', 'Cancelled'] as const
 
 
 export function roleLabel(role: string): string {
@@ -74,12 +75,12 @@ export function roleLabel(role: string): string {
 
 export function statusLabel(status: string): string {
   const map: Record<string, string> = {
-    Pending: 'Chờ xử lý', InProgress: 'Đang xử lý', Completed: 'Hoàn thành', Cancelled: 'Đã hủy',
+    Loading: 'Đang chất hàng', Pending: 'Chờ xử lý', InProgress: 'Đang xử lý', Completed: 'Hoàn thành', Cancelled: 'Đã hủy',
     Active: 'Đang hoạt động', Inactive: 'Ngừng hoạt động', Available: 'Sẵn sàng', Occupied: 'Đang chứa hàng',
     Reserved: 'Đã giữ hàng', Expired: 'Đã hết hạn', Inbound: 'Nhập hàng', Outbound: 'Xuất hàng',
     Processing: 'Đang xử lý', Sorting: 'Đang phân loại', Arrived: 'Đã đến', Fulfilled: 'Đã hoàn tất',
     Empty: 'Trống', Finalized: 'Đã chốt', Locked: 'Đã khóa', Received: 'Đã giao',
-    'In Transit to Zone': 'Đang chuyển zone', InTransit: 'Đang vận chuyển', ReadyForOutbound: 'Sẵn sàng xuất kho',
+    'In Transit to Zone': 'Đang chuyển zone', InTransit: 'Đang vận chuyển', ReadyForOutbound: 'Sẵn sàng xuất kho', Loaded: 'Đã chất lên xe',
     Create: 'Tạo mới', Update: 'Cập nhật', Delete: 'Xóa',
   }
   return map[status] ?? status

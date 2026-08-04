@@ -352,8 +352,30 @@ namespace WMS_.Controllers
             if (sack.SDestination != trip.Destination)
                 return BadRequest(new { message = "Bao hàng có điểm đến không khớp với điểm đến của chuyến xe." });
 
+            var palletId = sack.PalletId;
+            Pallet? pallet = null;
+            if (!string.IsNullOrWhiteSpace(palletId))
+            {
+                pallet = await _db.Pallets
+                    .FromSqlInterpolated($"SELECT * FROM pallet WHERE pallet_id = {palletId} FOR UPDATE")
+                    .SingleOrDefaultAsync();
+            }
+
             sack.TripId = id;
             sack.Status = "Loaded";
+
+            if (pallet != null)
+            {
+                var remainingSacks = await _db.Sacks.CountAsync(item =>
+                    item.PalletId == pallet.PalletId &&
+                    item.SackId != sack.SackId &&
+                    item.Status != "Loaded");
+
+                if (remainingSacks == 0)
+                {
+                    pallet.Status = "Empty";
+                }
+            }
 
             await _db.SaveChangesAsync();
 
@@ -516,6 +538,15 @@ namespace WMS_.Controllers
                 {
                     sack.TripId = null;
                     sack.Status = "ReadyForOutbound";
+
+                    if (!string.IsNullOrWhiteSpace(sack.PalletId))
+                    {
+                        var p = await _db.Pallets.FindAsync(sack.PalletId);
+                        if (p != null && p.Status == "Empty")
+                        {
+                            p.Status = "Finalized";
+                        }
+                    }
                 }
             }
 
@@ -544,6 +575,14 @@ namespace WMS_.Controllers
                 if (trip.Type == "Outbound" && trip.Status is ("Loading" or "Pending"))
                 {
                     sack.Status = "ReadyForOutbound";
+                }
+                if (!string.IsNullOrWhiteSpace(sack.PalletId))
+                {
+                    var p = await _db.Pallets.FindAsync(sack.PalletId);
+                    if (p != null && p.Status == "Empty")
+                    {
+                        p.Status = "Finalized";
+                    }
                 }
             }
             _db.Trips.Remove(trip);

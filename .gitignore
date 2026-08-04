@@ -7,3 +7,4 @@ appsettings.Development.json
 appsettings.json
 WMS-/appsettings.Development.example.json
 WMS-/bin/
+DbQuery/

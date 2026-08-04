@@ -5,3 +5,4 @@ obj/
 *.user
 appsettings.Development.json
 appsettings.json
+WMS-/appsettings.Development.example.json

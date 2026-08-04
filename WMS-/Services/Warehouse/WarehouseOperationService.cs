@@ -205,93 +205,92 @@ namespace WMS_.Services.Warehouse
             return true;
         }
 
-        public async Task<bool> FinalizePalletAsync(string palletId, string outboundOrderId, string userId)
+        public async Task<bool> PreparePalletForOutboundAsync(string palletId, string outboundOrderId, string userId)
         {
-            if (string.IsNullOrWhiteSpace(outboundOrderId))
-                throw new InvalidOperationException("Mã đơn xuất kho (OutboundOrderId) là bắt buộc để chốt Pallet.");
-
-            var sacks = await _db.Sacks.Where(s => s.PalletId == palletId).ToListAsync();
-            if (!sacks.Any()) return false;
-
-            var sackIds = sacks.Select(s => s.SackId).ToList();
-                        
-            var packSuccess = await PackSacksForOutboundAsync(outboundOrderId, sackIds, userId);
-
-            if (packSuccess)
-            {
-                var pallet = await _db.Pallets.FindAsync(palletId);
-                if (pallet != null)
-                {
-                    pallet.Status = "Finalized";
-                    await _db.SaveChangesAsync();
-                }
-            }
-
-            return packSuccess;
-        }
-
-        public async Task<bool> PackSacksForOutboundAsync(string outboundOrderId, System.Collections.Generic.List<string> sackIds, string userId)
-        {
-            if (string.IsNullOrWhiteSpace(outboundOrderId) || sackIds == null || !sackIds.Any())
-                return false;
+            if (string.IsNullOrWhiteSpace(outboundOrderId) || string.IsNullOrWhiteSpace(palletId))
+                throw new InvalidOperationException("Mã đơn xuất kho và mã pallet là bắt buộc.");
 
             await using var transaction = await _db.Database.BeginTransactionAsync();
 
-            // 1. Kiểm tra đơn hàng có tồn tại không
-            var order = await _db.OutboundOrders.FindAsync(outboundOrderId);
-            if (order == null) throw new InvalidOperationException("Không tìm thấy đơn xuất kho.");
-
-            // 2. Lấy danh sách bao hàng được quét
-            var sacks = await _db.Sacks.Where(s => sackIds.Contains(s.SackId)).ToListAsync();
-            if (sacks.Count != sackIds.Count)
-                throw new InvalidOperationException("Một số mã bao hàng vừa quét không tồn tại trong kho.");
-
-            if (sacks.Any(sack => sack.SDestination != order.OutboundDestination))
-                throw new InvalidOperationException("Bao hàng không đúng điểm đến của đơn xuất.");
-
-            // 3. Lấy danh sách các bao hàng ĐÃ ĐƯỢC GÁN vào đơn xuất này từ trước (nếu có)
-            var existingItems = await _db.OutboundOrderItems
-                .Where(i => i.OutboundOrderId == outboundOrderId)
-                .Select(i => i.SackId)
-                .ToListAsync();
-
-            // 4. Xử lý từng bao hàng
-            foreach (var sack in sacks)
+            try
             {
-                if (sack.Status == "InTransit" || sack.Status == "Received")
-                    throw new InvalidOperationException($"Bao hàng {sack.SackId} đang trên xe hoặc đã giao, không thể đóng gói.");
+                // 1. Order checking
+                var order = await _db.OutboundOrders.FindAsync(outboundOrderId);
+                if (order == null) throw new InvalidOperationException("Không tìm thấy đơn xuất kho.");
 
-                var oldValues = new { sack.Status };
+                if (order.Status is "Completed" or "Cancelled" or "Fulfilled")
+                    throw new InvalidOperationException("Đơn hàng này đã hoàn tất hoặc bị hủy, không thể chuẩn bị thêm Pallet.");
+                // 2. Lock & Kiểm tra Pallet
+                var pallet = await LoadPalletForUpdateAsync(palletId);
+                if (pallet == null) throw new InvalidOperationException("Không tìm thấy pallet.");
+                if (pallet.Status == "Empty") throw new InvalidOperationException("Pallet đang rỗng, không thể chốt.");
+                if (pallet.Status == "Finalized" || pallet.Status == "Locked") throw new InvalidOperationException("Pallet đã chốt hoặc đang bị khóa.");
 
-                // Cập nhật trạng thái thành ReadyForOutbound
-                sack.Status = "ReadyForOutbound";
+                // 3. Lock & Kiểm tra Sacks
+                var sacks = await LoadSacksOnPalletForUpdateAsync(palletId);
+                if (!sacks.Any()) throw new InvalidOperationException("Pallet không chứa bao hàng nào.");
 
-                // Nếu bao hàng chưa được link vào đơn xuất, tự động tạo OrderItem luôn
-                if (!existingItems.Contains(sack.SackId))
+                // Validate: Các sack không được ở trạng thái cấm
+                var invalidSacks = sacks.Where(s => s.Status == "InTransit" || s.Status == "Loaded" || s.Status == "Received").ToList();
+                if (invalidSacks.Any()) throw new InvalidOperationException("Một số bao hàng đang trên xe hoặc đã giao, không thể đóng gói.");
+
+                // Validate: Điểm đến phải khớp
+                var wrongDestSacks = sacks.Where(s => s.SDestination != order.OutboundDestination).ToList();
+                if (wrongDestSacks.Any()) throw new InvalidOperationException("Có bao hàng không đúng điểm đến của đơn xuất.");
+
+                // 4. Cập nhật dữ liệu
+                var existingItems = await _db.OutboundOrderItems
+                    .Where(i => i.OutboundOrderId == outboundOrderId)
+                    .Select(i => i.SackId)
+                    .ToListAsync();
+
+                foreach (var sack in sacks)
                 {
-                    var newItemId = $"OOI-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}".Substring(0, 50);
-                    _db.OutboundOrderItems.Add(new OutboundOrderItem
+                    var oldValues = new { sack.Status };
+                    sack.Status = "ReadyForOutbound"; 
+
+                    if (!existingItems.Contains(sack.SackId))
                     {
-                        OutboundOrderItemId = newItemId,
-                        OutboundOrderId = outboundOrderId,
-                        SackId = sack.SackId
-                    });
+                        var newItemId = $"OOI-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}".Substring(0, 50);
+                        _db.OutboundOrderItems.Add(new OutboundOrderItem
+                        {
+                            OutboundOrderItemId = newItemId,
+                            OutboundOrderId = outboundOrderId,
+                            SackId = sack.SackId
+                        });
+                    }
+                    AddAuditLog(userId, "PrepareSackForOutbound", sack.SackId, oldValues, new { sack.Status });
                 }
 
-                // Lưu vết lịch sử quét mã vạch
-                AddAuditLog(userId, "PackSackForOutbound", sack.SackId, oldValues, new { sack.Status });
-            }
+                // 👉 Đổi trạng thái Pallet
+                var oldPalletValues = new { pallet.Status };
+                pallet.Status = "Finalized";
 
-            // 5. Cập nhật trạng thái tổng của đơn hàng
-            if (order.Status == "Pending" || order.Status == "Reserved")
+                _db.AuditLogs.Add(new AuditLog
+                {
+                    UserId = userId,
+                    ActionType = "FinalizePallet",
+                    TableName = "pallet",
+                    RecordId = pallet.PalletId,
+                    OldValues = JsonSerializer.Serialize(oldPalletValues),
+                    NewValues = JsonSerializer.Serialize(new { pallet.Status }),
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                if (order.Status == "Pending" || order.Status == "Reserved")
+                {
+                    order.Status = "Packing";
+                }
+
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return true;
+            }
+            catch (Exception)
             {
-                order.Status = "Packing";
+                await transaction.RollbackAsync();
+                throw;
             }
-
-            await _db.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            return true;
         }
     }
 }

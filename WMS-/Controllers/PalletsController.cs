@@ -118,37 +118,17 @@ namespace WMS_.Controllers
             return success ? Ok(new { message = "Di chuyển Pallet thành công!" }) : BadRequest("Lỗi khi di chuyển Pallet.");
         }
 
-        /// <summary>Nghiệp vụ: Chốt lồng hàng, sẵn sàng xuất kho và nối thẳng vào Đơn xuất</summary>
+        /// <summary>Nghiệp vụ: Chuẩn bị Pallet cho đơn xuất kho (Quét chốt Pallet)</summary>
         [HttpPost("{palletId}/finalize")]
-        public async Task<IActionResult> FinalizePallet(string palletId, [FromBody] FinalizePalletRequest request)
+        public async Task<IActionResult> PreparePalletForOutbound(string palletId, [FromBody] FinalizePalletRequest request)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "SYSTEM";
             try
             {
-                var success = await _operationService.FinalizePalletAsync(palletId, request.OutboundOrderId, userId);
+                var success = await _operationService.PreparePalletForOutboundAsync(palletId, request.OutboundOrderId, userId);
                 return success
-                    ? Ok(new { message = "Đã chốt Pallet và gán vào đơn xuất kho thành công!" })
-                    : BadRequest(new { message = "Pallet trống hoặc không tồn tại." });
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        /// <summary>Nghiệp vụ: Quét mã vạch lấy hàng và đóng gói (Picking & Packing)</summary>
-        [HttpPost("{outboundOrderId}/pack")]
-        public async Task<IActionResult> PackSacks(string outboundOrderId, [FromBody] List<string> sackIds)
-        {
-            var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier) ?? "SYSTEM";
-
-            try
-            {
-                var success = await _operationService.PackSacksForOutboundAsync(outboundOrderId, sackIds, userId);
-
-                return success
-                    ? Ok(new { message = "Đã lấy hàng và đóng gói thành công!" })
-                    : BadRequest(new { message = "Dữ liệu quét không hợp lệ." });
+                    ? Ok(new { message = "Đã chuẩn bị Pallet và gán vào đơn xuất kho thành công!" })
+                    : BadRequest(new { message = "Không thể chuẩn bị Pallet." });
             }
             catch (InvalidOperationException ex)
             {

@@ -1,5 +1,6 @@
 @echo off
 setlocal
+title WMS Local Runner
 
 set "ROOT=%~dp0"
 set "BACKEND_DIR=%ROOT%WMS-"
@@ -15,6 +16,19 @@ echo ========================================
 echo  WMS Local Runner
 echo ========================================
 
+where dotnet >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Khong tim thay dotnet trong PATH.
+    pause
+    exit /b 1
+)
+
+where npm >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Khong tim thay npm trong PATH.
+    pause
+    exit /b 1
+)
 
 if not exist "%BACKEND_DIR%\WMS-.csproj" (
     echo [ERROR] Khong tim thay backend WMS tai: %BACKEND_DIR%
@@ -41,13 +55,12 @@ if exist "%PG_DATA%\PG_VERSION" (
     echo [WARN] Khong tim thay PostgreSQL data tai %PG_DATA%
 )
 
-echo [2/3] Dang dong backend WMS cu neu co...
-taskkill /IM WMS-.exe /F >nul 2>&1
-
-echo [3/3] Dang bat backend tai %BACKEND_URL%...
+echo [1/2] Dang bat backend tai %BACKEND_URL%...
 start "WMS Backend" cmd /k "cd /d ""%BACKEND_DIR%"" && dotnet run --project WMS-.csproj --urls %BACKEND_URL%"
 
-echo Dang bat frontend tai %FRONTEND_URL%...
+timeout /t 2 /nobreak >nul
+
+echo [2/2] Dang bat frontend tai %FRONTEND_URL%...
 if not exist "%FRONTEND_DIR%\node_modules" (
     start "WMS Frontend" cmd /k "cd /d ""%FRONTEND_DIR%"" && npm install && npm run dev"
 ) else (

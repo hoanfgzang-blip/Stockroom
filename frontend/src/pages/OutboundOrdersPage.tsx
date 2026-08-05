@@ -114,6 +114,9 @@ export default function OutboundOrdersPage() {
   const [activeTrip, setActiveTrip] = useState<Trip | null>(null)
   /** Danh sách sack đã quét (mã sack thô) */
   const [scannedSacks, setScannedSacks] = useState<string[]>([])
+  /** Danh sách sack kỳ vọng từ đơn outbound */
+  const [expectedSackIds, setExpectedSackIds] = useState<string[]>([])
+  const [loadingExpected, setLoadingExpected] = useState(false)
   const [scanInput, setScanInput] = useState('')
   const [scanSubmitting, setScanSubmitting] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
@@ -333,6 +336,17 @@ export default function OutboundOrdersPage() {
       setLoadScanOpen(true)
       setTimeout(() => scanInputRef.current?.focus(), 150)
       loadData(false)
+      // Tải danh sách sack kỳ vọng từ đơn outbound
+      if (tripForm.outboundOrderId) {
+        setExpectedSackIds([])
+        setLoadingExpected(true)
+        outboundOrdersApi.withItems(tripForm.outboundOrderId)
+          .then((data) => setExpectedSackIds(data.items.map((it) => it.sackId)))
+          .catch(() => setExpectedSackIds([]))
+          .finally(() => setLoadingExpected(false))
+      } else {
+        setExpectedSackIds([])
+      }
     } catch (err) {
       setTripFormError(getScanErrorMessage(err))
     } finally {
@@ -359,7 +373,13 @@ export default function OutboundOrdersPage() {
     try {
       const res = await tripsApi.loadSack(activeTrip.tripId, code)
       setScannedSacks((prev) => [...prev, code])
-      setScanNotice(`✓ Đã quét sack "${code}". Tổng: ${res.loadedCount} sack trên chuyến.`)
+      // Thông báo theo kết quả đối chiếu
+      const isExpected = expectedSackIds.length === 0 || expectedSackIds.includes(code)
+      if (!isExpected) {
+        setScanError(`⚠️ Sack "${code}" không thuộc đơn hàng! Đã chất lên (${res.loadedCount} sack) nhưng hãy kiểm tra lại.`)
+      } else {
+        setScanNotice(`✓ Đã quét đúng sack "${code}". Tổng: ${res.loadedCount} sack trên chuyến.`)
+      }
       setActiveTrip((prev) => prev ? { ...prev, sackCount: res.loadedCount } : null)
     } catch (err) {
       setScanError(getScanErrorMessage(err))
@@ -375,9 +395,8 @@ export default function OutboundOrdersPage() {
     void processSackScan(scanInput)
   }
 
-  const removeSack = async (sackId: string) => {
+  const removeSack = (sackId: string) => {
     if (!activeTrip) return
-    // Xoá sack khỏi danh sách đã quét (UI)
     setScannedSacks((prev) => prev.filter((s) => s !== sackId))
     setScanNotice(`Đã xoá sack "${sackId}" khỏi danh sách quét.`)
     setScanError(null)
@@ -765,12 +784,6 @@ export default function OutboundOrdersPage() {
             </div>
           )}
 
-          {/* Thông tin chuyến */}
-          <div className="rounded-lg border bg-slate-50 p-3 text-xs space-y-1">
-            <p><strong>Mã chuyến:</strong> <span className="font-mono text-primary font-semibold">{activeTrip?.tripId}</span></p>
-            <p><strong>Số sack đã quét:</strong> <span className="font-semibold text-primary">{scannedSacks.length} sack</span></p>
-          </div>
-
           {/* Form quét */}
           <form onSubmit={handleScanSubmit} className="space-y-2">
             <Label htmlFor="sack-scan-input">Quét hoặc nhập mã sack</Label>
@@ -827,57 +840,143 @@ export default function OutboundOrdersPage() {
             </div>
           )}
 
-          {/* Danh sách sack đã quét */}
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-700">Sack đã quét ({scannedSacks.length})</h3>
-            </div>
-            {scannedSacks.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-400">
-                <QrCode className="mx-auto mb-2 h-8 w-8 opacity-40" />
-                <p>Chưa có sack nào được quét.</p>
-                <p className="text-xs mt-1">Quét mã sack ở ô nhập phía trên.</p>
-              </div>
-            ) : (
-              <div className="max-h-52 space-y-1.5 overflow-y-auto rounded-lg border bg-slate-50 p-2">
-                {scannedSacks.map((sackId, index) => (
-                  <div
-                    key={sackId}
-                    className="flex items-center justify-between rounded-md border bg-white px-3 py-2 text-sm shadow-sm"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700">
-                        {index + 1}
-                      </span>
-                      <span className="font-mono font-medium text-slate-800">{sackId}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        title={`In QR sack ${sackId}`}
-                        onClick={() => activeTrip && printSackTripQr(activeTrip.tripId, sackId, activeTrip.destination)}
-                        className="h-7 w-7 p-0 text-slate-500 hover:text-slate-800"
-                      >
-                        <Printer className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        title={`Xoá sack ${sackId}`}
-                        onClick={() => void removeSack(sackId)}
-                        className="h-7 w-7 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+          {/* Thông tin chuyến + Tiến độ đối chiếu */}
+          {(() => {
+            const correctSacks   = scannedSacks.filter((s) => expectedSackIds.includes(s))
+            const wrongSacks     = scannedSacks.filter((s) => !expectedSackIds.includes(s))
+            const missingSacks   = expectedSackIds.filter((s) => !scannedSacks.includes(s))
+            const hasExpected    = expectedSackIds.length > 0
+            const pct            = hasExpected ? Math.round((correctSacks.length / expectedSackIds.length) * 100) : null
+
+            return (
+              <div className="space-y-3">
+                {/* Summary bar */}
+                <div className="rounded-xl border bg-slate-50 p-3 text-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span><strong>Mã chuyến:</strong> <span className="font-mono text-primary font-semibold">{activeTrip?.tripId}</span></span>
+                    {loadingExpected && <span className="flex items-center gap-1 text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> Đang tải danh sách sack...</span>}
                   </div>
-                ))}
+                  {hasExpected && (
+                    <>
+                      <div className="flex items-center justify-between text-[11px] font-medium">
+                        <span className="text-emerald-700">✅ Đúng: {correctSacks.length}/{expectedSackIds.length}</span>
+                        {wrongSacks.length > 0 && <span className="text-amber-700">⚠️ Sai: {wrongSacks.length}</span>}
+                        {missingSacks.length > 0 && <span className="text-rose-700">❌ Thiếu: {missingSacks.length}</span>}
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                        <div
+                          className={cn(
+                            'h-full rounded-full transition-all duration-300',
+                            pct === 100 && wrongSacks.length === 0 ? 'bg-emerald-500' : 'bg-violet-500',
+                          )}
+                          style={{ width: `${pct ?? 0}%` }}
+                        />
+                      </div>
+                    </>
+                  )}
+                  {!hasExpected && !loadingExpected && (
+                    <span className="text-slate-400">Không có thông tin sack kỳ vọng – quét tự do.</span>
+                  )}
+                </div>
+
+                {/* Bảng 3 nhóm */}
+                <div className="space-y-2">
+
+                  {/* Nhóm 1: Quét đúng */}
+                  {scannedSacks.length > 0 && (
+                    <div>
+                      <h4 className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Đã quét đúng ({hasExpected ? correctSacks.length : scannedSacks.length})
+                        {wrongSacks.length > 0 && <span className="ml-1 text-slate-400">· {wrongSacks.length} ngoài đơn</span>}
+                      </h4>
+                      <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-emerald-100 bg-emerald-50 p-1.5">
+                        {(hasExpected ? correctSacks : scannedSacks).map((sackId, index) => (
+                          <div key={sackId} className="flex items-center justify-between rounded border border-emerald-100 bg-white px-2.5 py-1.5 text-xs shadow-sm">
+                            <div className="flex items-center gap-1.5">
+                              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[9px] font-bold text-emerald-700">{index + 1}</span>
+                              <span className="font-mono font-medium text-slate-800">{sackId}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                type="button" size="sm" variant="ghost"
+                                title={`In QR sack ${sackId}`}
+                                onClick={() => activeTrip && printSackTripQr(activeTrip.tripId, sackId, activeTrip.destination)}
+                                className="h-6 w-6 p-0 text-slate-400 hover:text-slate-700"
+                              ><Printer className="h-3 w-3" /></Button>
+                              <Button
+                                type="button" size="sm" variant="ghost"
+                                title={`Xoá sack ${sackId}`}
+                                onClick={() => removeSack(sackId)}
+                                className="h-6 w-6 p-0 text-rose-400 hover:bg-rose-50 hover:text-rose-600"
+                              ><Trash2 className="h-3 w-3" /></Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Nhóm 2: Quét sai (ngoài đơn) */}
+                  {hasExpected && wrongSacks.length > 0 && (
+                    <div>
+                      <h4 className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-amber-700">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        Sack ngoài đơn hàng ({wrongSacks.length})
+                      </h4>
+                      <div className="max-h-28 space-y-1 overflow-y-auto rounded-lg border border-amber-200 bg-amber-50 p-1.5">
+                        {wrongSacks.map((sackId) => (
+                          <div key={sackId} className="flex items-center justify-between rounded border border-amber-100 bg-white px-2.5 py-1.5 text-xs shadow-sm">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-amber-500">⚠️</span>
+                              <span className="font-mono font-medium text-slate-800">{sackId}</span>
+                              <span className="text-[10px] text-amber-600 bg-amber-100 rounded px-1">Không trong đơn</span>
+                            </div>
+                            <Button
+                              type="button" size="sm" variant="ghost"
+                              title={`Xoá sack ${sackId}`}
+                              onClick={() => removeSack(sackId)}
+                              className="h-6 w-6 p-0 text-rose-400 hover:bg-rose-50 hover:text-rose-600"
+                            ><Trash2 className="h-3 w-3" /></Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Nhóm 3: Chưa quét (thiếu) */}
+                  {hasExpected && missingSacks.length > 0 && (
+                    <div>
+                      <h4 className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-rose-700">
+                        <CircleAlert className="h-3.5 w-3.5" />
+                        Còn thiếu ({missingSacks.length} sack chưa quét)
+                      </h4>
+                      <div className="max-h-28 space-y-1 overflow-y-auto rounded-lg border border-rose-200 bg-rose-50 p-1.5">
+                        {missingSacks.map((sackId) => (
+                          <div key={sackId} className="flex items-center justify-between rounded border border-rose-100 bg-white px-2.5 py-1.5 text-xs shadow-sm">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-rose-400">○</span>
+                              <span className="font-mono font-medium text-slate-500">{sackId}</span>
+                            </div>
+                            <span className="text-[10px] text-rose-500 bg-rose-50 rounded px-1">Đang chờ</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Trạng thái trống */}
+                  {scannedSacks.length === 0 && (
+                    <div className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-400">
+                      <QrCode className="mx-auto mb-2 h-8 w-8 opacity-40" />
+                      <p>Chưa có sack nào được quét.</p>
+                      <p className="text-xs mt-1">Quét mã sack ở ô nhập phía trên.</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
+            )
+          })()}
 
           {/* Actions */}
           <div className="flex items-center justify-between gap-2 border-t pt-3">

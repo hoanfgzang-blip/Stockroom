@@ -1,177 +1,514 @@
-# Hệ thống quản lý kho vận WMS
+# Warehouse Management System
 
-Hệ thống quản lý kho hàng hiện đại WMS được xây dựng trên nền tảng Blazor Interactive Server chạy trên bản .NET 9.0 kết hợp với Entity Framework Core và PostgreSQL (Giai đoạn v0.1 chạy Mock Data trên RAM). Dự án được thiết kế chuẩn chỉnh theo mô hình hướng dịch vụ giúp tối ưu hóa toàn bộ các hoạt động vận hành nhập xuất kho và quản lý sơ đồ kệ hàng thời gian thực.
+An academic software engineering project for managing cross-docking warehouse operations from inbound receipt to sorting, palletization, outbound loading, transportation, and final delivery.
 
----
+The system uses a React web client, an ASP.NET Core REST API, and PostgreSQL. The main tracked unit is a Sack. Every Sack can be scanned, routed, assigned to a Pallet, reserved for an Outbound Order, loaded onto a Trip, and traced through an audit history.
 
-## Tầm Nhìn Sản Phẩm
+## Project Information
 
-WMS hướng tới việc trở thành nền tảng điều phối kho vận tập trung cho mô hình kho trung chuyển, giúp doanh nghiệp quản lý chính xác từng bao hàng từ lúc tiếp nhận, phân loại, lưu kho, giữ chỗ tồn kho cho đến khi xuất kho và bàn giao vận chuyển.
+| Field | Value |
+| --- | --- |
+| Course | Software Engineering |
+| Project | Warehouse Management System |
+| Project code | WMS |
+| Project type | Full-stack web application |
+| Team size | Three developers |
+| Primary users | Managers, supervisors, warehouse staff, operators, and drivers |
+| Repository | https://github.com/hoanfgzang-blip/WMS-.git |
 
-Sản phẩm tập trung vào ba giá trị cốt lõi:
+## Problem Statement
 
-* **Minh bạch vận hành**: Mọi hoạt động nhập, xuất, phân loại, điều phối và thay đổi dữ liệu đều có thể theo dõi theo thời gian thực thông qua dashboard, trạng thái đơn hàng và nhật ký hệ thống.
-* **Tối ưu luồng hàng**: Hệ thống tổ chức dữ liệu theo tỉnh thành, hub, khu vực, pallet, chuyến xe và bao hàng để hỗ trợ ra quyết định nhanh, giảm sai sót khi gom hàng, giữ chỗ và xuất kho.
-* **Sẵn sàng mở rộng**: Kiến trúc backend API, service nghiệp vụ và cơ sở dữ liệu quan hệ được thiết kế để có thể mở rộng sang quét mã vạch, phân quyền người dùng, tự động hóa định tuyến và tích hợp với hệ thống vận tải bên ngoài.
+Warehouse teams often manage receiving, sorting, temporary storage, dispatch, and transportation through separate records. This creates several risks:
 
-Mục tiêu dài hạn là xây dựng một hệ thống WMS đủ thực dụng cho vận hành hằng ngày, nhưng vẫn có nền tảng kỹ thuật rõ ràng để phát triển thành giải pháp quản trị logistics hoàn chỉnh.
+- A Sack can be assigned to the wrong route or Pallet.
+- The same Sack can be reserved for more than one Outbound Order.
+- Loading and receiving updates can be delayed or entered incorrectly.
+- Managers may not have a reliable record of who changed operational data.
+- Drivers and warehouse staff may see information outside their assigned hub.
 
----
+This project provides one workflow and one data source for warehouse and transport operations. Barcode and QR scanning reduce manual input, business rules protect state transitions, and audit records improve traceability.
 
-## Các Tính Năng Nổi Bật
+## Project Objectives
 
-* **Sơ đồ kệ hàng trực quan**: Theo dõi tỉ lệ lấp đầy của từng kệ dưới dạng bản đồ nhiệt. Lựa chọn kệ để xem chi tiết sản phẩm và số lượng đang lưu trữ.
-* **Quy trình nhập kho tinh gọn**: Quản lý đơn đặt hàng và quét mã vạch nhận hàng thực tế.
-* **Logic xuất kho thông minh**:
-  * **Cơ chế giữ chỗ tồn kho** có thời hạn mười hai giờ.
-  * **Lập lộ trình lấy hàng tối ưu** tự động sắp xếp theo thứ tự lối đi giúp nhân viên di chuyển ngắn nhất.
-  * Hỗ trợ báo cáo lỗi ngoại quan sản phẩm và tự động tìm kiếm vị trí thay thế gần nhất.
-* **Nhật ký hệ thống tối bảo mật**: Ghi lại chi tiết mọi hoạt động thay đổi dữ liệu của nhân viên như ai sửa, sửa lúc nào, giá trị cũ và mới dưới dạng chỉ cho phép ghi thêm phục vụ công tác thanh tra.
+- Digitize the complete warehouse flow from inbound receipt to outbound delivery.
+- Support fast barcode and QR scanning on desktop and mobile browsers.
+- Route Sacks to the correct local or interprovince processing zone.
+- Enforce Pallet capacity, Trip state, and inventory reservation rules.
+- Provide role-based and hub-based access control.
+- Preserve operational history for review and debugging.
+- Deliver a maintainable layered system suitable for future expansion.
 
----
+## Scope
 
-## Công Nghệ Sử Dụng
+### Included
 
-* **Giao diện**: HTML5, Vanilla CSS, Tailwind CSS, Blazor Components.
-* **Hệ thống phía sau**: ASP.NET Core Blazor Server chạy trên bản .NET 9.0.
-* **Tầng dữ liệu**: Dữ liệu giả lập chạy trực tiếp trên bộ nhớ giúp chạy thử ứng dụng ngay lập tức mà không cần cài đặt cơ sở dữ liệu.
-* **Biểu tượng**: Google Material Symbols.
+- User authentication and account administration
+- Role-based and hub-based authorization
+- Dashboard metrics and recent activity
+- Province, location, hub, zone, and Pallet management
+- Employee, shift, vehicle, and driver management
+- Inbound Order and Outbound Order management
+- Sack creation, scanning, tracking, and state updates
+- Local and interprovince sorting
+- Pallet assignment, movement, completion, and finalization
+- Inventory reservation and duplicate reservation prevention
+- Trip planning, QR manifest generation, loading, sealing, dispatch, and check-in
+- Driver delivery view
+- Append-only audit logging
+- Demo data for Hanoi, Ho Chi Minh City, and Da Nang
 
----
+### Not Included
 
-## Kiến trúc Vận hành
+- Hardware scanner firmware
+- Payment and billing processing
+- Live GPS tracking
+- Automatic vehicle optimization
+- Integration with external carrier platforms
+- Production monitoring and disaster recovery automation
 
-Dưới đây là sơ đồ mặt bằng kho trung chuyển, thể hiện luồng di chuyển vật lý của hàng hóa làm cơ sở để xây dựng các API quét mã:
+## Users and Access Control
 
-<div align="center">
-  <img src=".\WMS-\wwwroot\Assets\System Architecture & Core Design\WMS_floor_plan.png" alt="Sơ đồ mặt bằng Kho trung chuyển" width="800"/>
-  <p><i>Hình 1: Sơ đồ mặt bằng và luồng luân chuyển bao tải (Sack) trong kho</i></p>
-</div>
+| Role | Main permissions |
+| --- | --- |
+| Manager | Full administration, infrastructure, accounts, employees, audit logs, and all warehouse operations |
+| Supervisor | Fleet and Trip dispatch plus operational warehouse workflows |
+| WarehouseStaff | Inbound, sorting, Pallet, Sack, Outbound Order, loading, and receiving workflows |
+| Operator | Operational warehouse workflows with the same warehouse policy boundary |
+| Driver | Assigned Trip and delivery information only |
 
----
+Access is enforced by the backend API. Hiding a menu item in the client is not treated as a security control. Each authenticated account is also associated with an operational hub where applicable.
 
-## Sơ Đồ Phân Cấp Chức Năng
+## Core Features
 
-```mermaid
-graph LR
-    HeThong[Hệ thống Quản lý Kho vận]
-    
-    %% Level 1
-    Inbound[Quản lý Nhập hàng Inbound]
-    Scan[Quản lý Quét mã và Phân loại]
-    Outbound[Quản lý Xuất hàng Outbound]
-    Exception[Quản lý Xử lý Ngoại lệ]
-    Operation[Quản lý Thiết bị và Vận hành]
+### Authentication and Administration
 
-    HeThong --> Inbound
-    HeThong --> Scan
-    HeThong --> Outbound
-    HeThong --> Exception
-    HeThong --> Operation
+- Secure cookie authentication
+- Password hashing with PBKDF2 and SHA-256
+- Login rate limiting
+- Session validation against active account, role, and hub data
+- Account activation and deactivation
+- Employee, shift, and role management
 
-    %% Level 2 - Inbound
-    Inbound1[Tiếp nhận dỡ hàng tại Dock 1 đến Dock 4]
-    Inbound2[Kiểm đếm tại khu vực hàng chờ phân loại]
-    Inbound --> Inbound1
-    Inbound --> Inbound2
+### Inbound Operations
 
-    %% Level 2 - Scan
-    Scan1[Quét mã và phân loại lần 1]
-    Scan2[Phân luồng hàng nội tỉnh theo Phương A B C D]
-    Scan3[Phân luồng hàng đi liên tỉnh]
-    Scan --> Scan1
-    Scan --> Scan2
-    Scan --> Scan3
+- Create and manage Inbound Orders
+- Associate expected Sacks with an Inbound Order
+- Resolve an inbound Trip QR manifest
+- Check in an arriving Trip by QR
+- Confirm Sack receipt at the destination hub
+- Update the interface immediately and report scan success or failure
 
-    %% Level 2 - Outbound
-    Outbound1[Bốc xếp luồng nội tỉnh tại Dock A đến Dock D]
-    Outbound2[Bốc xếp luồng liên tỉnh tại Dock H và Dock I]
-    Outbound --> Outbound1
-    Outbound --> Outbound2
+### Sorting and Pallet Operations
 
-    %% Level 2 - Exception
-    Exception1[Nhân viên phát hiện và ghi nhận tình trạng]
-    Exception2[Lập phiếu báo cáo hàng hỏng mất nhãn]
-    Exception3[Trưởng kho phê duyệt phương án xử lý]
-    Exception --> Exception1
-    Exception --> Exception2
-    Exception --> Exception3
+- Scan barcode or QR values through camera or keyboard input
+- Preview the calculated sorting route before confirming an action
+- Distinguish local flow from interprovince flow
+- Assign or reassign a Sack to a Pallet
+- Enforce a maximum Pallet capacity of six Sacks
+- Move Pallets between operational zones
+- Complete sorting and finalize destination-specific Pallets
+- Recycle empty Zone C Pallets for later operations
 
-    %% Level 2 - Operation
-    Operation1[Quản lý pallet rỗng đầy và xe nâng]
-    Operation2[Điều phối hoạt động tại khu vực quản lý]
-    Operation --> Operation1
-    Operation --> Operation2
-```
----
+### Outbound Operations
 
-## Kiến trúc Cơ sở dữ liệu
+- Create and manage Outbound Orders
+- Reserve Sacks for an Outbound Order
+- Prevent simultaneous active reservations for the same Sack
+- Release or fulfill inventory reservations
+- Associate an Outbound Order with a Trip
+- Load each Sack through scanning with optimistic interface updates
+- Scan a seal code and track loading progress
+- Dispatch a Trip using its QR manifest
 
-Hệ thống được thiết kế theo mô hình chuẩn hóa với 16 bảng, bao quát toàn bộ luồng vận hành Cross-docking: từ xử lý đơn nhập/xuất, định tuyến luân chuyển (Routing), đến kiểm soát lưu vết (Audit Log). 
+### Transportation and Delivery
 
-<div align="center">
-  <img src=".\WMS-\wwwroot\Assets\System Architecture & Core Design\TKDB.drawio.png" alt="Sơ đồ ERD 16 bảng" width="1000"/>
-  <p><i>Hình 2: Sơ đồ Thực thể - Liên kết (ERD) thể hiện cấu trúc ràng buộc dữ liệu toàn hệ thống</i></p>
-</div>
+- Manage vehicles, capacity, drivers, and Trip details
+- Issue time-limited Trip QR tokens
+- Revoke and replace QR tokens when a manifest changes
+- View the Trip QR manifest and assigned cargo
+- Check in at the receiving hub
+- Provide drivers with a focused view of assigned deliveries
 
----
+### Monitoring and Traceability
 
-## Các Trang Chức Năng Trên Giao Diện Web
+- Dashboard totals for Sacks, Orders, active Trips, and sorting work
+- Append-only audit records with old and new JSON values
+- Real-time Sack location lookup
+- Search and filtering across operational screens
+- Clear success, warning, and error feedback for scanning actions
 
-Hệ thống quản lý kho vận WMS này cung cấp các trang giao diện trực quan sau đây phục vụ công tác vận hành:
+## Main Operational Workflow
 
-* **Trang chủ Tổng quan Dashboard**: Hiển thị nhanh các chỉ số đo lường hiệu suất chính như tổng số lượng sản phẩm, số lượng hàng cảnh báo tồn kho thấp, tổng sản lượng tồn kho và biểu đồ trực quan về tỉ lệ lấp đầy kho.
-* **Bản đồ Vị trí Kệ hàng**: Giao diện trực quan mô phỏng sơ đồ kho thực tế theo các khu vực Zone A và Zone B. Cho phép người dùng theo dõi trạng thái sức chứa của từng kệ và bấm vào để xem danh sách sản phẩm cùng số lượng cụ thể đang lưu trữ tại kệ đó.
-* **Quản lý Sản phẩm**: Danh sách hiển thị toàn bộ thông tin sản phẩm bao gồm tên sản phẩm, mã SKU, mã vạch, đơn giá và tổng số lượng tồn kho thực tế. Hỗ trợ tìm kiếm nhanh theo tên sản phẩm hoặc mã SKU và chức năng xóa sản phẩm.
-* **Thêm Sản phẩm Mới**: Biểu mẫu nhập liệu cho phép khai báo sản phẩm mới vào hệ thống gồm các trường thông tin như tên sản phẩm, mã SKU, mã vạch, đơn giá bán và mô tả chi tiết sản phẩm.
-* **Nhập Xuất Kho Mới**: Giao diện ghi nhận giao dịch nhập kho thực tế từ nhà cung cấp. Hỗ trợ quét mã vạch hoặc nhập mã SKU để thêm sản phẩm vào danh sách giao dịch, tự động tính toán tổng số tiền và in hóa đơn biên nhận.
-* **Báo cáo Tồn kho**: Trang hiển thị báo cáo số liệu chi tiết về tình hình luân chuyển hàng hóa và doanh thu kho hàng.
-* **Cài đặt Hệ thống**: Cấu hình các thông số vận hành chung của hệ thống quản lý kho vận.
+1. A Manager or Supervisor creates a Trip and assigns a driver and vehicle.
+2. The system issues a QR manifest for the Trip.
+3. The receiving team scans the Trip QR code and checks in the vehicle.
+4. Sacks are confirmed as received and placed in the inbound processing area.
+5. Each Sack is scanned and evaluated against its destination and routing rule.
+6. Local Sacks move through Zone A and are finalized into Zone B.
+7. Interprovince Sacks are directed to Zone C for the next hub.
+8. Eligible Sacks are reserved for an Outbound Order.
+9. A dispatch Trip is linked to the Outbound Order.
+10. Staff scan and load each Sack, scan the seal, and confirm departure by QR.
+11. The destination hub checks in the Trip and confirms the received Sacks.
+12. The system updates states and writes audit records throughout the workflow.
 
----
+## Sorting Rules
 
-## Cấu Trúc Thư Mục Dự Án
+| Condition | Processing route |
+| --- | --- |
+| Destination is in the current hub province | Inbound receipt to Zone A to Zone B |
+| Destination is in another province | Inbound receipt to Zone C and then the configured next hub |
+| No valid route exists | Reject the operation and return a validation message |
+| Target Pallet is full | Reject assignment and keep the current Sack state |
+| Sack is actively reserved elsewhere | Reject the new reservation |
+
+## System Architecture
+
+The solution follows a layered client and server architecture.
+
+| Layer | Responsibility | Main implementation |
+| --- | --- | --- |
+| Presentation | Pages, forms, tables, scanner interface, and user feedback | React and TypeScript |
+| Client integration | Typed requests and session-aware API access | Fetch-based API services |
+| API | HTTP endpoints, authorization, request validation, and responses | ASP.NET Core controllers |
+| Business logic | Inbound, Outbound, Pallet, routing, tracking, and warehouse workflows | Scoped service classes and interfaces |
+| Persistence | Entity mapping, queries, transactions, and migrations | Entity Framework Core |
+| Data | Relational records, constraints, indexes, and audit protection | PostgreSQL |
+
+Request flow:
 
 ```text
-├── WMS-                       # Thư mục chứa mã nguồn chính
-│   ├── Components/            # Giao diện Blazor Components
-│   │   ├── Pages/             # Các trang nghiệp vụ như Dashboard, Bản đồ, Sản phẩm
-│   │   └── Layout/            # Layout trang trí và thanh điều hướng Navigation
-│   ├── Data/                  # Tầng truy cập dữ liệu
-│   │   ├── Entities/          # Các thực thể C# ánh xạ tới bảng trong Database
-│   │   └── WmsDbContext.cs    # Cấu hình kết nối DB và Khởi tạo dữ liệu mẫu
-│   ├── Services/              # Các dịch vụ xử lý logic nghiệp vụ kho
-│   │   ├── InventoryService.cs
-│   │   ├── InboundService.cs
-│   │   └── OutboundService.cs
-│   ├── Program.cs             # Cấu hình khởi chạy ứng dụng
-│   └── WMS-.csproj            # Khai báo các thư viện phụ thuộc
-├── WMS-.sln                   # File Solution quản lý dự án .NET
+Browser
+  -> React application
+  -> REST API
+  -> Authorization policies
+  -> Business services
+  -> Entity Framework Core
+  -> PostgreSQL
 ```
 
----
+The frontend and API run on separate origins during development. Vite proxies requests under `/api` to the backend. A production build can be served from the ASP.NET Core static web root as a single application.
 
-## Hướng Dẫn Cài Đặt và Chạy Dự Án
+## Technology Stack
 
-### Yêu Cầu Hệ Thống
-* Đã cài đặt .NET 9.0 SDK. Tải về tại đường dẫn https://dotnet.microsoft.com/download/dotnet/9.0
+| Area | Technology |
+| --- | --- |
+| Frontend | React 19 |
+| Language | TypeScript 5.7 |
+| Build tool | Vite 6 |
+| Styling | Tailwind CSS 3.4 |
+| Routing | React Router 7 |
+| Charts | Recharts 2 |
+| Barcode and QR | ZXing Browser and ZXing Library |
+| Backend | ASP.NET Core on .NET 9 |
+| Data access | Entity Framework Core 9 |
+| Database provider | Npgsql 9 |
+| Database | PostgreSQL |
+| API documentation | Swagger through Swashbuckle |
+| Automated checks | PowerShell smoke test, .NET build, and TypeScript build |
 
-### Các Bước Thực Hiện
-1. **Tải dự án**:
-   ```bash
-   git clone https://github.com/hoanfgzang-blip/WMS-.git
-   cd WMS-
-   ```
-2. **Khôi phục thư viện và dựng dự án**:
-   ```bash
-   dotnet restore
-   dotnet build
-   ```
-3. **Chạy ứng dụng**:
-   ```bash
-   dotnet run --project WMS-/WMS-.csproj
-   ```
-4. **Truy cập giao diện**:
-   Mở trình duyệt và truy cập đường dẫn được hiển thị trên bảng điều khiển, ví dụ như http://localhost:5000
+## Database Design
 
-*Lưu ý: Bản v0.1-alpha chạy hoàn toàn trên RAM (Mock Data) để demo UI/UX, không yêu cầu cài đặt DB. Bản v0.2 sẽ chính thức kết nối PostgreSQL.*
+The schema contains eighteen main tables.
+
+| Domain | Tables |
+| --- | --- |
+| Network | `province`, `location`, `zone`, `routing_rule` |
+| Warehouse | `pallet`, `sack` |
+| Workforce | `shift`, `employee`, `user_account` |
+| Transport | `car`, `trip`, `trip_qr_token` |
+| Inbound | `inbound_order`, `inbound_order_item` |
+| Outbound | `outbound_order`, `outbound_order_item`, `inventory_reservation` |
+| Audit | `audit_log` |
+
+Important data integrity rules include:
+
+- Foreign keys protect operational relationships.
+- Check constraints reject invalid capacity and time values.
+- A Trip origin and destination must be different.
+- Only one active reservation can exist for a Sack.
+- Routing rules are unique for each current location and destination pair.
+- Frequently queried state, location, Trip, Pallet, and reservation fields are indexed.
+- The audit table is protected against update and delete operations.
+- Service operations use database transactions where several records must change together.
+
+## API Overview
+
+All business endpoints are available under `/api`.
+
+| Route group | Responsibility |
+| --- | --- |
+| `/api/Auth` | Login, logout, session details, and accounts |
+| `/api/Dashboard` | Operational summaries and recent activity |
+| `/api/Locations` | Hubs and delivery destinations |
+| `/api/Zones` | Operational warehouse zones |
+| `/api/Pallets` | Pallet assignment, movement, and finalization |
+| `/api/Sacks` | Sack queries, routing, sorting, and receipt |
+| `/api/InboundOrders` | Inbound Order lifecycle |
+| `/api/OutboundOrders` | Outbound Order, reservation, and fulfillment workflows |
+| `/api/Trips` | Trip planning, QR manifest, loading, dispatch, and check-in |
+| `/api/Cars` | Fleet management |
+| `/api/Employees` | Employee management |
+| `/api/Shifts` | Shift management |
+| `/api/RoutingRules` | Next-hop configuration |
+| `/api/AuditLogs` | Audit history and Sack tracking |
+
+Swagger is available in the Development environment at:
+
+```text
+http://localhost:5295/swagger
+```
+
+## Project Structure
+
+```text
+WMS
+|-- frontend
+|   |-- src
+|   |   |-- api
+|   |   |-- auth
+|   |   |-- components
+|   |   |-- lib
+|   |   |-- pages
+|   |   `-- types
+|   |-- package.json
+|   `-- vite.config.ts
+|-- WMS-
+|   |-- Configuration
+|   |-- Controllers
+|   |-- Data
+|   |   |-- Entities
+|   |   `-- WmsDbContext.cs
+|   |-- Migrations
+|   |-- Security
+|   |-- Services
+|   |-- Program.cs
+|   `-- WMS-.csproj
+|-- database
+|   |-- database_setup.sql
+|   |-- demo_seed.sql
+|   |-- auth_seed.sql
+|   |-- normalize_hubs.sql
+|   |-- merge_legacy_zones.sql
+|   `-- recycle_empty_zone_c_pallets.sql
+|-- docs
+|   |-- KICH_BAN_DEMO_KHO.md
+|   `-- KICH_BAN_KIEM_THU.md
+|-- tests
+|   `-- SmokeTest.ps1
+|-- tools
+|   |-- WmsTripCli
+|   `-- WmsTripSeeder
+|-- RUN.bat
+|-- WMS-SERVER-START.bat
+`-- WMS-.sln
+```
+
+## Installation
+
+### Prerequisites
+
+- Git
+- .NET 9 SDK
+- Node.js 18 or newer
+- npm
+- PostgreSQL and psql
+- A modern browser with camera permission for live scanning
+
+### Clone the Repository
+
+```powershell
+git clone https://github.com/hoanfgzang-blip/WMS-.git
+Set-Location WMS-
+```
+
+### Create and Initialize the Database
+
+Create a PostgreSQL database named `wmsdb` and a login role named `wmsdev`. Choose a local password and keep it outside source control.
+
+The setup script drops existing WMS tables before recreating them. Run it only against a development database or create a backup first.
+
+From the project root, run:
+
+```powershell
+psql --host 127.0.0.1 --port 5432 --username wmsdev --dbname wmsdb --file database/database_setup.sql
+psql --host 127.0.0.1 --port 5432 --username wmsdev --dbname wmsdb --file database/demo_seed.sql
+psql --host 127.0.0.1 --port 5432 --username wmsdev --dbname wmsdb --file database/auth_seed.sql
+```
+
+The demo seed is designed to be rerun safely for records whose identifiers begin with `DEMO-`. The authentication seed must be applied after the demo seed. Plaintext demo passwords are not stored in the repository and should be distributed privately by the project team.
+
+### Configure and Run the Backend
+
+Set the database connection for the current PowerShell session:
+
+```powershell
+$env:WMS_DB_CONNECTION = 'Host=127.0.0.1;Port=5432;Database=wmsdb;Username=wmsdev;Password=your-password;SSL Mode=Disable'
+dotnet restore WMS-.sln
+dotnet run --project WMS-/WMS-.csproj --urls http://localhost:5295
+```
+
+The backend reads `WMS_DB_CONNECTION` first and then falls back to `ConnectionStrings:DefaultConnection` in the development settings.
+
+### Configure and Run the Frontend
+
+Open a second terminal:
+
+```powershell
+Set-Location frontend
+npm ci
+npm run dev
+```
+
+Open the application at:
+
+```text
+http://localhost:5173
+```
+
+The Vite development server proxies `/api` to `http://localhost:5295`.
+
+To use another API address, set:
+
+```powershell
+$env:VITE_API_URL = 'http://localhost:5295/api'
+npm run dev
+```
+
+### Windows Convenience Runner
+
+After the database is configured, `RUN.bat` starts the backend and frontend in separate windows.
+
+```powershell
+./RUN.bat
+```
+
+The script currently expects PostgreSQL 18 under `C:\Program Files\PostgreSQL\18` and a local database cluster on port `55432`. Update the script if your installation uses another path or port.
+
+## Build and Verification
+
+### Backend Build
+
+```powershell
+dotnet restore WMS-.sln
+dotnet build WMS-.sln --configuration Release
+```
+
+### Frontend Build
+
+```powershell
+Set-Location frontend
+npm ci
+npm run build
+```
+
+### Manual Verification
+
+Use `docs/KICH_BAN_KIEM_THU.md` for the functional checklist and `docs/KICH_BAN_DEMO_KHO.md` for the end-to-end warehouse demonstration.
+
+Recommended acceptance scenarios:
+
+- Successful and failed login
+- Permission checks for every role
+- Inbound Trip QR check-in
+- Barcode and QR Sack scanning
+- Local and interprovince sorting
+- Pallet capacity rejection
+- Duplicate reservation rejection
+- Outbound loading and seal scan
+- Trip departure and destination check-in
+- Audit record creation
+- Invalid state transition rejection
+
+### Smoke Test
+
+The repository includes a read-only PowerShell smoke test:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ./tests/SmokeTest.ps1 -BaseUrl http://127.0.0.1:5295
+```
+
+Most API routes now require authentication. The current smoke script does not create an authenticated session, so protected checks return `401` until cookie-based login support is added to the script. This limitation should be addressed before using the script in continuous integration.
+
+## Software Engineering Practices
+
+- Layered separation between presentation, API, business logic, and persistence
+- Service interfaces for warehouse operations
+- Backend authorization independent of frontend navigation
+- Database transactions for multi-record business operations
+- Input validation and explicit state validation
+- Optimistic interface updates with error recovery and scan feedback
+- Database constraints as a second line of data protection
+- Append-only audit history for accountability
+- Seed scripts for repeatable demonstrations
+- Manual test scenarios and a basic automated smoke test
+
+## Requirements Traceability
+
+| Requirement | Implementation evidence |
+| --- | --- |
+| Receive warehouse cargo by scan | Scanner views, Trip QR resolution, check-in endpoints, and Sack receipt logic |
+| Sort cargo by destination | Routing rules, sorting route preview, Zone A, Zone B, and Zone C workflows |
+| Prevent Pallet overload | Capacity validation in Pallet services and database constraints |
+| Prevent duplicate allocation | Unique active reservation index and Outbound Order validation |
+| Dispatch cargo safely | Outbound Order linkage, Sack loading, seal scan, and QR departure flow |
+| Restrict access | Cookie authentication, role policies, and hub access checks |
+| Preserve traceability | Audit log records with old values, new values, user, and time |
+| Support demonstration | Demo seed, authentication seed, demo script, and test checklist |
+
+## Current Limitations
+
+- Automated unit, integration, and browser test coverage is limited.
+- The smoke test does not yet authenticate against protected endpoints.
+- Local launch scripts contain Windows-specific paths and ports.
+- Camera scanning depends on browser permission and a secure context such as localhost or HTTPS.
+- Operational text in the current web interface is primarily Vietnamese.
+- The project does not provide live GPS, external carrier integration, or production observability.
+- Database initialization is script-based and requires careful environment selection.
+
+## Future Development
+
+- Add unit tests for routing, Pallet capacity, Trip states, and reservations.
+- Add authenticated API integration tests and end-to-end browser tests.
+- Add container-based development and deployment.
+- Add continuous integration for backend build, frontend build, and tests.
+- Add structured logging, health checks, metrics, and alerting.
+- Add offline-friendly scanning and queued synchronization.
+- Add live vehicle location and carrier integration.
+- Add configurable Pallet rules and route optimization.
+- Add bilingual Vietnamese and English interface support.
+
+## Team Contributions
+
+### Phạm Duy Anh — Developer C
+
+- Developed and integrated the Scanner UI.
+- Implemented barcode and QR scanning workflows for inbound and outbound operations.
+- Developed Trip QR scanning and outbound loading interactions.
+- Implemented optimistic UI updates, API integration, and scanning result feedback.
+- Participated in functional testing and UI refinement.
+
+### Lê Hoàng Giang — Developer C
+
+- Developed the Trip QR Manifest and inbound scanning workflow.
+- Refactored frontend and backend components.
+- Integrated pallet-related APIs.
+- Improved authentication and input validation logic.
+- Participated in system integration, debugging, documentation, and testing.
+
+### Trần Quang Khải — Developer B
+
+- Developed the core backend and warehouse business logic.
+- Implemented Sack, Pallet, Trip, Outbound Order, routing, sorting, and pallet finalization workflows.
+- Developed database entities and API endpoints.
+- Implemented database transactions and state validation.
+- Integrated Sack and Pallet data with Outbound Orders.
+- Participated in code review and backend testing.
+
+## Academic Evaluation Summary
+
+This project demonstrates requirements analysis, modular architecture, relational data modeling, API design, frontend and backend integration, role-based security, transaction management, validation, testing, and team collaboration. The implementation addresses a realistic warehouse problem while keeping the design extensible for future logistics features.
+
+## Repository Use
+
+This repository is an academic project. It does not currently declare an open-source license. Use and redistribution require permission from the project team.

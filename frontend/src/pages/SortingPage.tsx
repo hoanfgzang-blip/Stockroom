@@ -1,114 +1,84 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { BrowserMultiFormatReader, type IScannerControls } from '@zxing/browser'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
-import { ArrowRight, Barcode, Camera, CheckCircle2, CircleAlert, ClipboardCheck, History, Keyboard, MapPin, Package, Route, ScanLine, Undo2 } from 'lucide-react'
-import { locationsApi, palletsApi, sacksApi, type PalletAssignmentResult } from '@/api/services'
+import { ArrowRight, Camera, CheckCircle2, ClipboardCheck, History, Package, Route, ScanLine, Undo2 } from 'lucide-react'
+import { palletsApi, sacksApi, type PalletAssignmentResult, type SortingPalletTarget, type SortingRoutePreview } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardTitle } from '@/components/ui/card'
 import { Dialog } from '@/components/ui/dialog'
-import { Input, Label, Select } from '@/components/ui/input'
+import { Input, Label } from '@/components/ui/input'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { zoneProcessRoleLabel } from '@/lib/zoneFlow'
-import type { Location, Pallet, Sack } from '@/types'
+import type { Pallet } from '@/types'
 
-type CameraTarget = 'pallet' | 'sack'
+type HistoryItem = { id: number; code: string; message: string; success: boolean; at: Date }
+type CameraTarget = 'sack' | 'pallet'
 
-type ScanHistoryItem = {
-  id: number
-  code: string
-  message: string
-  success: boolean
-  at: Date
-  stage?: string
+function routeLabel(processRole?: string | null) {
+  return processRole === 'InterprovinceOutbound' ? 'Zone C · Ngoại tỉnh' : 'Zone B · Nội tỉnh'
 }
 
-type ClassificationResult = {
-  sack: Sack
-  assignment: PalletAssignmentResult
+function targetZoneLabel(processRole?: string | null) {
+  return processRole === 'InterprovinceOutbound' ? 'Zone C' : 'Zone B'
 }
 
-type SortingStage = {
-  round: string
-  zoneLabel: string
-  description: string
-}
-
-type SortingProcessRole = 'LocalSortBuffer' | 'LocalOutbound' | 'InterprovinceOutbound'
-
-function classificationLabel(assignment: PalletAssignmentResult) {
-  const typeLabel = assignment.classification === 'IntraProvince'
-    ? 'Hàng nội tỉnh'
-    : assignment.classification === 'InterProvince'
-      ? 'Hàng liên tỉnh'
-      : 'Đã phân loại'
-
-  return assignment.processRole
-    ? `${zoneProcessRoleLabel(assignment.processRole)} · ${typeLabel}`
-    : typeLabel
-}
-
-function getSortingStage(processRole?: string | null): SortingStage {
-  if (processRole === 'LocalSortBuffer') {
-    return {
-      round: 'Phân loại lần 1',
-      zoneLabel: 'Zone A',
-      description: 'Quét sack sau inbound để xác định location đích hoặc hub next hop.',
-    }
-  }
-  if (processRole === 'LocalOutbound') {
-    return {
-      round: 'Phân loại lần 2',
-      zoneLabel: 'Zone B',
-      description: 'Chia hàng nội tỉnh theo điểm phát trước khi xuất kho.',
-    }
-  }
-  if (processRole === 'InterprovinceOutbound') {
-    return {
-      round: 'Phân loại lần 2',
-      zoneLabel: 'Zone C',
-      description: 'Khu outbound liên tỉnh, nhận sack đã được phân tuyến từ Zone A.',
-    }
-  }
-  return {
-    round: 'Luồng chưa cấu hình',
-    zoneLabel: zoneProcessRoleLabel(processRole),
-    description: 'Pallet này chưa thuộc Zone A, Zone B hoặc Zone C.',
-  }
+function targetStatus(target: SortingPalletTarget) {
+  if (target.status === 'ReadyForOutbound') return 'Đã hoàn tất sorting'
+  if (target.status === 'Occupied') return `${target.assignedSackCount} sack`
+  return 'Trống'
 }
 
 export default function SortingPage() {
-  const palletInputRef = useRef<HTMLInputElement>(null)
-  const sackInputRef = useRef<HTMLInputElement>(null)
-  const cameraVideoRef = useRef<HTMLVideoElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
   const scannerControlsRef = useRef<IScannerControls | null>(null)
-  const [palletCode, setPalletCode] = useState('')
-  const [selectedPallet, setSelectedPallet] = useState<Pallet | null>(null)
-  const [activeProcessRole, setActiveProcessRole] = useState<SortingProcessRole>('LocalSortBuffer')
-  const [destinationId, setDestinationId] = useState('')
-  const [destinations, setDestinations] = useState<Location[]>([])
+  const [targets, setTargets] = useState<SortingPalletTarget[]>([])
   const [sackCode, setSackCode] = useState('')
+  const [palletCode, setPalletCode] = useState('')
+  const [route, setRoute] = useState<SortingRoutePreview | null>(null)
+  const [selectedTarget, setSelectedTarget] = useState<SortingPalletTarget | null>(null)
+  const [selectedPallet, setSelectedPallet] = useState<Pallet | null>(null)
+  const [lastAssignment, setLastAssignment] = useState<PalletAssignmentResult | null>(null)
+  const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
-  const [selectingPallet, setSelectingPallet] = useState(false)
-  const [palletSelectionError, setPalletSelectionError] = useState('')
-  const [palletSelectionNotice, setPalletSelectionNotice] = useState('')
-  const [history, setHistory] = useState<ScanHistoryItem[]>([])
-  const [lastClassification, setLastClassification] = useState<ClassificationResult | null>(null)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [history, setHistory] = useState<HistoryItem[]>([])
   const [cameraTarget, setCameraTarget] = useState<CameraTarget | null>(null)
   const [cameraError, setCameraError] = useState('')
-  const activeStage = getSortingStage(activeProcessRole)
-  const destinationOptions = activeProcessRole === 'InterprovinceOutbound'
-    ? destinations.filter((location) => location.locationType === 'Hub')
-    : activeProcessRole === 'LocalOutbound'
-      ? destinations.filter((location) => location.locationType !== 'Hub')
-      : []
 
-  const addHistory = (code: string, message: string, success: boolean, stage?: string) => {
+  const addHistory = (code: string, message: string, success: boolean) => {
     setHistory((current) => [
-      { id: Date.now() + Math.random(), code, message, success, at: new Date(), stage },
+      { id: Date.now() + Math.random(), code, message, success, at: new Date() },
       ...current,
-    ].slice(0, 10))
+    ].slice(0, 12))
+  }
+
+  const loadTargets = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const pallets = await palletsApi.ensureZoneASortingTargets()
+      const sackCounts = await Promise.all(pallets.map(async (pallet) => [pallet.palletId, (await sacksApi.byPallet(pallet.palletId)).length] as const))
+      const countByPallet = new Map(sackCounts)
+      setTargets(pallets
+        .filter((pallet) => pallet.destinationLocationId && pallet.zone?.processRole === 'LocalSortBuffer')
+        .map((pallet) => ({
+          palletId: pallet.palletId,
+          destinationLocationId: pallet.destinationLocationId!,
+          destinationName: pallet.destinationLocation?.locationName ?? pallet.destinationLocationId!,
+          status: pallet.status,
+          assignedSackCount: countByPallet.get(pallet.palletId) ?? 0,
+          capacity: pallet.capacity,
+          zoneId: pallet.zoneId,
+          zoneName: pallet.zone?.zoneName ?? 'Zone A',
+          processRole: pallet.destinationLocation?.locationType === 'Hub' ? 'InterprovinceOutbound' : 'LocalOutbound',
+        })))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không thể khởi tạo 6 pallet sorting.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const stopCamera = useCallback(() => {
@@ -117,72 +87,90 @@ export default function SortingPage() {
     setCameraTarget(null)
   }, [])
 
-  const selectWorkflow = (processRole: SortingProcessRole) => {
-    setActiveProcessRole(processRole)
-    setPalletCode('')
-    setSelectedPallet(null)
-    setDestinationId('')
-    setSackCode('')
-    setPalletSelectionError('')
-    setPalletSelectionNotice('')
-    setLastClassification(null)
-    setTimeout(() => palletInputRef.current?.focus(), 0)
-  }
-
   useEffect(() => {
-    palletInputRef.current?.focus()
+    void loadTargets()
     return () => stopCamera()
   }, [stopCamera])
 
-  useEffect(() => {
-    locationsApi.dispatchDestinations().then(setDestinations).catch(() => setDestinations([]))
-  }, [])
+  const localTargets = useMemo(() => targets.filter((target) => target.processRole === 'LocalOutbound'), [targets])
+  const remoteTargets = useMemo(() => targets.filter((target) => target.processRole === 'InterprovinceOutbound'), [targets])
 
-  const selectPalletByCode = async (code: string) => {
-    const value = code.trim()
-    if (!value || selectingPallet) return
+  const previewSack = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const value = sackCode.trim()
+    if (!value || processing) return
 
-    setSelectingPallet(true)
-    setPalletSelectionError('')
-    setPalletSelectionNotice('')
+    setProcessing(true)
+    setError('')
+    setNotice('')
+    setLastAssignment(null)
     try {
-      const pallet = await palletsApi.get(value)
-      const stage = getSortingStage(pallet.zone?.processRole)
-      if (pallet.zone?.processRole !== activeProcessRole) {
-        throw new Error(`${pallet.palletId} thuộc ${stage.zoneLabel}. Hãy chọn trạm ${stage.round} · ${stage.zoneLabel} trước khi kích hoạt pallet.`)
+      const preview = await sacksApi.previewSortingRoute(value)
+      setRoute(preview)
+      const matchingCurrent = selectedPallet && selectedPallet.destinationLocationId === preview.nextHopId
+        ? selectedTarget
+        : null
+      const recommendation = matchingCurrent ?? preview.candidatePallets.find((target) => target.palletId === preview.recommendedPalletId) ?? preview.candidatePallets[0] ?? null
+      setSelectedTarget(recommendation)
+      if (matchingCurrent) {
+        setNotice(`Sack này cùng tuyến với pallet ${selectedPallet?.palletId}; có thể gắn ngay.`)
+      } else if (recommendation) {
+        setNotice(`Tuyến ${routeLabel(preview.targetProcessRole)}. Đưa sack vào pallet ${recommendation.palletId}.`)
+        setPalletCode(recommendation.palletId)
+      } else {
+        setError('Không còn pallet Zone A đang mở cho tuyến này. Hãy hoàn tất/đổi pallet cùng tuyến trước.')
       }
-      const isZoneA = pallet.zone?.processRole === 'LocalSortBuffer'
-      const palletDestinationId = pallet.destinationLocationId ?? destinationId
-      if (!isZoneA && !palletDestinationId)
-        throw new Error('Hãy chọn location đích cho pallet trước khi kích hoạt.')
-      if (!isZoneA && !pallet.destinationLocationId)
-        await palletsApi.setDestination(pallet.palletId, palletDestinationId)
-
-      setPalletCode(pallet.palletId)
-      setDestinationId(isZoneA ? '' : palletDestinationId)
-      setSelectedPallet({ ...pallet, destinationLocationId: isZoneA ? null : palletDestinationId })
-      setLastClassification(null)
-      setPalletSelectionNotice(isZoneA
-        ? `Quét sack tại Zone A để hệ thống xác định location đích hoặc hub next hop trước khi đưa sang outbound.`
-        : stage.zoneLabel === 'Zone C'
-        ? `Sack ngoại tỉnh sẽ vào pallet ${pallet.palletId}. Hệ thống tra Routing Rule và chỉ nhận sack có hub next hop ${palletDestinationId}.`
-        : `Sack nội tỉnh sẽ được đưa vào pallet ${pallet.palletId} · điểm phát ${palletDestinationId}.`)
-      addHistory(pallet.palletId, `Đã chọn ${pallet.palletId}${isZoneA ? ' · khu gom chung' : ` · đích ${palletDestinationId}`} · ${stage.round}.`, true, stage.round)
-      setTimeout(() => sackInputRef.current?.focus(), 0)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Không thể kiểm tra pallet.'
+      addHistory(value, `${routeLabel(preview.targetProcessRole)} · ${preview.nextHopName}`, true)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Không thể xác định tuyến sack.'
+      setRoute(null)
+      setSelectedTarget(null)
       setSelectedPallet(null)
-      setPalletSelectionError(message)
-      setPalletSelectionNotice('')
+      setError(message)
       addHistory(value, message, false)
     } finally {
-      setSelectingPallet(false)
+      setProcessing(false)
     }
+  }
+
+  const confirmPallet = async (code: string) => {
+    const value = code.trim()
+    if (!value || !route || processing) return
+
+    setProcessing(true)
+    setError('')
+    try {
+      const pallet = await palletsApi.get(value)
+      if (pallet.zone?.processRole !== 'LocalSortBuffer')
+        throw new Error('Pallet xác nhận phải đang ở Zone A.')
+      if (pallet.destinationLocationId !== route.nextHopId)
+        throw new Error(`Sai pallet. Sack này phải vào pallet có tuyến ${route.nextHopName}.`)
+      if (pallet.status === 'ReadyForOutbound' || pallet.status === 'Finalized' || pallet.status === 'Locked')
+        throw new Error('Pallet đã hoàn tất sorting hoặc đã khóa.')
+
+      const target = route.candidatePallets.find((item) => item.palletId === pallet.palletId) ?? selectedTarget
+      setSelectedPallet(pallet)
+      setSelectedTarget(target ?? null)
+      setPalletCode(pallet.palletId)
+      setNotice(`Đã xác nhận ${pallet.palletId}. Có thể gắn sack ${route.sackId}.`)
+      addHistory(pallet.palletId, `Đã xác nhận pallet ${pallet.palletId} cho ${route.nextHopName}.`, true)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Không thể xác nhận pallet.'
+      setSelectedPallet(null)
+      setError(message)
+      addHistory(value, message, false)
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const confirmRecommended = () => {
+    if (selectedTarget) void confirmPallet(selectedTarget.palletId)
   }
 
   const startCamera = async (target: CameraTarget) => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError('Trình duyệt hoặc thiết bị này chưa hỗ trợ truy cập camera.')
+      setCameraError('Trình duyệt hoặc thiết bị chưa hỗ trợ camera.')
       setCameraTarget(target)
       return
     }
@@ -190,16 +178,14 @@ export default function SortingPage() {
     stopCamera()
     setCameraError('')
     setCameraTarget(target)
-
     try {
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-      const video = cameraVideoRef.current
-      if (!video) throw new Error('Không thể mở vùng xem trước của camera.')
+      const video = videoRef.current
+      if (!video) throw new Error('Không thể mở vùng xem trước camera.')
 
       const hints = new Map<DecodeHintType, BarcodeFormat[]>()
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_39, BarcodeFormat.CODE_128, BarcodeFormat.QR_CODE])
       const reader = new BrowserMultiFormatReader(hints)
-
       scannerControlsRef.current = await reader.decodeFromConstraints(
         { video: { facingMode: { ideal: 'environment' } }, audio: false },
         video,
@@ -207,363 +193,165 @@ export default function SortingPage() {
           if (!result) return
           const value = result.getText().trim()
           if (!value) return
-
           controls.stop()
           scannerControlsRef.current = null
           setCameraTarget(null)
-           if (target === 'pallet') {
-             setPalletCode(value)
-             if (selectedPallet) {
-               setSelectedPallet(null)
-               setDestinationId('')
-             }
-             setPalletSelectionError('')
-             setPalletSelectionNotice('')
-             setLastClassification(null)
-             void selectPalletByCode(value)
-           } else {
+          if (target === 'sack') {
             setSackCode(value)
-            addHistory(value, 'Đã đọc mã bao từ camera. Nhấn Phân loại để xử lý.', true)
+            addHistory(value, 'Đã đọc mã sack từ camera. Nhấn Xác định tuyến.', true)
+          } else {
+            setPalletCode(value)
+            if (route) {
+              void confirmPallet(value)
+            } else {
+              setNotice(`Đã đọc mã pallet ${value}. Hãy quét sack trước để hệ thống kiểm tra pallet đúng tuyến.`)
+              addHistory(value, 'Đã đọc mã pallet từ camera; đang chờ tuyến của sack.', true)
+            }
           }
         },
       )
-    } catch (error) {
-      setCameraError(error instanceof Error ? error.message : 'Không thể truy cập camera.')
+    } catch (err) {
+      setCameraError(err instanceof Error ? err.message : 'Không thể truy cập camera.')
     }
   }
 
-  const selectPallet = async (event: FormEvent<HTMLFormElement>) => {
+  const assignSack = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    await selectPalletByCode(palletCode)
-  }
-
-  const processSack = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const sackId = sackCode.trim()
-    const palletId = selectedPallet?.palletId ?? ''
-    if (!sackId || processing) return
-
-    if (!palletId) {
-      addHistory(sackId, 'Hãy quét hoặc nhập mã pallet trước.', false)
-      palletInputRef.current?.focus()
-      return
-    }
+    if (!route || !selectedPallet || processing) return
 
     setProcessing(true)
+    setError('')
     try {
-      const sack = await sacksApi.get(sackId)
-      const assignment = await palletsApi.assignSack(palletId, sack.sackId)
-      setLastClassification({
-        sack: {
-          ...sack,
-          palletId: assignment.palletId ?? palletId,
-          zoneId: assignment.zoneId ?? sack.zoneId,
-          nextHopId: assignment.nextHopId ?? sack.nextHopId,
-          status: 'Sorted',
-        },
-        assignment,
-      })
-      addHistory(sack.sackId, `${assignment.message} Pallet hiện có ${assignment.assignedSackCount} bao.`, true, selectedStage.round)
+      const result = await palletsApi.assignSack(selectedPallet.palletId, route.sackId)
+      setLastAssignment(result)
+      setNotice(`Đã đưa ${route.sackId} vào ${selectedPallet.palletId}.`)
+      addHistory(route.sackId, result.message, true)
       setSackCode('')
-      setTimeout(() => sackInputRef.current?.focus(), 0)
-    } catch (error) {
-      addHistory(sackId, error instanceof Error ? error.message : 'Không thể phân loại bao hàng.', false, selectedStage.round)
+      setRoute(null)
+      await loadTargets()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Không thể đưa sack vào pallet.'
+      setError(message)
+      addHistory(route.sackId, message, false)
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const completeSorting = async () => {
+    if (!selectedPallet || processing) return
+    setProcessing(true)
+    setError('')
+    try {
+      await palletsApi.completeSorting(selectedPallet.palletId)
+      addHistory(selectedPallet.palletId, 'Đã hoàn tất sorting, pallet sẵn sàng chuyển sang Zone B/C.', true)
+      setNotice(`${selectedPallet.palletId} đã được chuyển sang ${targetZoneLabel(selectedTarget?.processRole)} và sẵn sàng outbound.`)
+      setSelectedPallet(null)
+      setSelectedTarget(null)
+      setRoute(null)
+      await loadTargets()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Không thể hoàn tất sorting pallet.'
+      setError(message)
     } finally {
       setProcessing(false)
     }
   }
 
   const clearSession = () => {
-    stopCamera()
-    setPalletCode('')
-    setSelectedPallet(null)
-    setDestinationId('')
     setSackCode('')
-    setPalletSelectionError('')
-    setPalletSelectionNotice('')
-    setLastClassification(null)
+    setPalletCode('')
+    setRoute(null)
+    setSelectedTarget(null)
+    setSelectedPallet(null)
+    setLastAssignment(null)
+    setError('')
+    setNotice('')
     setHistory([])
-    setTimeout(() => palletInputRef.current?.focus(), 0)
   }
-
-  const selectedPalletId = selectedPallet?.palletId ?? ''
-  const selectedStage = getSortingStage(selectedPallet?.zone?.processRole)
-  const hasSelectedPallet = selectedPallet !== null
-  const lastStage = getSortingStage(lastClassification?.assignment.processRole)
-  const successfulActions = history.filter((item) => item.success).length
-  const failedActions = history.length - successfulActions
 
   return (
     <div>
       <PageHeader
-        title="Phân loại hàng"
-        description="Zone A xác định tuyến/location; Zone B và Zone C chỉ tiếp nhận hàng đã phân tuyến để outbound."
-        action={
-          <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${hasSelectedPallet ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'}`}>
-            <span className={`h-2 w-2 rounded-full ${hasSelectedPallet ? 'bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]' : 'bg-slate-300'}`} />
-            {hasSelectedPallet ? `${selectedStage.round} · ${selectedStage.zoneLabel}` : `Trạm chọn: ${activeStage.zoneLabel}`}
-          </div>
-        }
+        title="Sorting Zone A"
+        description="Quét sack trước, hệ thống chỉ pallet đúng tuyến. Đầu ra mỗi hub gồm 4 pallet nội tỉnh cho Zone B và 2 pallet liên tỉnh cho Zone C."
+        action={<Badge status={targets.length === 6 ? 'Success' : 'Warning'}>{targets.length}/6 pallet đích</Badge>}
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
-          <Card className="overflow-hidden border-slate-200 shadow-md shadow-slate-200/60">
-            <div className="border-b border-blue-100 bg-[radial-gradient(circle_at_top_right,_rgba(96,165,250,0.22),_transparent_42%),linear-gradient(135deg,_#eff6ff,_#ffffff_72%)] px-5 py-5 sm:px-6">
-              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+          <Card>
+            <div className="border-b border-blue-100 bg-blue-50/70 px-5 py-5 sm:px-6">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white"><Package className="h-5 w-5" /></span>
                 <div>
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-blue-200">
-                      <Package className="h-5 w-5" />
-                    </span>
-                    <div>
-                      <h2 className="text-lg font-semibold tracking-tight text-slate-900">Phiên phân loại hai lần</h2>
-                      <p className="mt-0.5 text-sm text-slate-600">Pallet đích xác định chính xác lần phân loại đang thao tác.</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-xl border border-white/80 bg-white/75 px-3 py-2 text-right shadow-sm backdrop-blur">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Pallet hoạt động</p>
-                  <p className={`mt-1 font-mono text-sm font-bold ${hasSelectedPallet ? 'text-primary' : 'text-slate-400'}`}>{selectedPalletId || 'Chưa chọn'}</p>
+                  <h2 className="text-lg font-semibold text-slate-900">Một công đoạn sorting tại Zone A</h2>
+                  <p className="mt-1 text-sm text-slate-600">Sack → xác định tuyến → pallet đích → hoàn tất pallet.</p>
                 </div>
               </div>
-
-              <div className="mt-5">
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-semibold text-slate-900">Chọn trạm phân loại</p><p className="text-xs text-slate-500">Pallet quét sau đó phải thuộc đúng trạm đã chọn.</p></div>
-                <div className="mt-3 grid gap-3 lg:grid-cols-3">
-                  <button type="button" aria-pressed={activeProcessRole === 'LocalSortBuffer'} onClick={() => selectWorkflow('LocalSortBuffer')} className={`rounded-2xl border p-4 text-left transition-all ${activeProcessRole === 'LocalSortBuffer' ? 'border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-200' : 'border-blue-200 bg-white/85 text-slate-900 hover:border-blue-400 hover:bg-blue-50'}`}>
-                    <div className="flex items-start justify-between gap-3"><span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${activeProcessRole === 'LocalSortBuffer' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'}`}>Trạm 01</span><span className={`text-xs font-semibold ${activeProcessRole === 'LocalSortBuffer' ? 'text-blue-100' : 'text-blue-600'}`}>Lần 1</span></div>
-                    <p className="mt-4 text-base font-bold">Zone A · Phân tuyến</p><p className={`mt-1 text-xs leading-5 ${activeProcessRole === 'LocalSortBuffer' ? 'text-blue-100' : 'text-slate-600'}`}>Quét toàn bộ sack sau inbound để xác định location đích hoặc hub next hop.</p>
-                    <p className={`mt-4 flex items-center gap-1.5 text-xs font-semibold ${activeProcessRole === 'LocalSortBuffer' ? 'text-white' : 'text-blue-700'}`}>Zone A <ArrowRight className="h-3.5 w-3.5" /> Outbound B / C</p>
-                  </button>
-                  <button type="button" aria-pressed={activeProcessRole === 'InterprovinceOutbound'} onClick={() => selectWorkflow('InterprovinceOutbound')} className={`rounded-2xl border p-4 text-left transition-all ${activeProcessRole === 'InterprovinceOutbound' ? 'border-violet-500 bg-violet-600 text-white shadow-lg shadow-violet-200' : 'border-violet-200 bg-white/85 text-slate-900 hover:border-violet-400 hover:bg-violet-50'}`}>
-                    <div className="flex items-start justify-between gap-3"><span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${activeProcessRole === 'InterprovinceOutbound' ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-700'}`}>Trạm 02</span><span className={`text-xs font-semibold ${activeProcessRole === 'InterprovinceOutbound' ? 'text-violet-100' : 'text-violet-600'}`}>Lần 2</span></div>
-                    <p className="mt-4 text-base font-bold">Zone C · Outbound liên tỉnh</p><p className={`mt-1 text-xs leading-5 ${activeProcessRole === 'InterprovinceOutbound' ? 'text-violet-100' : 'text-slate-600'}`}>Nhận sack ngoại tỉnh đã có hub next hop từ Zone A để gom outbound.</p>
-                    <p className={`mt-4 flex items-center gap-1.5 text-xs font-semibold ${activeProcessRole === 'InterprovinceOutbound' ? 'text-white' : 'text-violet-700'}`}>Zone C <ArrowRight className="h-3.5 w-3.5" /> Xuất kho</p>
-                  </button>
-                  <button type="button" aria-pressed={activeProcessRole === 'LocalOutbound'} onClick={() => selectWorkflow('LocalOutbound')} className={`rounded-2xl border p-4 text-left transition-all ${activeProcessRole === 'LocalOutbound' ? 'border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'border-emerald-200 bg-white/85 text-slate-900 hover:border-emerald-400 hover:bg-emerald-50'}`}>
-                    <div className="flex items-start justify-between gap-3"><span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${activeProcessRole === 'LocalOutbound' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700'}`}>Trạm 03</span><span className={`text-xs font-semibold ${activeProcessRole === 'LocalOutbound' ? 'text-emerald-100' : 'text-emerald-600'}`}>Lần 2</span></div>
-                    <p className="mt-4 text-base font-bold">Zone B · Outbound nội tỉnh</p><p className={`mt-1 text-xs leading-5 ${activeProcessRole === 'LocalOutbound' ? 'text-emerald-100' : 'text-slate-600'}`}>Nhận sack nội tỉnh đã có location đích từ Zone A để gom outbound.</p>
-                    <p className={`mt-4 flex items-center gap-1.5 text-xs font-semibold ${activeProcessRole === 'LocalOutbound' ? 'text-white' : 'text-emerald-700'}`}>Zone B <ArrowRight className="h-3.5 w-3.5" /> Xuất kho</p>
-                  </button>
-                </div>
-              </div>
-              {hasSelectedPallet && <div className="mt-3 flex flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50/90 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600" /><span className="font-semibold text-emerald-900">Đang thao tác: {selectedStage.round} · {selectedStage.zoneLabel}</span></div><span className="text-xs text-emerald-800">{selectedPallet?.zone?.zoneName ?? selectedStage.description}</span></div>}
             </div>
-
-            <CardContent className="space-y-4 p-5 pt-5 sm:p-6 sm:pt-6">
-              <form onSubmit={(event) => void selectPallet(event)} className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 sm:p-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex items-start gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white">01</span>
-                    <div>
-                      <Label htmlFor="sorting-pallet" className="text-base font-semibold text-slate-900">Quét pallet {activeStage.zoneLabel}</Label>
-                      <p className="mt-1 text-xs leading-5 text-slate-600">{activeStage.round} đang được chọn. Chỉ pallet thuộc {activeStage.zoneLabel} mới được kích hoạt.</p>
-                    </div>
-                  </div>
-                  {hasSelectedPallet && <Badge status="Success">{selectedStage.round} · {selectedStage.zoneLabel}</Badge>}
+            <CardContent className="space-y-5 p-5 sm:p-6">
+              <form onSubmit={(event) => void previewSack(event)} className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 sm:p-5">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white">01</span>
+                  <div><Label htmlFor="sorting-sack" className="text-base font-semibold text-slate-900">Quét sack trước</Label><p className="mt-1 text-xs leading-5 text-slate-600">Hệ thống tra destination và hiển thị pallet đúng tuyến.</p></div>
                 </div>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:gap-3">
-                  <div className="relative min-w-0 flex-1">
-                    <Barcode className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
-                    <Input
-                      ref={palletInputRef}
-                      id="sorting-pallet"
-                      value={palletCode}
-                       onChange={(event) => {
-                         setPalletCode(event.target.value)
-                         setPalletSelectionError('')
-                         setPalletSelectionNotice('')
-                          if (selectedPallet) {
-                           setSelectedPallet(null)
-                           setDestinationId('')
-                           setLastClassification(null)
-                         }
-                      }}
-                      placeholder="Quét hoặc nhập mã pallet"
-                      autoComplete="off"
-                      className="h-14 border-blue-200 bg-white pl-12 font-mono text-base shadow-sm focus:border-primary"
-                      disabled={processing || selectingPallet}
-                    />
-                  </div>
-                  <Button type="button" variant="outline" className="h-14 shrink-0 border-blue-200 bg-white px-4 sm:px-5" onClick={() => void startCamera('pallet')} disabled={processing || selectingPallet} title="Quét pallet bằng camera">
-                    <Camera className="h-5 w-5" />
-                    Camera
-                  </Button>
-                  <Button type="submit" className="h-14 shrink-0 px-5 shadow-lg shadow-blue-200" disabled={!palletCode.trim() || processing || selectingPallet}>
-                    <CheckCircle2 className="h-5 w-5" />
-                    {selectingPallet ? 'Đang kiểm tra...' : hasSelectedPallet ? 'Cập nhật pallet' : 'Xác nhận pallet'}
-                  </Button>
+                <div className="mt-4 flex gap-3">
+                  <Input id="sorting-sack" value={sackCode} onChange={(event) => setSackCode(event.target.value)} placeholder="Quét hoặc nhập SACK-..." autoComplete="off" disabled={processing} />
+                  <Button type="button" variant="outline" onClick={() => void startCamera('sack')} disabled={processing} title="Quét sack bằng camera"><Camera className="h-4 w-4" /> Camera</Button>
+                  <Button type="submit" disabled={!sackCode.trim() || processing}><ScanLine className="h-4 w-4" /> Xác định tuyến</Button>
                 </div>
-                {activeProcessRole !== 'LocalSortBuffer' && <div className="mt-3">
-                  <Label htmlFor="sorting-destination">{activeProcessRole === 'InterprovinceOutbound' ? 'Hub next hop của pallet Zone C' : 'Location đích của pallet nội tỉnh'}</Label>
-                  <Select
-                    id="sorting-destination"
-                    className="mt-1 h-12 bg-white"
-                    value={destinationId}
-                    onChange={(event) => setDestinationId(event.target.value)}
-                    disabled={processing || selectingPallet || hasSelectedPallet}
-                  >
-                    <option value="">{activeProcessRole === 'InterprovinceOutbound' ? 'Chọn hub next hop' : 'Chọn location đích nội tỉnh'}</option>
-                    {destinationOptions.map((location) => (
-                      <option key={location.locationId} value={location.locationId}>
-                        {location.locationName} · {location.locationId}
-                      </option>
-                    ))}
-                  </Select>
-                  <p className="mt-1 text-xs text-slate-500">{activeProcessRole === 'InterprovinceOutbound' ? 'Zone C chỉ nhận bao ngoại tỉnh có cùng hub next hop.' : 'Pallet nội tỉnh chỉ nhận bao cùng location đích.'}</p>
-                </div>}
-                {palletSelectionError && <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{palletSelectionError}</p>}
               </form>
 
-              {palletSelectionNotice && selectedPallet && (
-                <div role="status" aria-live="polite" className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm shadow-emerald-100">
-                  <div className="flex items-start gap-3">
-                    <Route className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-emerald-950">Hướng dẫn phân loại</p>
-                      <p className="mt-1 text-sm font-semibold text-emerald-900">{palletSelectionNotice}</p>
-                      <div className="mt-3 grid gap-2 text-xs text-emerald-800 sm:grid-cols-2">
-                        <p><span className="font-semibold">Zone:</span> {selectedPallet.zone?.zoneName ?? selectedStage.zoneLabel}</p>
-                        <p><span className="font-semibold">Luồng:</span> {selectedStage.round}</p>
-                      </div>
-                      <p className="mt-2 text-xs leading-5 text-emerald-800">{selectedStage.description} Chỉ quét sack sau khi đã xác nhận đúng pallet.</p>
-                    </div>
+              {route && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div><p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Tuyến đã xác định</p><p className="mt-1 text-lg font-bold text-emerald-950">{routeLabel(route.targetProcessRole)}</p><p className="mt-1 text-sm text-emerald-800">Đích: {route.destinationName} · Next-hop: {route.nextHopName}</p></div>
+                    <Route className="h-6 w-6 text-emerald-600" />
                   </div>
+                  <div className="mt-4 rounded-xl border border-emerald-200 bg-white/75 p-3 text-sm text-emerald-900"><span className="font-semibold">Pallet cần đưa sack vào:</span> {selectedTarget?.palletId ?? 'Chưa có pallet phù hợp'}</div>
                 </div>
               )}
 
-              <div className="flex items-center gap-3 px-2" aria-hidden="true">
-                <div className="h-px flex-1 bg-slate-200" />
-                <ArrowRight className={`h-4 w-4 ${hasSelectedPallet ? 'text-primary' : 'text-slate-300'}`} />
-                <div className="h-px flex-1 bg-slate-200" />
-              </div>
-
-              <form onSubmit={processSack} className={`rounded-2xl border p-4 transition-colors sm:p-5 ${hasSelectedPallet ? 'border-slate-200 bg-white shadow-sm' : 'border-slate-200 bg-slate-50/70'}`}>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex items-start gap-3">
-                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${hasSelectedPallet ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-500'}`}>02</span>
-                    <div>
-                      <Label htmlFor="sorting-sack" className="text-base font-semibold text-slate-900">{hasSelectedPallet ? `${selectedStage.round} · Quét bao hàng` : 'Quét bao hàng'}</Label>
-                      <p className="mt-1 text-xs leading-5 text-slate-600">{hasSelectedPallet ? selectedStage.description : 'Xác nhận pallet ở trên để mở thao tác này.'}</p>
-                    </div>
-                  </div>
-                  {hasSelectedPallet && <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white"><ClipboardCheck className="h-3.5 w-3.5" />{selectedStage.zoneLabel} · {selectedPalletId}</span>}
-                </div>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:gap-3">
-                  <div className="relative min-w-0 flex-1">
-                    <ScanLine className={`pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 ${hasSelectedPallet ? 'text-primary' : 'text-slate-400'}`} />
-                    <Input
-                      ref={sackInputRef}
-                      id="sorting-sack"
-                      value={sackCode}
-                      onChange={(event) => setSackCode(event.target.value)}
-                      placeholder={hasSelectedPallet ? 'Quét mã SACK-...' : 'Chọn pallet trước'}
-                      autoComplete="off"
-                      className="h-14 bg-white pl-12 font-mono text-base shadow-sm"
-                      disabled={processing || !hasSelectedPallet}
-                    />
-                  </div>
-                  <Button type="button" variant="outline" className="h-14 shrink-0 px-4 sm:px-5" onClick={() => void startCamera('sack')} disabled={processing || !hasSelectedPallet} title="Quét bao bằng camera">
-                    <Camera className="h-5 w-5" />
-                    Camera
-                  </Button>
-                  <Button type="submit" className="h-14 shrink-0 px-5 shadow-lg shadow-blue-200" disabled={!sackCode.trim() || processing || !hasSelectedPallet}>
-                    <ScanLine className="h-5 w-5" />
-                    {processing ? 'Đang phân loại...' : 'Phân loại'}
-                  </Button>
-                </div>
-                <div className="mt-4 flex items-start gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">
-                  <Keyboard className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                  <p>Máy quét USB hoặc Bluetooth có thể gửi phím Enter sau mã để phân loại liên tục, không cần chạm chuột.</p>
-                </div>
+              <form onSubmit={(event) => { event.preventDefault(); void confirmPallet(palletCode) }} className={`rounded-2xl border p-4 sm:p-5 ${route ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50'}`}>
+                <div className="flex items-start gap-3"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${route ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-500'}`}>02</span><div><Label htmlFor="sorting-pallet" className="text-base font-semibold text-slate-900">Xác nhận pallet đích</Label><p className="mt-1 text-xs leading-5 text-slate-600">Quét pallet được hệ thống chỉ định, hoặc dùng pallet đề xuất.</p></div></div>
+                <div className="mt-4 flex gap-3"><Input id="sorting-pallet" value={palletCode} onChange={(event) => setPalletCode(event.target.value)} placeholder={route ? 'Quét mã pallet đích' : 'Quét pallet bằng camera'} disabled={!route || processing} autoComplete="off" /><Button type="button" variant="outline" onClick={() => void startCamera('pallet')} disabled={processing} title="Quét pallet bằng camera"><Camera className="h-4 w-4" /> Camera</Button><Button type="submit" variant="outline" disabled={!route || !palletCode.trim() || processing}>Xác nhận pallet</Button></div>
+                {route && selectedTarget && <Button type="button" variant="ghost" className="mt-2 text-blue-700" onClick={confirmRecommended} disabled={processing}><CheckCircle2 className="h-4 w-4" /> Dùng pallet đề xuất {selectedTarget.palletId}</Button>}
               </form>
+
+              <form onSubmit={(event) => void assignSack(event)} className={`rounded-2xl border p-4 sm:p-5 ${route && selectedPallet ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-slate-50'}`}>
+                <div className="flex items-start gap-3"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${route && selectedPallet ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'}`}>03</span><div><Label className="text-base font-semibold text-slate-900">Gắn sack vào pallet</Label><p className="mt-1 text-xs leading-5 text-slate-600">{selectedPallet ? `${route?.sackId} → ${selectedPallet.palletId}` : 'Cần xác nhận đúng pallet trước.'}</p></div></div>
+                <div className="mt-4 flex items-center justify-between gap-3"><span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-semibold text-slate-700"><ClipboardCheck className="h-4 w-4 text-emerald-600" />{selectedPallet?.palletId ?? 'Chưa chọn pallet'}</span><Button type="submit" disabled={!route || !selectedPallet || processing}><ArrowRight className="h-4 w-4" /> Gắn sack</Button></div>
+              </form>
+
+              {selectedPallet && <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3"><p className="text-sm text-amber-900">Pallet {selectedPallet.palletId} đã gom đủ? Hãy khóa đầu ra trước khi chuyển zone.</p><Button type="button" variant="outline" onClick={() => void completeSorting()} disabled={processing}>Hoàn tất sorting pallet</Button></div>}
+
+              {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+              {notice && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</p>}
+              {lastAssignment && <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm text-emerald-900"><p className="font-semibold">Đã sorting thành công</p><p className="mt-1">{lastAssignment.sackId} → {lastAssignment.palletId} · {lastAssignment.nextHopName ?? lastAssignment.nextHopId}</p></div>}
             </CardContent>
           </Card>
 
-          {lastClassification && (
-            <Card className="overflow-hidden border-emerald-200 shadow-md shadow-emerald-100">
-                <div className="flex flex-col gap-3 border-b border-emerald-100 bg-emerald-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500 text-white"><CheckCircle2 className="h-5 w-5" /></span><div><CardTitle className="text-base text-emerald-950">Kết quả {lastStage.round.toLowerCase()}</CardTitle><p className="mt-1 text-xs text-emerald-800">Bao vừa quét đã được xác nhận tại {lastStage.zoneLabel}.</p></div></div>
-                <Badge status="Success">{lastStage.zoneLabel} · {classificationLabel(lastClassification.assignment)}</Badge>
+          <Card>
+            <CardContent className="p-5 sm:p-6">
+              <div className="flex items-center justify-between gap-3"><div><CardTitle className="text-base">Đầu ra Zone A</CardTitle><p className="mt-1 text-xs text-slate-500">4 pallet nội tỉnh chuyển Zone B · 2 pallet liên tỉnh chuyển Zone C.</p></div><Button variant="ghost" size="sm" onClick={() => void loadTargets()} disabled={loading}>Làm mới</Button></div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {[...localTargets, ...remoteTargets].map((target) => <button key={target.palletId} type="button" className={`rounded-xl border p-3 text-left ${selectedTarget?.palletId === target.palletId ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 bg-white'}`} onClick={() => { setSelectedTarget(target); setPalletCode(target.palletId) }}><div className="flex items-center justify-between gap-2"><span className="font-mono text-xs font-bold text-slate-900">{target.palletId}</span><Badge status={target.processRole === 'InterprovinceOutbound' ? 'Info' : 'Success'}>{targetZoneLabel(target.processRole)}</Badge></div><p className="mt-2 truncate text-xs text-slate-600">{target.destinationName}</p><p className="mt-2 text-xs font-semibold text-slate-500">{targetStatus(target)}</p></button>)}
               </div>
-              <CardContent className="p-5 pt-5 sm:p-6 sm:pt-6">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3"><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Mã bao</p><p className="mt-1.5 truncate font-mono text-sm font-bold text-slate-900">{lastClassification.sack.sackId}</p></div>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3"><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Pallet</p><p className="mt-1.5 truncate font-mono text-sm font-bold text-slate-900">{lastClassification.assignment.palletId ?? selectedPalletId}</p></div>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3"><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Zone / lần phân loại</p><p className="mt-1.5 truncate text-sm font-semibold text-slate-900">{lastStage.zoneLabel} · {lastClassification.assignment.zoneName ?? lastClassification.assignment.zoneId ?? 'Chưa xác định'}</p></div>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3"><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Bao trên pallet</p><p className="mt-1.5 text-sm font-bold text-slate-900">{lastClassification.assignment.assignedSackCount} bao</p></div>
-                </div>
-                <div className="mt-4 grid gap-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 sm:grid-cols-2">
-                  <div className="flex gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><div><p className="text-xs font-semibold text-emerald-900">Điểm đến cuối</p><p className="mt-1 text-sm text-emerald-800">{lastClassification.assignment.destinationName ?? lastClassification.sack.sDestination}</p></div></div>
-                  <div className="flex gap-2"><ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><div><p className="text-xs font-semibold text-emerald-900">Điểm xuất / next hop</p><p className="mt-1 text-sm text-emerald-800">{lastClassification.assignment.nextHopName ?? lastClassification.assignment.nextHopId ?? 'Không có'}</p></div></div>
-                </div>
-                <p className="mt-4 text-sm leading-6 text-emerald-900">{lastClassification.assignment.message}</p>
-              </CardContent>
-            </Card>
-          )}
+            </CardContent>
+          </Card>
         </div>
 
-        <Card className="h-fit overflow-hidden xl:sticky xl:top-6">
-          <div className="border-b bg-slate-900 px-5 py-5 text-white">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10"><History className="h-4 w-4" /></span><div><CardTitle className="text-base text-white">Lịch sử phân loại</CardTitle><p className="mt-1 text-xs text-slate-300">Theo dõi riêng từng lần phân loại</p></div></div>
-              <Button variant="ghost" size="sm" className="text-slate-300 hover:bg-white/10 hover:text-white" onClick={clearSession} disabled={history.length === 0 && !palletCode} title="Xóa phiên phân loại">
-                <Undo2 className="h-4 w-4" />
-                Xóa
-              </Button>
-            </div>
-            <div className="mt-5 grid grid-cols-2 gap-2">
-              <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2.5"><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">Thành công</p><p className="mt-1 text-xl font-bold text-white">{successfulActions}</p></div>
-              <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2.5"><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">Cần xử lý</p><p className="mt-1 text-xl font-bold text-white">{failedActions}</p></div>
-            </div>
-          </div>
-          <CardContent className="p-0">
-            {history.length === 0 ? (
-              <div className="flex min-h-64 flex-col items-center justify-center px-6 py-10 text-center">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><ScanLine className="h-6 w-6" /></span>
-                <p className="mt-4 text-sm font-medium text-slate-700">Chưa có thao tác nào</p>
-                <p className="mt-1 max-w-52 text-xs leading-5 text-slate-500">Chọn pallet rồi quét mã bao để bắt đầu phiên phân loại.</p>
-              </div>
-            ) : (
-              <ol className="max-h-[34rem] divide-y divide-slate-100 overflow-y-auto">
-                {history.map((item) => (
-                  <li key={item.id} className="flex gap-3 px-5 py-4">
-                    <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${item.success ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                      {item.success ? <CheckCircle2 className="h-4 w-4" /> : <CircleAlert className="h-4 w-4" />}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-2"><p className="truncate font-mono text-xs font-bold text-slate-800">{item.code}</p>{item.stage && <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">{item.stage}</span>}</div>
-                        <time className="shrink-0 text-[11px] text-slate-400">{item.at.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</time>
-                      </div>
-                      <p className={`mt-1 text-xs leading-5 ${item.success ? 'text-slate-600' : 'text-red-600'}`}>{item.message}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </CardContent>
+        <Card className="h-fit xl:sticky xl:top-6">
+          <div className="border-b bg-slate-900 px-5 py-5 text-white"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><History className="h-4 w-4" /><CardTitle className="text-base text-white">Lịch sử sorting</CardTitle></div><Button variant="ghost" size="sm" className="text-slate-300" onClick={clearSession}><Undo2 className="h-4 w-4" /> Xóa</Button></div></div>
+          <CardContent className="p-0">{history.length === 0 ? <p className="px-5 py-10 text-center text-sm text-slate-500">Chưa có thao tác.</p> : <ol className="divide-y divide-slate-100">{history.map((item) => <li key={item.id} className="flex gap-3 px-5 py-4"><span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${item.success ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}><CheckCircle2 className="h-4 w-4" /></span><div className="min-w-0"><p className="font-mono text-xs font-bold text-slate-800">{item.code}</p><p className="mt-1 text-xs leading-5 text-slate-600">{item.message}</p><time className="mt-1 block text-[11px] text-slate-400">{item.at.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</time></div></li>)}</ol>}</CardContent>
         </Card>
       </div>
 
-      <Dialog
-        open={cameraTarget !== null}
-        onClose={stopCamera}
-        title={cameraTarget === 'pallet' ? 'Quét mã pallet' : 'Quét mã bao hàng'}
-        description="Đưa mã vạch vào giữa khung hình để đọc tự động."
-      >
+      <Dialog open={cameraTarget !== null} onClose={stopCamera} title={cameraTarget === 'sack' ? 'Quét mã sack' : 'Quét mã pallet'} description="Đưa mã vạch vào giữa khung hình để đọc tự động.">
         <div className="space-y-4">
-          {cameraError ? (
-            <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{cameraError}</p>
-          ) : (
-            <div className="overflow-hidden rounded-lg bg-black">
-              <video ref={cameraVideoRef} className="aspect-video w-full object-cover" muted playsInline />
-            </div>
-          )}
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={stopCamera}>Đóng camera</Button>
-          </div>
+          {cameraError ? <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{cameraError}</p> : <div className="overflow-hidden rounded-lg bg-black"><video ref={videoRef} className="aspect-video w-full object-cover" muted playsInline /></div>}
+          <div className="flex justify-end"><Button variant="outline" onClick={stopCamera}>Đóng camera</Button></div>
         </div>
       </Dialog>
     </div>

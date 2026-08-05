@@ -25,6 +25,13 @@ import type { InboundOrder, InboundOrderItem, TripQrManifest } from '@/types'
 
 type InboundStep = 'idle' | 'pallet-scan' | 'scanning'
 type SackFilter = 'all' | 'scanned' | 'missing' | 'wrong'
+type InboundOrderStatus = 'Pending' | 'InProgress' | 'Completed'
+
+const inboundOrderTabs: Array<{ status: InboundOrderStatus; label: string }> = [
+  { status: 'Pending', label: 'Chờ nhập kho' },
+  { status: 'InProgress', label: 'Đang nhập kho' },
+  { status: 'Completed', label: 'Hoàn thành' },
+]
 
 type ScanResult = {
   id: number
@@ -102,11 +109,11 @@ function StepIndicator({ step }: { step: InboundStep }) {
 export default function InboundOrdersPage() {
   /* ── Order list state */
   const [orders, setOrders] = useState<InboundOrder[]>([])
+  const [activeOrderStatus, setActiveOrderStatus] = useState<InboundOrderStatus>('Pending')
   const [selected, setSelected] = useState<InboundOrder | null>(null)
   const [items, setItems] = useState<InboundOrderItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [updatingStatus, setUpdatingStatus] = useState(false)
 
   /* ── QR dialog open/close */
   const [qrDialogOpen, setQrDialogOpen] = useState(false)
@@ -391,18 +398,6 @@ export default function InboundOrdersPage() {
     } catch { setItems([]) }
   }
 
-  const handleUpdateStatus = async (orderId: string, newStatus: string) => {
-    setUpdatingStatus(true)
-    try {
-      await inboundOrdersApi.updateStatus(orderId, newStatus)
-      await fetchOrders()
-      if (selected?.inboundOrderId === orderId)
-        setSelected((prev) => (prev ? { ...prev, status: newStatus } : null))
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái.')
-    } finally { setUpdatingStatus(false) }
-  }
-
   /* ─── Derived checklist values ────────────────────────────────────── */
 
   const expectedSacks = tripManifest?.sacks ?? []
@@ -425,6 +420,8 @@ export default function InboundOrdersPage() {
     wrong: wrongSackIds.length,
   }
 
+  const visibleOrders = orders.filter((order) => order.status === activeOrderStatus)
+
   /* ─── Render ──────────────────────────────────────────────────────── */
 
   if (loading) return <LoadingState />
@@ -446,7 +443,31 @@ export default function InboundOrdersPage() {
       {/* ── Order table ── */}
       <Card>
         <CardHeader>
-          <CardTitle>Danh sách đơn nhập kho ({orders.length})</CardTitle>
+          <div className="space-y-4">
+            <CardTitle>Danh sách đơn nhập kho ({visibleOrders.length})</CardTitle>
+            <div className="flex flex-wrap gap-2" role="tablist" aria-label="Trạng thái đơn nhập kho">
+              {inboundOrderTabs.map((tab) => {
+                const count = orders.filter((order) => order.status === tab.status).length
+                const isActive = activeOrderStatus === tab.status
+                return (
+                  <Button
+                    key={tab.status}
+                    type="button"
+                    size="sm"
+                    variant={isActive ? 'default' : 'outline'}
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => setActiveOrderStatus(tab.status)}
+                  >
+                    {tab.label}
+                    <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                      {count}
+                    </span>
+                  </Button>
+                )
+              })}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -459,7 +480,7 @@ export default function InboundOrdersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.map((order) => (
+              {visibleOrders.map((order) => (
                 <TableRow
                   key={order.inboundOrderId}
                   className={cn('cursor-pointer hover:bg-slate-50 transition-colors', selected?.inboundOrderId === order.inboundOrderId && 'bg-blue-50')}
@@ -471,9 +492,9 @@ export default function InboundOrdersPage() {
                   <TableCell>{formatDateTime(order.createAt)}</TableCell>
                 </TableRow>
               ))}
-              {orders.length === 0 && (
+              {visibleOrders.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-6 text-slate-500">Chưa có đơn nhập kho nào.</TableCell>
+                  <TableCell colSpan={4} className="text-center py-6 text-slate-500">Không có đơn {inboundOrderTabs.find((tab) => tab.status === activeOrderStatus)?.label.toLowerCase()}.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -501,23 +522,6 @@ export default function InboundOrdersPage() {
               <div>
                 <p className="text-xs text-slate-500 font-medium">Ngày tạo</p>
                 <p className="text-sm text-slate-700 mt-0.5">{formatDateTime(selected.createAt)}</p>
-              </div>
-            </div>
-
-            <div className="rounded-lg border p-4">
-              <p className="text-sm font-semibold mb-2">Cập nhật trạng thái đơn nhập</p>
-              <div className="flex flex-wrap gap-2">
-                {(['Pending', 'InProgress', 'Completed'] as const).map((s) => (
-                  <Button
-                    key={s}
-                    size="sm"
-                    variant={selected.status === s ? 'default' : 'outline'}
-                    disabled={updatingStatus || selected.status === s}
-                    onClick={() => handleUpdateStatus(selected.inboundOrderId, s)}
-                  >
-                    {s === 'Pending' ? 'Chờ xử lý' : s === 'InProgress' ? 'Đang nhập kho' : 'Hoàn thành'}
-                  </Button>
-                ))}
               </div>
             </div>
 

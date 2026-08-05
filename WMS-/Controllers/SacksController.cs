@@ -7,6 +7,7 @@ using WMS_.Data.Entities;
 using WMS_.Configuration;
 using WMS_.Security;
 using WMS_.Services;
+using WMS_.Services.Warehouse;
 
 namespace WMS_.Controllers
 {
@@ -17,11 +18,13 @@ namespace WMS_.Controllers
     {
         private readonly WmsDbContext _db;
         private readonly IOutboundService _outboundService;
+        private readonly IWarehouseOperationService _operationService;
 
-        public SacksController(WmsDbContext db, IOutboundService outboundService)
+        public SacksController(WmsDbContext db, IOutboundService outboundService, IWarehouseOperationService operationService)
         {
             _db = db;
             _outboundService = outboundService;
+            _operationService = operationService;
         }
 
         /// <summary>Get all sacks with optional status filter and sorting</summary>
@@ -52,6 +55,22 @@ namespace WMS_.Controllers
         {
             var sack = await QuerySacksAtCurrentHub().FirstOrDefaultAsync(item => item.SackId == id);
             return sack == null ? NotFound() : Ok(sack);
+        }
+
+        [HttpGet("{id}/sorting-route")]
+        public async Task<ActionResult<SortingRoutePreview>> PreviewSortingRoute(string id)
+        {
+            var locationId = User.HubId();
+            if (string.IsNullOrWhiteSpace(locationId)) return Forbid();
+            try
+            {
+                var preview = await _operationService.PreviewSackSortingRouteAsync(id, locationId);
+                return preview == null ? NotFound() : Ok(preview);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
         }
 
         /// <summary>Get sacks by trip</summary>

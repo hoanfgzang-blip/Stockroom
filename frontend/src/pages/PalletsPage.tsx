@@ -19,7 +19,7 @@ import { statusLabel } from '@/lib/utils'
 import { isDispatchProcessRole, zoneProcessRoleLabel } from '@/lib/zoneFlow'
 import type { Location, OutboundOrder, Pallet, Sack, Zone } from '@/types'
 
-const statusOptions = ['Empty', 'Occupied', 'In Transit to Zone', 'Finalized', 'Locked']
+const statusOptions = ['Empty', 'Occupied', 'ReadyForOutbound', 'In Transit to Zone', 'Finalized', 'Locked']
 
 const emptyForm = () => ({
   zoneId: '',
@@ -338,7 +338,7 @@ export default function PalletsPage() {
                   <TableCell>{pallet.capacity}</TableCell>
                   <TableCell><Badge status={pallet.status}>{statusLabel(pallet.status)}</Badge></TableCell>
                   <TableCell>
-                    <Select value={pallet.zoneId} onChange={(event) => void movePallet(pallet, event.target.value)} disabled={saving || pallet.status !== 'Empty'}>
+                    <Select value={pallet.zoneId} onChange={(event) => void movePallet(pallet, event.target.value)} disabled={saving || !['Empty', 'ReadyForOutbound'].includes(pallet.status)}>
                       {zones.map((zone) => <option key={zone.zoneId} value={zone.zoneId}>{zone.zoneName}</option>)}
                     </Select>
                   </TableCell>

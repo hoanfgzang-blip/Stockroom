@@ -48,9 +48,10 @@ namespace WMS_.Services
             var hubId = _httpContextAccessor.HttpContext?.User.HubId();
             if (string.IsNullOrWhiteSpace(hubId)) return null;
 
+            var code = id.Trim();
             var currentSackIds = QuerySacksAtCurrentHub().Select(sack => sack.SackId);
             return await _db.OutboundOrders.FirstOrDefaultAsync(order =>
-                order.OutboundOrderId == id &&
+                (order.OutboundOrderId == code || order.OutboundOrderNumber == code) &&
                 OperationalHubScope.OutboundDestinationIds.Contains(order.OutboundDestination) &&
                 (order.OriginLocationId == hubId ||
                  (order.OriginLocationId == null && _db.OutboundOrderItems.Any(item =>
@@ -238,6 +239,32 @@ namespace WMS_.Services
         public Task<bool> FulfillOrderAsync(string outboundOrderId)
         {
             throw new InvalidOperationException("Không thể hoàn tất đơn xuất trực tiếp. Hãy chốt pallet, chất bao vào chuyến xe và cho xe xuất phát.");
+        }
+
+        public async Task<int> MarkOrdersInProgressForTripAsync(string tripId)
+        {
+            var trip = await _db.Trips.FindAsync(tripId);
+            if (trip == null || trip.Type != "Outbound")
+                return 0;
+
+            var orderIds = await _db.OutboundOrderItems
+                .Where(item => item.Sack.TripId == tripId)
+                .Select(item => item.OutboundOrderId)
+                .Distinct()
+                .ToListAsync();
+            if (!string.IsNullOrWhiteSpace(trip.OutboundOrderId) && !orderIds.Contains(trip.OutboundOrderId))
+                orderIds.Add(trip.OutboundOrderId);
+
+            var orders = await _db.OutboundOrders
+                .Where(order => orderIds.Contains(order.OutboundOrderId) &&
+                                order.Status != "Completed" &&
+                                order.Status != "Cancelled")
+                .ToListAsync();
+
+            foreach (var order in orders)
+                order.Status = "InProgress";
+
+            return orders.Count;
         }
 
         public async Task<bool> CompleteOrderForCompletedTripAsync(string tripId)

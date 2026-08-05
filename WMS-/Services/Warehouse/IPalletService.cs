@@ -9,6 +9,7 @@ namespace WMS_.Services.Warehouse
         Task<IEnumerable<Pallet>> GetAllPalletsAsync(string? status = null);
         Task<Pallet?> GetPalletByIdAsync(string id);
         Task<Pallet> CreatePalletAsync(Pallet pallet);
+        Task<IEnumerable<Pallet>> EnsureZoneASortingPalletsAsync(string locationId);
         Task<Pallet> SetPalletDestinationAsync(string id, string destinationLocationId);
         Task<bool> UpdatePalletAsync(string id, Pallet pallet);
         Task<bool> UpdatePalletStatusAsync(string id, string status);

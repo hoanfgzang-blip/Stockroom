@@ -28,6 +28,7 @@ export interface Pallet {
   status: string
   capacity: number
   zone?: Zone
+  destinationLocation?: Location
 }
 
 export interface Shift {

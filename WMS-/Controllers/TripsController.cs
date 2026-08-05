@@ -851,6 +851,7 @@ namespace WMS_.Controllers
             var previousStatus = trip.Status;
             trip.Status = "InProgress";
             trip.UpdatedAt = DateTime.UtcNow;
+            await _outboundService.MarkOrdersInProgressForTripAsync(trip.TripId);
             AddAuditLog("DispatchOutboundByQr", "trip", trip.TripId, new { Status = previousStatus }, new
             {
                 Status = trip.Status,

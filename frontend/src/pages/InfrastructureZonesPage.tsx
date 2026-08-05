@@ -8,6 +8,17 @@ import { cn } from '@/lib/utils'
 import { zoneProcessRoleDescription, zoneProcessRoleLabel } from '@/lib/zoneFlow'
 import type { Pallet, Zone } from '@/types'
 
+function zoneDisplayLabel(zone: Zone) {
+  if (zone.processRole !== 'General') return zoneProcessRoleLabel(zone.processRole)
+
+  const source = `${zone.zoneId} ${zone.zoneName} ${zone.zoneType}`.toLowerCase()
+  if (source.includes('inbound') || source.includes('-in') || source.includes('nhap')) return 'Inbound'
+  if (source.includes('inter') || source.includes('ngoai')) return 'Zone C'
+  if (source.includes('sort') || source.includes('chia')) return 'Zone A'
+  if (source.includes('out') || source.includes('xuat')) return 'Zone B'
+  return 'Zone'
+}
+
 export default function InfrastructureZonesPage() {
   const [zones, setZones] = useState<Zone[]>([])
   const [pallets, setPallets] = useState<Pallet[]>([])
@@ -71,6 +82,10 @@ export default function InfrastructureZonesPage() {
               const palletsInZone = pallets.filter((pallet) => pallet.zoneId === zone.zoneId)
               const activePallets = palletsInZone.filter((pallet) => pallet.status !== 'Empty').length
               const palletCapacity = palletsInZone.reduce((total, pallet) => total + pallet.capacity, 0)
+              const flowLabel = zoneDisplayLabel(zone)
+              const flowDescription = zone.processRole === 'General'
+                ? `Luồng vận hành ${flowLabel}.`
+                : zoneProcessRoleDescription(zone.processRole)
 
               return (
                 <button
@@ -83,10 +98,10 @@ export default function InfrastructureZonesPage() {
                   )}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <p className="font-semibold">{zone.zoneName}</p>
-                    <Badge status={zone.processRole}>{zoneProcessRoleLabel(zone.processRole)}</Badge>
+                    <p className="font-semibold">{flowLabel}</p>
+                    <Badge status={zone.processRole}>{flowLabel}</Badge>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">{zoneProcessRoleDescription(zone.processRole)}</p>
+                  <p className="mt-1 text-xs text-slate-500">{flowDescription}</p>
                   <p className="mt-2 text-xs text-slate-500">{zone.location?.locationName ?? zone.locationId} · Sức chứa zone {zone.capacity}</p>
                   <p className="mt-2 text-xs text-slate-400">{activePallets}/{palletsInZone.length} pallet đang có hàng · Tổng sức chứa pallet {palletCapacity}</p>
                 </button>

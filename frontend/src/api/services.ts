@@ -66,6 +66,31 @@ export type PalletAssignmentResult = {
   nextHopName?: string | null
 }
 
+export type SortingPalletTarget = {
+  palletId: string
+  destinationLocationId: string
+  destinationName: string
+  status: string
+  assignedSackCount: number
+  capacity: number
+  zoneId: string
+  zoneName: string
+  processRole: string
+}
+
+export type SortingRoutePreview = {
+  sackId: string
+  classification: 'IntraProvince' | 'InterProvince'
+  destinationId: string
+  destinationName: string
+  nextHopId: string
+  nextHopName: string
+  targetProcessRole: 'LocalOutbound' | 'InterprovinceOutbound'
+  targetZoneLabel: string
+  candidatePallets: SortingPalletTarget[]
+  recommendedPalletId?: string | null
+}
+
 export const accountsApi = {
   all: (locationId?: string) =>
     api.get<ManagedAccount[]>(`/Auth/accounts${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`),
@@ -111,6 +136,7 @@ export const palletsApi = {
     api.get<Pallet[]>(`/Pallets${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Pallet>(`/Pallets/${id}`),
   create: (data: Pick<Pallet, 'zoneId' | 'destinationLocationId'> & { capacity?: number; palletId?: string }) => api.post<Pallet>('/Pallets', data),
+  ensureZoneASortingTargets: () => api.post<Pallet[]>('/Pallets/ensure-zone-a-sorting-targets', {}),
   setDestination: (id: string, destinationLocationId: string) =>
     api.patch(`/Pallets/${id}/destination`, { destinationLocationId }),
   delete: (id: string) => api.delete(`/Pallets/${id}`),
@@ -122,6 +148,8 @@ export const palletsApi = {
     api.delete<PalletAssignmentResult>(`/Pallets/${palletId}/sacks/${sackId}`),
   moveToZone: (palletId: string, zoneId: string) =>
     api.post<{ message: string }>(`/Pallets/${palletId}/move-to-zone/${zoneId}`, {}),
+  completeSorting: (palletId: string) =>
+    api.post<{ message: string }>(`/Pallets/${palletId}/complete-sorting`, {}),
   finalize: (palletId: string, outboundOrderId: string) =>
     api.post<{ message: string }>(`/Pallets/${palletId}/finalize`, { outboundOrderId }),
 }
@@ -265,6 +293,7 @@ export const sacksApi = {
   all: (status?: string) =>
     api.get<Sack[]>(`/Sacks${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Sack>(`/Sacks/${id}`),
+  previewSortingRoute: (id: string) => api.get<SortingRoutePreview>(`/Sacks/${id}/sorting-route`),
   byPallet: (palletId: string) => api.get<Sack[]>(`/Sacks/by-pallet/${palletId}`),
   confirmReceived: (id: string) => api.post<void>(`/Sacks/${id}/confirm-received`, {}),
   delete: (id: string) => api.delete(`/Sacks/${id}`),

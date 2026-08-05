@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -30,6 +31,119 @@ namespace WMS_.Services.Warehouse
         public Task<PalletAssignmentResult> ReassignSackToPalletAsync(string sackId, string palletId, string userId, string locationId)
             => PlaceSackOnPalletAsync(sackId, palletId, userId, locationId, allowReassignment: true);
 
+        public async Task<SortingRoutePreview?> PreviewSackSortingRouteAsync(string sackId, string locationId)
+        {
+            if (!OperationalHubScope.IsHub(locationId)) return null;
+
+            var sack = await _db.Sacks
+                .Include(item => item.Zone)
+                    .ThenInclude(item => item.Location)
+                .FirstOrDefaultAsync(item => item.SackId == sackId && item.Zone != null && item.Zone.LocationId == locationId);
+            if (sack == null) return null;
+            if (sack.Zone?.ProcessRole != ZoneProcessRoles.LocalSortBuffer)
+                throw new InvalidOperationException("Chỉ sack đang ở Zone A mới được sorting.");
+            if (sack.Status is "InTransit" or "Received")
+                throw new InvalidOperationException("Sack đang vận chuyển hoặc đã giao, không thể sorting.");
+
+            var route = await ResolveSackRouteAsync(locationId, sack.SDestination);
+            var zone = sack.Zone;
+            var palletRows = await _db.Pallets
+                .Include(item => item.Zone)
+                .Include(item => item.DestinationLocation)
+                .Where(item => item.ZoneId == zone.ZoneId &&
+                               item.DestinationLocationId == route.NextHopId &&
+                               item.Status != "Finalized" && item.Status != "Locked" && item.Status != "ReadyForOutbound")
+                .OrderBy(item => item.Status == "Empty" ? 0 : 1)
+                .ThenBy(item => item.PalletId)
+                .ToListAsync();
+
+            var candidates = new List<SortingPalletTarget>();
+            foreach (var pallet in palletRows)
+            {
+                var count = await _db.Sacks.CountAsync(item => item.PalletId == pallet.PalletId);
+                candidates.Add(new SortingPalletTarget(
+                    pallet.PalletId,
+                    pallet.DestinationLocationId!,
+                    pallet.DestinationLocation?.LocationName ?? pallet.DestinationLocationId!,
+                    pallet.Status,
+                    count,
+                    pallet.Capacity,
+                    pallet.ZoneId,
+                    pallet.Zone?.ZoneName ?? "Zone A",
+                    route.Classification == "InterProvince"
+                        ? ZoneProcessRoles.InterprovinceOutbound
+                        : ZoneProcessRoles.LocalOutbound));
+            }
+
+            return new SortingRoutePreview(
+                sack.SackId,
+                route.Classification,
+                sack.SDestination,
+                route.DestinationName,
+                route.NextHopId,
+                route.NextHopName,
+                route.Classification == "InterProvince"
+                    ? ZoneProcessRoles.InterprovinceOutbound
+                    : ZoneProcessRoles.LocalOutbound,
+                zone.ZoneName,
+                candidates,
+                candidates.FirstOrDefault()?.PalletId);
+        }
+
+        public async Task<bool> CompleteZoneASortingAsync(string palletId, string userId, string locationId)
+        {
+            if (!OperationalHubScope.IsHub(locationId))
+                throw new InvalidOperationException("Tài khoản chưa được gán hub vận hành.");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+            var pallet = await LoadPalletForUpdateAsync(palletId);
+            if (pallet == null) return false;
+            var zone = await _db.Zones.FirstOrDefaultAsync(item => item.ZoneId == pallet.ZoneId && item.LocationId == locationId);
+            if (zone?.ProcessRole != ZoneProcessRoles.LocalSortBuffer)
+                throw new InvalidOperationException("Chỉ pallet ở Zone A mới được hoàn tất sorting.");
+            if (pallet.Status is "Finalized" or "Locked" or "ReadyForOutbound")
+                return false;
+
+            var sacks = await LoadSacksOnPalletForUpdateAsync(palletId);
+            if (sacks.Count == 0)
+                throw new InvalidOperationException("Pallet chưa có sack, không thể hoàn tất sorting.");
+            if (string.IsNullOrWhiteSpace(pallet.DestinationLocationId))
+                throw new InvalidOperationException("Pallet chưa được gán tuyến đích.");
+            if (sacks.Any(item => item.Status != "Sorted" || item.NextHopId != pallet.DestinationLocationId))
+                throw new InvalidOperationException("Pallet phải chứa các sack đã sorting và cùng một tuyến.");
+
+            var destination = await _db.Locations.FindAsync(pallet.DestinationLocationId);
+            if (destination == null)
+                throw new InvalidOperationException("Không tìm thấy destination của pallet.");
+            var outboundRole = OperationalHubScope.IsHub(destination.LocationId)
+                ? ZoneProcessRoles.InterprovinceOutbound
+                : ZoneProcessRoles.LocalOutbound;
+            var outboundZone = await _db.Zones.FirstOrDefaultAsync(item =>
+                item.LocationId == locationId && item.ProcessRole == outboundRole);
+            if (outboundZone == null)
+                throw new InvalidOperationException("Hub chưa có Zone B/Zone C tương ứng để nhận pallet.");
+
+            var oldZoneId = pallet.ZoneId;
+            pallet.ZoneId = outboundZone.ZoneId;
+            pallet.Status = "ReadyForOutbound";
+            foreach (var sack in sacks)
+                sack.ZoneId = outboundZone.ZoneId;
+
+            _db.AuditLogs.Add(new AuditLog
+            {
+                UserId = userId,
+                ActionType = "CompleteZoneASorting",
+                TableName = "pallet",
+                RecordId = pallet.PalletId,
+                OldValues = JsonSerializer.Serialize(new { Status = "Occupied", ZoneId = oldZoneId }),
+                NewValues = JsonSerializer.Serialize(new { pallet.Status, ZoneId = pallet.ZoneId, ZoneProcessRole = outboundRole, pallet.DestinationLocationId, SackCount = sacks.Count }),
+                CreatedAt = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return true;
+        }
+
         public async Task<PalletAssignmentResult> RemoveSackFromPalletAsync(string sackId, string palletId, string userId, string locationId)
         {
             if (!OperationalHubScope.IsHub(locationId)) return new(false, "Tài khoản chưa được gán hub vận hành.");
@@ -45,7 +159,7 @@ namespace WMS_.Services.Warehouse
             var palletZoneLocation = await _db.Zones.Where(zone => zone.ZoneId == pallet.ZoneId).Select(zone => zone.LocationId).SingleOrDefaultAsync();
             if (palletZoneLocation != locationId)
                 return new(false, "Pallet không thuộc hub của tài khoản.");
-            if (pallet.Status is "Finalized" or "Locked")
+            if (pallet.Status is "Finalized" or "Locked" or "ReadyForOutbound")
                 return new(false, "Pallet đã chốt hoặc đang bị khóa.");
 
             var oldValues = new { sack.PalletId, sack.ZoneId, sack.NextHopId, sack.Status };
@@ -114,9 +228,11 @@ namespace WMS_.Services.Warehouse
                 return new(false, "Pallet phải thuộc hub của tài khoản đang chia chọn.");
             if (!ZoneProcessRoles.IsKnown(targetZone.ProcessRole))
                 return new(false, "Zone chưa được cấu hình vai trò nghiệp vụ hợp lệ.");
-            if (targetPallet.Status is "Finalized" or "Locked")
+            if (ZoneProcessRoles.IsDispatch(targetZone.ProcessRole))
+                return new(false, "Zone B/C chỉ nhận nguyên pallet đã hoàn tất sorting; không gắn sack trực tiếp.");
+            if (targetPallet.Status is "Finalized" or "Locked" or "ReadyForOutbound")
                 return new(false, "Pallet đã chốt hoặc đang bị khóa.");
-            if (previousPalletId != null && pallets.TryGetValue(previousPalletId, out var sourcePallet) && sourcePallet.Status is ("Finalized" or "Locked"))
+            if (previousPalletId != null && pallets.TryGetValue(previousPalletId, out var sourcePallet) && sourcePallet.Status is ("Finalized" or "Locked" or "ReadyForOutbound"))
                 return new(false, "Pallet cũ đã chốt hoặc đang bị khóa, không thể tháo sack.");
             if (sack.Status is "InTransit" or "Received")
                 return new(false, "Bao hàng đang vận chuyển hoặc đã giao, không thể phân loại lại.");
@@ -136,35 +252,14 @@ namespace WMS_.Services.Warehouse
                 var flowError = await ValidateTargetZoneFlowAsync(sack, targetPallet, targetZone, route);
                 if (flowError != null) return new(false, flowError);
             }
-            else if (ZoneProcessRoles.IsDispatch(targetZone.ProcessRole))
-            {
-                if (string.IsNullOrWhiteSpace(sack.NextHopId))
-                    return new(false, "Bao phải được phân tuyến tại Zone A trước khi vào khu outbound.");
-
-                try
-                {
-                    route = await ResolveSackRouteAsync(locationId, sack.SDestination);
-                }
-                catch (InvalidOperationException ex)
-                {
-                    return new(false, ex.Message);
-                }
-
-                if (!string.Equals(sack.NextHopId, route.NextHopId, StringComparison.OrdinalIgnoreCase))
-                    return new(false, "Tuyến của bao đã thay đổi. Hãy đưa bao trở lại Zone A để phân tuyến lại.");
-
-                var flowError = await ValidateTargetZoneFlowAsync(sack, targetPallet, targetZone, route);
-                if (flowError != null) return new(false, flowError);
-            }
-
-            if (ZoneProcessRoles.IsDispatch(targetZone.ProcessRole))
+            if (targetZone.ProcessRole == ZoneProcessRoles.LocalSortBuffer && route != null)
             {
                 if (string.IsNullOrWhiteSpace(targetPallet.DestinationLocationId))
-                    return new(false, "Pallet outbound chưa được gán điểm đến.");
-
-                var sackDispatchDestination = route?.NextHopId ?? sack.NextHopId ?? sack.SDestination;
-                if (!string.Equals(targetPallet.DestinationLocationId, sackDispatchDestination, StringComparison.OrdinalIgnoreCase))
-                    return new(false, $"Pallet {targetPallet.PalletId} đã gán cho {targetPallet.DestinationLocationId}, bao này đi {sackDispatchDestination}.");
+                    return new(false, "Pallet Zone A chưa thuộc một trong 6 pallet đích của wave sorting.");
+                if (!string.Equals(targetPallet.DestinationLocationId, route.NextHopId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new(false, $"Pallet {targetPallet.PalletId} đã phân tuyến đến {targetPallet.DestinationLocationId}; bao này đi {route.NextHopId}.");
+                }
             }
 
             var classification = route?.Classification;
@@ -356,11 +451,31 @@ namespace WMS_.Services.Warehouse
 
             var sacks = await LoadSacksOnPalletForUpdateAsync(palletId);
             if (sacks.Count > 0 && sourceZone.ProcessRole != zone.ProcessRole)
-                return false;
+            {
+                if (sourceZone.ProcessRole != ZoneProcessRoles.LocalSortBuffer || !ZoneProcessRoles.IsDispatch(zone.ProcessRole))
+                    return false;
+                if (pallet.Status != "ReadyForOutbound")
+                    return false;
+                if (string.IsNullOrWhiteSpace(pallet.DestinationLocationId) ||
+                    sacks.Any(sack => string.IsNullOrWhiteSpace(sack.NextHopId) || sack.NextHopId != pallet.DestinationLocationId))
+                    return false;
+
+                var destination = await _db.Locations.FindAsync(pallet.DestinationLocationId);
+                if (destination == null) return false;
+
+                var mustUseZoneB = destination.LocationType != "Hub";
+                if ((mustUseZoneB && zone.ProcessRole != ZoneProcessRoles.LocalOutbound) ||
+                    (!mustUseZoneB && zone.ProcessRole != ZoneProcessRoles.InterprovinceOutbound))
+                    return false;
+            }
 
             var oldPalletZoneId = pallet.ZoneId;
             pallet.ZoneId = newZoneId;
-            pallet.Status = sacks.Count == 0 ? "Empty" : "Occupied";
+            pallet.Status = sacks.Count == 0
+                ? "Empty"
+                : sourceZone.ProcessRole == ZoneProcessRoles.LocalSortBuffer && ZoneProcessRoles.IsDispatch(zone.ProcessRole)
+                    ? "ReadyForOutbound"
+                    : pallet.Status;
 
             foreach (var sack in sacks)
             {

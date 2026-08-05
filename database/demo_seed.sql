@@ -80,6 +80,31 @@ INSERT INTO pallet (pallet_id, zone_id, status, capacity) VALUES
    ('DEMO-PLT-018', 'DEMO-Z-HCM-OUT', 'Empty', 1200)
 ON CONFLICT (pallet_id) DO NOTHING;
 
+-- 20 pallet trống bổ sung cho demo inbound, Zone A, Zone B và Zone C.
+-- Giữ mã DEMO- và không reset dữ liệu vận hành nếu seed được chạy lại.
+INSERT INTO pallet (pallet_id, zone_id, status, capacity) VALUES
+  ('DEMO-PLT-019', 'DEMO-Z-HN-IN', 'Empty', 1000),
+  ('DEMO-PLT-020', 'DEMO-Z-HN-IN', 'Empty', 1000),
+  ('DEMO-PLT-021', 'DEMO-Z-HCM-IN', 'Empty', 1200),
+  ('DEMO-PLT-022', 'DEMO-Z-HCM-IN', 'Empty', 1200),
+  ('DEMO-PLT-023', 'DEMO-Z-HN-SORT', 'Empty', 1000),
+  ('DEMO-PLT-024', 'DEMO-Z-HN-SORT', 'Empty', 1000),
+  ('DEMO-PLT-025', 'DEMO-Z-HCM-SORT', 'Empty', 1200),
+  ('DEMO-PLT-026', 'DEMO-Z-HCM-SORT', 'Empty', 1200),
+  ('DEMO-PLT-027', 'DEMO-Z-DN-SORT', 'Empty', 800),
+  ('DEMO-PLT-028', 'DEMO-Z-DN-SORT', 'Empty', 800),
+  ('DEMO-PLT-029', 'DEMO-Z-HN-OUT', 'Empty', 1000),
+  ('DEMO-PLT-030', 'DEMO-Z-HN-OUT', 'Empty', 1000),
+  ('DEMO-PLT-031', 'DEMO-Z-HCM-OUT', 'Empty', 1200),
+  ('DEMO-PLT-032', 'DEMO-Z-HCM-OUT', 'Empty', 1200),
+  ('DEMO-PLT-033', 'DEMO-Z-DN-OUT', 'Empty', 800),
+  ('DEMO-PLT-034', 'DEMO-Z-HN-OUT-INTER', 'Empty', 1000),
+  ('DEMO-PLT-035', 'DEMO-Z-HN-OUT-INTER', 'Empty', 1000),
+  ('DEMO-PLT-036', 'DEMO-Z-HCM-OUT-INTER', 'Empty', 1200),
+  ('DEMO-PLT-037', 'DEMO-Z-HCM-OUT-INTER', 'Empty', 1200),
+  ('DEMO-PLT-038', 'DEMO-Z-DN-OUT-INTER', 'Empty', 800)
+ON CONFLICT (pallet_id) DO NOTHING;
+
 INSERT INTO shift (shift_id, shift_name, start_at, end_at) VALUES
   ('DEMO-S1', 'Ca sang', '06:00', '14:00'),
   ('DEMO-S2', 'Ca chieu', '14:00', '22:00'),

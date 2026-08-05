@@ -30,6 +30,7 @@ namespace WMS_.Services.Warehouse
 
             var query = _db.Pallets
                 .Include(p => p.Zone)
+                .Include(p => p.DestinationLocation)
                 .Where(p => OperationalHubScope.HubIds.Contains(p.Zone.LocationId));
 
             if (!string.IsNullOrWhiteSpace(status))
@@ -38,6 +39,79 @@ namespace WMS_.Services.Warehouse
             query = query.Where(p => p.Zone.LocationId == myLocationId);
 
             return await query.ToListAsync();
+        }
+
+        public async Task<IEnumerable<Pallet>> EnsureZoneASortingPalletsAsync(string locationId)
+        {
+            if (!OperationalHubScope.IsHub(locationId))
+                throw new InvalidOperationException("Tài khoản chưa được gán hub vận hành.");
+
+            var zone = await _db.Zones.FirstOrDefaultAsync(item =>
+                item.LocationId == locationId && item.ProcessRole == ZoneProcessRoles.LocalSortBuffer);
+            if (zone == null)
+                throw new InvalidOperationException("Hub chưa có Zone A để phân loại.");
+
+            var hubProvinceId = await _db.Locations
+                .Where(item => item.LocationId == locationId)
+                .Select(item => item.ProvinceId)
+                .SingleOrDefaultAsync();
+            if (string.IsNullOrWhiteSpace(hubProvinceId))
+                throw new InvalidOperationException("Không tìm thấy tỉnh của hub hiện tại.");
+
+            var localTargets = await _db.Locations
+                .Where(item => !OperationalHubScope.HubIds.Contains(item.LocationId) && item.ProvinceId == hubProvinceId)
+                .OrderBy(item => item.LocationId)
+                .Take(4)
+                .ToListAsync();
+            var remoteTargets = await _db.Locations
+                .Where(item => OperationalHubScope.HubIds.Contains(item.LocationId) && item.LocationId != locationId)
+                .OrderBy(item => item.LocationId)
+                .Take(2)
+                .ToListAsync();
+
+            if (localTargets.Count != 4 || remoteTargets.Count != 2)
+                throw new InvalidOperationException("Cần đúng 4 location nội tỉnh và 2 hub next-hop để khởi tạo 6 pallet sorting.");
+
+            var targets = localTargets.Concat(remoteTargets).ToList();
+            var targetIds = targets.Select(item => item.LocationId).ToArray();
+            foreach (var destination in targets)
+            {
+                var active = await _db.Pallets.FirstOrDefaultAsync(item =>
+                    item.ZoneId == zone.ZoneId &&
+                    item.DestinationLocationId == destination.LocationId &&
+                    item.Status != "Finalized" && item.Status != "Locked" && item.Status != "ReadyForOutbound");
+                if (active != null) continue;
+
+                var hubCode = locationId.Replace("DEMO-HUB-", string.Empty, StringComparison.OrdinalIgnoreCase);
+                var destinationCode = destination.LocationId
+                    .Replace("DEMO-LOC-", string.Empty, StringComparison.OrdinalIgnoreCase)
+                    .Replace("DEMO-HUB-", string.Empty, StringComparison.OrdinalIgnoreCase);
+                var prefix = OperationalHubScope.IsHub(destination.LocationId) ? "C" : "B";
+                var palletId = $"SORT-{hubCode}-{prefix}-{destinationCode}";
+                if (await _db.Pallets.AnyAsync(item => item.PalletId == palletId))
+                    palletId = $"{palletId}-{Guid.NewGuid().ToString("N")[..4]}";
+
+                _db.Pallets.Add(new Pallet
+                {
+                    PalletId = palletId,
+                    ZoneId = zone.ZoneId,
+                    DestinationLocationId = destination.LocationId,
+                    Status = "Empty",
+                    Capacity = 1000
+                });
+            }
+
+            await _db.SaveChangesAsync();
+            var activePallets = await _db.Pallets
+                .Include(item => item.Zone)
+                .Include(item => item.DestinationLocation)
+                .Where(item => item.ZoneId == zone.ZoneId && targetIds.Contains(item.DestinationLocationId!) && item.Status != "Finalized" && item.Status != "Locked" && item.Status != "ReadyForOutbound")
+                .OrderBy(item => item.DestinationLocationId)
+                .ToListAsync();
+            return activePallets
+                .GroupBy(item => item.DestinationLocationId)
+                .Select(group => group.First())
+                .ToList();
         }
 
         public async Task<Pallet?> GetPalletByIdAsync(string id)

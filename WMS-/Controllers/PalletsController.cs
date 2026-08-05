@@ -82,6 +82,21 @@ namespace WMS_.Controllers
             }
         }
 
+        [HttpPost("ensure-zone-a-sorting-targets")]
+        public async Task<ActionResult<IEnumerable<Pallet>>> EnsureZoneASortingTargets()
+        {
+            var locationId = User.FindFirstValue("location_id");
+            if (string.IsNullOrWhiteSpace(locationId)) return Forbid();
+            try
+            {
+                return Ok(await _palletService.EnsureZoneASortingPalletsAsync(locationId));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
+        }
+
         [HttpPatch("{id}/destination")]
         public async Task<ActionResult<Pallet>> SetDestination(string id, [FromBody] SetPalletDestinationRequest request)
         {
@@ -156,6 +171,24 @@ namespace WMS_.Controllers
 
             var success = await _operationService.MovePalletToZoneAsync(palletId, zoneId, userId, locationId);
             return success ? Ok(new { message = "Di chuyển Pallet thành công!" }) : BadRequest("Lỗi khi di chuyển Pallet.");
+        }
+
+        [HttpPost("{palletId}/complete-sorting")]
+        public async Task<IActionResult> CompleteSorting(string palletId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var locationId = User.FindFirstValue("location_id");
+            if (userId == null || string.IsNullOrWhiteSpace(locationId)) return Forbid();
+
+            try
+            {
+                var success = await _operationService.CompleteZoneASortingAsync(palletId, userId, locationId);
+                return success ? Ok(new { message = "Đã hoàn tất sorting pallet." }) : BadRequest(new { message = "Không thể hoàn tất sorting pallet." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
         }
 
         /// <summary>Nghiệp vụ: Chuẩn bị Pallet cho đơn xuất kho (Quét chốt Pallet)</summary>

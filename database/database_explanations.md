@@ -64,7 +64,7 @@ erDiagram
   * `pallet_id` - Khóa chính: Mã pallet duy nhất dán trên nhãn.
   * `zone_id` - Khóa ngoại: Nằm tại phân khu chức năng nào trong kho.
   * `status`: Trạng thái pallet - `Empty` - Trống, `Loaded` - Đang chứa hàng, `Damaged` - Bị hỏng.
-  * `capacity`: Tải trọng tối đa cho phép của pallet tính bằng kg.
+  * `capacity`: Số sack tối đa pallet được phép chứa; quy ước hiện tại là không quá 6 sack/pallet.
 
 ---
 

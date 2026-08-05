@@ -41,6 +41,10 @@ namespace WMS_.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Pallet>>> GetAll([FromQuery] string? status = null)
         {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var locationId = User.FindFirstValue("location_id");
+            if (userId == null || string.IsNullOrWhiteSpace(locationId)) return Forbid();
+            await _operationService.RecycleEmptyDispatchPalletsAsync(userId, locationId);
             var pallets = await _palletService.GetAllPalletsAsync(status);
             return Ok(pallets);
         }
@@ -59,8 +63,9 @@ namespace WMS_.Controllers
         {
             if (string.IsNullOrWhiteSpace(request.ZoneId))
                 return BadRequest("Zone đặt pallet là bắt buộc.");
-            if (request.Capacity is <= 0)
-                return BadRequest("Sức chứa pallet phải lớn hơn 0.");
+            if (request.Capacity.HasValue &&
+                (request.Capacity.Value <= 0 || request.Capacity.Value > PalletCapacityRules.MaxSacks))
+                return BadRequest($"Pallet chỉ được chứa tối đa {PalletCapacityRules.MaxSacks} sack.");
 
             // Ma pallet va trang thai phai do he thong/nghiep vu quet quyet dinh.
             var pallet = new Pallet
@@ -69,7 +74,7 @@ namespace WMS_.Controllers
                 ZoneId = request.ZoneId.Trim(),
                 DestinationLocationId = request.DestinationLocationId?.Trim(),
                 Status = "Empty",
-                Capacity = request.Capacity ?? 1000
+                Capacity = request.Capacity ?? PalletCapacityRules.MaxSacks
             };
             try
             {

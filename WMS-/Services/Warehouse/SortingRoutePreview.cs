@@ -24,4 +24,8 @@ namespace WMS_.Services.Warehouse
         string TargetZoneLabel,
         IReadOnlyList<SortingPalletTarget> CandidatePallets,
         string? RecommendedPalletId);
+
+    public sealed record AutoSortingResult(
+        SortingRoutePreview Route,
+        PalletAssignmentResult Assignment);
 }

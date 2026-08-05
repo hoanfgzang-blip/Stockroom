@@ -97,7 +97,7 @@ namespace WMS_.Services.Warehouse
                     ZoneId = zone.ZoneId,
                     DestinationLocationId = destination.LocationId,
                     Status = "Empty",
-                    Capacity = 1000
+                    Capacity = PalletCapacityRules.MaxSacks
                 });
             }
 
@@ -127,6 +127,9 @@ namespace WMS_.Services.Warehouse
 
         public async Task<Pallet> CreatePalletAsync(Pallet pallet)
         {
+            if (pallet.Capacity <= 0 || pallet.Capacity > PalletCapacityRules.MaxSacks)
+                throw new InvalidOperationException($"Pallet chỉ được chứa tối đa {PalletCapacityRules.MaxSacks} sack.");
+
             var myLocationId = _httpContextAccessor.HttpContext?.User.HubId();
             if (string.IsNullOrWhiteSpace(myLocationId))
                 throw new InvalidOperationException("Tài khoản chưa được gán hub.");
@@ -230,6 +233,7 @@ namespace WMS_.Services.Warehouse
         public async Task<bool> UpdatePalletAsync(string id, Pallet pallet)
         {
             if (id != pallet.PalletId) return false;
+            if (pallet.Capacity <= 0 || pallet.Capacity > PalletCapacityRules.MaxSacks) return false;
 
             var myLocationId = _httpContextAccessor.HttpContext?.User.HubId();
             if (string.IsNullOrWhiteSpace(myLocationId) ||

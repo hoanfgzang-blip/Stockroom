@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS pallet (
     zone_id VARCHAR(50) NOT NULL REFERENCES zone(zone_id) ON DELETE CASCADE,
     destination_location_id VARCHAR(50) REFERENCES location(location_id) ON DELETE RESTRICT,
     status VARCHAR(50) NOT NULL DEFAULT 'Empty',
-    capacity DECIMAL(10,2) NOT NULL DEFAULT 1000.00 CONSTRAINT chk_pallet_capacity CHECK (capacity > 0)
+    capacity DECIMAL(10,2) NOT NULL DEFAULT 6.00 CONSTRAINT chk_pallet_capacity CHECK (capacity > 0 AND capacity <= 6)
 );
 
 -- Bảng Ca làm việc

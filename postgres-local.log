@@ -1,0 +1,8 @@
+2026-08-03 04:01:19 +07 LOG:  redirecting log output to logging collector process
+2026-08-03 04:01:19 +07 HINT:  Future log output will appear in directory "log".
+^C2026-08-03 04:04:01 +07 LOG:  redirecting log output to logging collector process
+2026-08-03 04:04:01 +07 HINT:  Future log output will appear in directory "log".
+^C2026-08-03 04:09:10 +07 LOG:  redirecting log output to logging collector process
+2026-08-03 04:09:10 +07 HINT:  Future log output will appear in directory "log".
+^C2026-08-03 17:53:06 +07 LOG:  redirecting log output to logging collector process
+2026-08-03 17:53:06 +07 HINT:  Future log output will appear in directory "log".

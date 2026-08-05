@@ -38,8 +38,12 @@ namespace WMS_.Services.Warehouse
             var sack = await _db.Sacks
                 .Include(item => item.Zone)
                     .ThenInclude(item => item.Location)
-                .FirstOrDefaultAsync(item => item.SackId == sackId && item.Zone != null && item.Zone.LocationId == locationId);
+                .FirstOrDefaultAsync(item => item.SackId == sackId);
             if (sack == null) return null;
+            if (sack.Zone == null)
+                throw new InvalidOperationException("Sack chưa được check-in inbound tại hub; hãy xác nhận chuyến inbound trước khi sorting.");
+            if (!string.Equals(sack.Zone.LocationId, locationId, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Sack chưa ở hub của tài khoản hiện tại.");
             if (sack.Zone?.ProcessRole != ZoneProcessRoles.LocalSortBuffer)
                 throw new InvalidOperationException("Chỉ sack đang ở Zone A mới được sorting.");
             if (sack.Status is "InTransit" or "Received")
@@ -53,7 +57,7 @@ namespace WMS_.Services.Warehouse
                 .Where(item => item.ZoneId == zone.ZoneId &&
                                item.DestinationLocationId == route.NextHopId &&
                                item.Status != "Finalized" && item.Status != "Locked" && item.Status != "ReadyForOutbound")
-                .OrderBy(item => item.Status == "Empty" ? 0 : 1)
+                .OrderBy(item => item.Status == "Occupied" ? 0 : 1)
                 .ThenBy(item => item.PalletId)
                 .ToListAsync();
 
@@ -61,6 +65,10 @@ namespace WMS_.Services.Warehouse
             foreach (var pallet in palletRows)
             {
                 var count = await _db.Sacks.CountAsync(item => item.PalletId == pallet.PalletId);
+                var capacity = (int)Math.Min(
+                    pallet.Capacity > 0 ? pallet.Capacity : PalletCapacityRules.MaxSacks,
+                    PalletCapacityRules.MaxSacks);
+                if (count >= capacity) continue;
                 candidates.Add(new SortingPalletTarget(
                     pallet.PalletId,
                     pallet.DestinationLocationId!,
@@ -88,6 +96,43 @@ namespace WMS_.Services.Warehouse
                 zone.ZoneName,
                 candidates,
                 candidates.FirstOrDefault()?.PalletId);
+        }
+
+        public async Task<AutoSortingResult?> AutoAssignSackToPalletAsync(string sackId, string userId, string locationId)
+        {
+            var preview = await PreviewSackSortingRouteAsync(sackId, locationId);
+            if (preview == null) return null;
+
+            if (preview.CandidatePallets.Count == 0)
+            {
+                return new AutoSortingResult(
+                    preview,
+                    new PalletAssignmentResult(
+                        false,
+                        "Không còn pallet Zone A còn chỗ cho tuyến này. Hãy hoàn tất pallet hiện tại để hệ thống cấp pallet tiếp theo."));
+            }
+
+            foreach (var candidate in preview.CandidatePallets)
+            {
+                var assignment = await PlaceSackOnPalletAsync(
+                    sackId,
+                    candidate.PalletId,
+                    userId,
+                    locationId,
+                    allowReassignment: false);
+                if (assignment.Succeeded)
+                    return new AutoSortingResult(preview, assignment);
+
+                if (!assignment.Message.Contains("tối đa", StringComparison.OrdinalIgnoreCase) &&
+                    !assignment.Message.Contains("đầy", StringComparison.OrdinalIgnoreCase))
+                    return new AutoSortingResult(preview, assignment);
+            }
+
+            return new AutoSortingResult(
+                preview,
+                new PalletAssignmentResult(
+                    false,
+                    "Pallet đúng tuyến đã đầy. Hãy hoàn tất pallet hiện tại để hệ thống cấp pallet tiếp theo."));
         }
 
         public async Task<bool> CompleteZoneASortingAsync(string palletId, string userId, string locationId)
@@ -236,6 +281,16 @@ namespace WMS_.Services.Warehouse
                 return new(false, "Pallet cũ đã chốt hoặc đang bị khóa, không thể tháo sack.");
             if (sack.Status is "InTransit" or "Received")
                 return new(false, "Bao hàng đang vận chuyển hoặc đã giao, không thể phân loại lại.");
+
+            if (previousPalletId != palletId)
+            {
+                var palletCapacity = (int)Math.Min(
+                    targetPallet.Capacity > 0 ? targetPallet.Capacity : PalletCapacityRules.MaxSacks,
+                    PalletCapacityRules.MaxSacks);
+                var targetSackCount = await _db.Sacks.CountAsync(item => item.PalletId == palletId);
+                if (targetSackCount >= palletCapacity)
+                    return new(false, $"Pallet chỉ chứa tối đa {palletCapacity} sack.");
+            }
 
             SackRoute? route = null;
             if (targetZone.ProcessRole == ZoneProcessRoles.LocalSortBuffer)
@@ -435,6 +490,48 @@ namespace WMS_.Services.Warehouse
                 NewValues = JsonSerializer.Serialize(newValues),
                 CreatedAt = DateTime.UtcNow
             });
+        }
+
+        public async Task<int> RecycleEmptyDispatchPalletsAsync(string userId, string locationId)
+        {
+            if (!OperationalHubScope.IsHub(locationId)) return 0;
+
+            var zoneA = await _db.Zones.FirstOrDefaultAsync(zone =>
+                zone.LocationId == locationId && zone.ProcessRole == ZoneProcessRoles.LocalSortBuffer);
+            if (zoneA == null) return 0;
+
+            var emptyDispatchPallets = await _db.Pallets
+                .Include(pallet => pallet.Zone)
+                .Where(pallet => pallet.Status == "Empty" &&
+                                 pallet.Zone.LocationId == locationId &&
+                                 (pallet.Zone.ProcessRole == ZoneProcessRoles.LocalOutbound ||
+                                  pallet.Zone.ProcessRole == ZoneProcessRoles.InterprovinceOutbound))
+                .ToListAsync();
+
+            foreach (var pallet in emptyDispatchPallets)
+            {
+                var oldZoneId = pallet.ZoneId;
+                var oldProcessRole = pallet.Zone?.ProcessRole;
+                pallet.ZoneId = zoneA.ZoneId;
+                pallet.DestinationLocationId = null;
+                _db.AuditLogs.Add(new AuditLog
+                {
+                    UserId = userId,
+                    ActionType = oldProcessRole == ZoneProcessRoles.LocalOutbound
+                        ? "RecycleEmptyZoneBPallet"
+                        : "RecycleEmptyZoneCPallet",
+                    TableName = "pallet",
+                    RecordId = pallet.PalletId,
+                    OldValues = JsonSerializer.Serialize(new { ZoneId = oldZoneId, pallet.Status }),
+                    NewValues = JsonSerializer.Serialize(new { ZoneId = pallet.ZoneId, pallet.Status }),
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            if (emptyDispatchPallets.Count > 0)
+                await _db.SaveChangesAsync();
+
+            return emptyDispatchPallets.Count;
         }
 
         public async Task<bool> MovePalletToZoneAsync(string palletId, string newZoneId, string userId, string locationId)

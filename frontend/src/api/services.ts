@@ -91,6 +91,11 @@ export type SortingRoutePreview = {
   recommendedPalletId?: string | null
 }
 
+export type AutoSortingResult = {
+  route: SortingRoutePreview
+  assignment: PalletAssignmentResult
+}
+
 export const accountsApi = {
   all: (locationId?: string) =>
     api.get<ManagedAccount[]>(`/Auth/accounts${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`),
@@ -135,7 +140,7 @@ export const palletsApi = {
   all: (status?: string) =>
     api.get<Pallet[]>(`/Pallets${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Pallet>(`/Pallets/${id}`),
-  create: (data: Pick<Pallet, 'zoneId' | 'destinationLocationId'> & { capacity?: number; palletId?: string }) => api.post<Pallet>('/Pallets', data),
+  create: (data: Pick<Pallet, 'zoneId'> & { destinationLocationId?: string | null; capacity?: number; palletId?: string }) => api.post<Pallet>('/Pallets', data),
   ensureZoneASortingTargets: () => api.post<Pallet[]>('/Pallets/ensure-zone-a-sorting-targets', {}),
   setDestination: (id: string, destinationLocationId: string) =>
     api.patch(`/Pallets/${id}/destination`, { destinationLocationId }),
@@ -294,6 +299,7 @@ export const sacksApi = {
     api.get<Sack[]>(`/Sacks${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   get: (id: string) => api.get<Sack>(`/Sacks/${id}`),
   previewSortingRoute: (id: string) => api.get<SortingRoutePreview>(`/Sacks/${id}/sorting-route`),
+  autoSort: (id: string) => api.post<AutoSortingResult>(`/Sacks/${id}/auto-sort`, {}),
   byPallet: (palletId: string) => api.get<Sack[]>(`/Sacks/by-pallet/${palletId}`),
   confirmReceived: (id: string) => api.post<void>(`/Sacks/${id}/confirm-received`, {}),
   delete: (id: string) => api.delete(`/Sacks/${id}`),

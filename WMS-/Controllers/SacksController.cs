@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
+using System.Security.Claims;
 using System.ComponentModel.DataAnnotations;
 using WMS_.Data;
 using WMS_.Data.Entities;
@@ -66,6 +67,27 @@ namespace WMS_.Controllers
             {
                 var preview = await _operationService.PreviewSackSortingRouteAsync(id, locationId);
                 return preview == null ? NotFound() : Ok(preview);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("{id}/auto-sort")]
+        public async Task<ActionResult<AutoSortingResult>> AutoSort(string id)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var locationId = User.HubId();
+            if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(locationId)) return Forbid();
+
+            try
+            {
+                var result = await _operationService.AutoAssignSackToPalletAsync(id, userId, locationId);
+                if (result == null) return NotFound();
+                return result.Assignment.Succeeded
+                    ? Ok(result)
+                    : Conflict(new { message = result.Assignment.Message, route = result.Route });
             }
             catch (InvalidOperationException ex)
             {

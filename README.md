@@ -162,6 +162,17 @@ Access is enforced by the backend API. Hiding a menu item in the client is not t
 | Target Pallet is full | Reject assignment and keep the current Sack state |
 | Sack is actively reserved elsewhere | Reject the new reservation |
 
+## Warehouse Floor Plan
+
+The reference layout below illustrates the physical movement of cargo through inbound docks, temporary storage, sorting stations, local handling areas, interprovince handling areas, Pallet staging, and outbound docks.
+
+<div align="center">
+  <img src="docs/images/warehouse-floor-plan.png" alt="Sample warehouse floor plan" width="1000">
+  <p><em>Figure 1. Sample warehouse floor plan and cargo movement</em></p>
+</div>
+
+The layout is a conceptual operating model and is not intended to represent an exact building scale. Its zones correspond to the receiving, sorting, storage, and dispatch responsibilities implemented by the system.
+
 ## System Architecture
 
 The solution follows a layered client and server architecture.
@@ -188,6 +199,55 @@ Browser
 ```
 
 The frontend and API run on separate origins during development. Vite proxies requests under `/api` to the backend. A production build can be served from the ASP.NET Core static web root as a single application.
+
+## Functional Decomposition Diagram
+
+The following hierarchy shows how the main system objective is decomposed into operational and supporting functions.
+
+```mermaid
+flowchart TB
+    WMS["Warehouse Management System"]
+
+    WMS --> OPS["Warehouse Operations"]
+    WMS --> LOG["Transport and Delivery"]
+    WMS --> RES["Infrastructure and Resources"]
+    WMS --> GOV["Administration and Monitoring"]
+
+    OPS --> INB["Inbound Management"]
+    OPS --> SRT["Sorting Management"]
+    OPS --> OUT["Outbound Management"]
+
+    INB --> INB1["Inbound Orders"]
+    INB --> INB2["Trip QR Check-in"]
+    INB --> INB3["Sack Receipt"]
+
+    SRT --> SRT1["Barcode and QR Scanning"]
+    SRT --> SRT2["Route Determination"]
+    SRT --> SRT3["Pallet Assignment"]
+    SRT --> SRT4["Pallet Finalization"]
+
+    OUT --> OUT1["Outbound Orders"]
+    OUT --> OUT2["Inventory Reservations"]
+    OUT --> OUT3["Sack Loading"]
+    OUT --> OUT4["Seal and Departure"]
+
+    LOG --> LOG1["Fleet Management"]
+    LOG --> LOG2["Trip Planning"]
+    LOG --> LOG3["QR Manifest"]
+    LOG --> LOG4["Driver Deliveries"]
+    LOG --> LOG5["Destination Check-in"]
+
+    RES --> RES1["Provinces and Locations"]
+    RES --> RES2["Zones and Pallets"]
+    RES --> RES3["Employees and Shifts"]
+    RES --> RES4["Routing Rules"]
+
+    GOV --> GOV1["Authentication and Sessions"]
+    GOV --> GOV2["Accounts and Permissions"]
+    GOV --> GOV3["Dashboard Metrics"]
+    GOV --> GOV4["Audit Logs"]
+    GOV --> GOV5["Sack Tracking"]
+```
 
 ## Technology Stack
 
@@ -220,6 +280,17 @@ The schema contains eighteen main tables.
 | Inbound | `inbound_order`, `inbound_order_item` |
 | Outbound | `outbound_order`, `outbound_order_item`, `inventory_reservation` |
 | Audit | `audit_log` |
+
+### Conceptual Data Relationship Diagram
+
+The supplied diagram represents the initial database model and its main relationships.
+
+<div align="center">
+  <img src="docs/images/conceptual-database-erd.png" alt="Conceptual database relationship diagram" width="1200">
+  <p><em>Figure 2. Conceptual data relationship diagram</em></p>
+</div>
+
+The implemented schema has since expanded to eighteen tables. It also includes `user_account`, `trip_qr_token`, destination-aware Pallets, next-hop routing fields, and Outbound Order links for Trips. The entity classes, migrations, and `database/database_setup.sql` are the authoritative sources for the current schema.
 
 Important data integrity rules include:
 
@@ -292,6 +363,9 @@ WMS
 |   |-- merge_legacy_zones.sql
 |   `-- recycle_empty_zone_c_pallets.sql
 |-- docs
+|   |-- images
+|   |   |-- conceptual-database-erd.png
+|   |   `-- warehouse-floor-plan.png
 |   |-- KICH_BAN_DEMO_KHO.md
 |   `-- KICH_BAN_KIEM_THU.md
 |-- tests

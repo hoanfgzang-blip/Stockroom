@@ -57,52 +57,52 @@ ON CONFLICT (zone_id) DO UPDATE SET
   capacity = EXCLUDED.capacity;
 
 INSERT INTO pallet (pallet_id, zone_id, status, capacity) VALUES
-  ('DEMO-PLT-001', 'DEMO-Z-HN-IN', 'Occupied', 1000),
-  ('DEMO-PLT-002', 'DEMO-Z-HN-SORT', 'Occupied', 1000),
-  ('DEMO-PLT-003', 'DEMO-Z-HN-SORT', 'Empty', 1000),
-  ('DEMO-PLT-004', 'DEMO-Z-HN-OUT', 'Occupied', 1000),
-  ('DEMO-PLT-005', 'DEMO-Z-HCM-IN', 'Occupied', 1200),
-  ('DEMO-PLT-006', 'DEMO-Z-HCM-SORT', 'Occupied', 1200),
-  ('DEMO-PLT-007', 'DEMO-Z-HCM-SORT', 'Empty', 1200),
-  ('DEMO-PLT-008', 'DEMO-Z-HCM-OUT', 'Occupied', 1200),
-  ('DEMO-PLT-009', 'DEMO-Z-DN-SORT', 'Occupied', 800),
-  ('DEMO-PLT-010', 'DEMO-Z-DN-SORT', 'Empty', 800),
-  ('DEMO-PLT-011', 'DEMO-Z-HN-SORT', 'Occupied', 800),
-  ('DEMO-PLT-012', 'DEMO-Z-HCM-OUT', 'Occupied', 800)
+  ('DEMO-PLT-001', 'DEMO-Z-HN-IN', 'Occupied', 6),
+  ('DEMO-PLT-002', 'DEMO-Z-HN-SORT', 'Occupied', 6),
+  ('DEMO-PLT-003', 'DEMO-Z-HN-SORT', 'Empty', 6),
+  ('DEMO-PLT-004', 'DEMO-Z-HN-OUT', 'Occupied', 6),
+  ('DEMO-PLT-005', 'DEMO-Z-HCM-IN', 'Occupied', 6),
+  ('DEMO-PLT-006', 'DEMO-Z-HCM-SORT', 'Occupied', 6),
+  ('DEMO-PLT-007', 'DEMO-Z-HCM-SORT', 'Empty', 6),
+  ('DEMO-PLT-008', 'DEMO-Z-HCM-OUT', 'Occupied', 6),
+  ('DEMO-PLT-009', 'DEMO-Z-DN-SORT', 'Occupied', 6),
+  ('DEMO-PLT-010', 'DEMO-Z-DN-SORT', 'Empty', 6),
+  ('DEMO-PLT-011', 'DEMO-Z-HN-SORT', 'Occupied', 6),
+  ('DEMO-PLT-012', 'DEMO-Z-HCM-OUT', 'Occupied', 6)
 ON CONFLICT (pallet_id) DO NOTHING;
 
 INSERT INTO pallet (pallet_id, zone_id, status, capacity) VALUES
-   ('DEMO-PLT-013', 'DEMO-Z-HN-OUT-INTER', 'Empty', 1000),
-   ('DEMO-PLT-014', 'DEMO-Z-HCM-OUT-INTER', 'Empty', 1200),
-   ('DEMO-PLT-015', 'DEMO-Z-DN-OUT', 'Empty', 800),
-   ('DEMO-PLT-016', 'DEMO-Z-DN-OUT-INTER', 'Empty', 800),
-   ('DEMO-PLT-017', 'DEMO-Z-HN-OUT', 'Empty', 1000),
-   ('DEMO-PLT-018', 'DEMO-Z-HCM-OUT', 'Empty', 1200)
+   ('DEMO-PLT-013', 'DEMO-Z-HN-OUT-INTER', 'Empty', 6),
+   ('DEMO-PLT-014', 'DEMO-Z-HCM-OUT-INTER', 'Empty', 6),
+   ('DEMO-PLT-015', 'DEMO-Z-DN-OUT', 'Empty', 6),
+   ('DEMO-PLT-016', 'DEMO-Z-DN-OUT-INTER', 'Empty', 6),
+   ('DEMO-PLT-017', 'DEMO-Z-HN-OUT', 'Empty', 6),
+   ('DEMO-PLT-018', 'DEMO-Z-HCM-OUT', 'Empty', 6)
 ON CONFLICT (pallet_id) DO NOTHING;
 
 -- 20 pallet trống bổ sung cho demo inbound, Zone A, Zone B và Zone C.
 -- Giữ mã DEMO- và không reset dữ liệu vận hành nếu seed được chạy lại.
 INSERT INTO pallet (pallet_id, zone_id, status, capacity) VALUES
-  ('DEMO-PLT-019', 'DEMO-Z-HN-IN', 'Empty', 1000),
-  ('DEMO-PLT-020', 'DEMO-Z-HN-IN', 'Empty', 1000),
-  ('DEMO-PLT-021', 'DEMO-Z-HCM-IN', 'Empty', 1200),
-  ('DEMO-PLT-022', 'DEMO-Z-HCM-IN', 'Empty', 1200),
-  ('DEMO-PLT-023', 'DEMO-Z-HN-SORT', 'Empty', 1000),
-  ('DEMO-PLT-024', 'DEMO-Z-HN-SORT', 'Empty', 1000),
-  ('DEMO-PLT-025', 'DEMO-Z-HCM-SORT', 'Empty', 1200),
-  ('DEMO-PLT-026', 'DEMO-Z-HCM-SORT', 'Empty', 1200),
-  ('DEMO-PLT-027', 'DEMO-Z-DN-SORT', 'Empty', 800),
-  ('DEMO-PLT-028', 'DEMO-Z-DN-SORT', 'Empty', 800),
-  ('DEMO-PLT-029', 'DEMO-Z-HN-OUT', 'Empty', 1000),
-  ('DEMO-PLT-030', 'DEMO-Z-HN-OUT', 'Empty', 1000),
-  ('DEMO-PLT-031', 'DEMO-Z-HCM-OUT', 'Empty', 1200),
-  ('DEMO-PLT-032', 'DEMO-Z-HCM-OUT', 'Empty', 1200),
-  ('DEMO-PLT-033', 'DEMO-Z-DN-OUT', 'Empty', 800),
-  ('DEMO-PLT-034', 'DEMO-Z-HN-OUT-INTER', 'Empty', 1000),
-  ('DEMO-PLT-035', 'DEMO-Z-HN-OUT-INTER', 'Empty', 1000),
-  ('DEMO-PLT-036', 'DEMO-Z-HCM-OUT-INTER', 'Empty', 1200),
-  ('DEMO-PLT-037', 'DEMO-Z-HCM-OUT-INTER', 'Empty', 1200),
-  ('DEMO-PLT-038', 'DEMO-Z-DN-OUT-INTER', 'Empty', 800)
+  ('DEMO-PLT-019', 'DEMO-Z-HN-IN', 'Empty', 6),
+  ('DEMO-PLT-020', 'DEMO-Z-HN-IN', 'Empty', 6),
+  ('DEMO-PLT-021', 'DEMO-Z-HCM-IN', 'Empty', 6),
+  ('DEMO-PLT-022', 'DEMO-Z-HCM-IN', 'Empty', 6),
+  ('DEMO-PLT-023', 'DEMO-Z-HN-SORT', 'Empty', 6),
+  ('DEMO-PLT-024', 'DEMO-Z-HN-SORT', 'Empty', 6),
+  ('DEMO-PLT-025', 'DEMO-Z-HCM-SORT', 'Empty', 6),
+  ('DEMO-PLT-026', 'DEMO-Z-HCM-SORT', 'Empty', 6),
+  ('DEMO-PLT-027', 'DEMO-Z-DN-SORT', 'Empty', 6),
+  ('DEMO-PLT-028', 'DEMO-Z-DN-SORT', 'Empty', 6),
+  ('DEMO-PLT-029', 'DEMO-Z-HN-OUT', 'Empty', 6),
+  ('DEMO-PLT-030', 'DEMO-Z-HN-OUT', 'Empty', 6),
+  ('DEMO-PLT-031', 'DEMO-Z-HCM-OUT', 'Empty', 6),
+  ('DEMO-PLT-032', 'DEMO-Z-HCM-OUT', 'Empty', 6),
+  ('DEMO-PLT-033', 'DEMO-Z-DN-OUT', 'Empty', 6),
+  ('DEMO-PLT-034', 'DEMO-Z-HN-OUT-INTER', 'Empty', 6),
+  ('DEMO-PLT-035', 'DEMO-Z-HN-OUT-INTER', 'Empty', 6),
+  ('DEMO-PLT-036', 'DEMO-Z-HCM-OUT-INTER', 'Empty', 6),
+  ('DEMO-PLT-037', 'DEMO-Z-HCM-OUT-INTER', 'Empty', 6),
+  ('DEMO-PLT-038', 'DEMO-Z-DN-OUT-INTER', 'Empty', 6)
 ON CONFLICT (pallet_id) DO NOTHING;
 
 INSERT INTO shift (shift_id, shift_name, start_at, end_at) VALUES

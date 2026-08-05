@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { BrowserQRCodeSvgWriter } from '@zxing/browser'
 import { CheckCircle2, Eye, Plus, RefreshCcw, Search, Trash2 } from 'lucide-react'
-import { locationsApi, outboundOrdersApi, palletsApi, sacksApi, zonesApi } from '@/api/services'
+import { outboundOrdersApi, palletsApi, sacksApi, zonesApi } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,20 +18,37 @@ import {
 import { ErrorState, LoadingState, PageHeader } from '@/components/shared/PageHeader'
 import { statusLabel } from '@/lib/utils'
 import { isDispatchProcessRole, zoneProcessRoleLabel } from '@/lib/zoneFlow'
-import type { Location, OutboundOrder, Pallet, Sack, Zone } from '@/types'
+import type { OutboundOrder, Pallet, Sack, Zone } from '@/types'
 
 const statusOptions = ['Empty', 'Occupied', 'ReadyForOutbound', 'In Transit to Zone', 'Finalized', 'Locked']
 
 const emptyForm = () => ({
   zoneId: '',
-  destinationLocationId: '',
-  capacity: '1000',
+  capacity: '6',
 })
+
+function PalletQrCode({ value }: { value: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const svg = new BrowserQRCodeSvgWriter().write(value, 240, 240)
+    svg.classList.add('h-full', 'w-full')
+    svg.setAttribute('role', 'img')
+    svg.setAttribute('aria-label', `Mã QR chứa ${value}`)
+    container.replaceChildren(svg)
+
+    return () => container.replaceChildren()
+  }, [value])
+
+  return <div ref={containerRef} className="aspect-square w-56 max-w-full rounded-lg border border-slate-200 bg-white p-2" />
+}
 
 export default function PalletsPage() {
   const [pallets, setPallets] = useState<Pallet[]>([])
   const [zones, setZones] = useState<Zone[]>([])
-  const [destinations, setDestinations] = useState<Location[]>([])
   const [statusFilter, setStatusFilter] = useState('')
   const [zoneFilter, setZoneFilter] = useState('')
   const [search, setSearch] = useState('')
@@ -54,17 +72,15 @@ export default function PalletsPage() {
   const load = () => {
     setLoading(true)
     setError(null)
-    Promise.all([palletsApi.all(statusFilter || undefined), zonesApi.all(), locationsApi.dispatchDestinations()])
-      .then(([palletData, zoneData, destinationData]) => {
+    Promise.all([palletsApi.all(statusFilter || undefined), zonesApi.all()])
+      .then(([palletData, zoneData]) => {
         setZones(zoneData)
-        setDestinations(destinationData)
         const operationalZoneIds = new Set(zoneData.map((zone) => zone.zoneId))
         setPallets(palletData.filter((pallet) => operationalZoneIds.has(pallet.zoneId)))
-        if (!form.zoneId || !form.destinationLocationId) {
+        if (!form.zoneId) {
           setForm((current) => ({
             ...current,
             zoneId: current.zoneId || zoneData[0]?.zoneId || '',
-            destinationLocationId: current.destinationLocationId || destinationData[0]?.locationId || '',
           }))
         }
       })
@@ -77,17 +93,16 @@ export default function PalletsPage() {
   }, [statusFilter])
 
   const zoneName = (id: string) => zones.find((z) => z.zoneId === id)?.zoneName ?? id
-  const destinationName = (id?: string | null) => destinations.find((location) => location.locationId === id)?.locationName ?? id ?? 'Chưa gán'
   const zoneRole = (pallet: Pallet) => pallet.zone?.processRole ?? zones.find((zone) => zone.zoneId === pallet.zoneId)?.processRole
 
   const filteredPallets = useMemo(() => {
     const query = search.trim().toLowerCase()
     return pallets.filter((pallet) => {
       const matchesZone = !zoneFilter || pallet.zoneId === zoneFilter
-      const matchesSearch = !query || pallet.palletId.toLowerCase().includes(query) || zoneName(pallet.zoneId).toLowerCase().includes(query) || destinationName(pallet.destinationLocationId).toLowerCase().includes(query)
+      const matchesSearch = !query || pallet.palletId.toLowerCase().includes(query) || zoneName(pallet.zoneId).toLowerCase().includes(query)
       return matchesZone && matchesSearch
     })
-  }, [destinations, pallets, search, zoneFilter, zones])
+  }, [pallets, search, zoneFilter, zones])
 
   const stats = useMemo(() => ({
     total: pallets.length,
@@ -97,7 +112,7 @@ export default function PalletsPage() {
   }), [pallets])
 
   const openCreate = () => {
-    setForm({ ...emptyForm(), zoneId: zones[0]?.zoneId ?? '', destinationLocationId: destinations[0]?.locationId ?? '' })
+    setForm({ ...emptyForm(), zoneId: zones[0]?.zoneId ?? '' })
     setDialogOpen(true)
   }
 
@@ -107,38 +122,18 @@ export default function PalletsPage() {
       setError('Hãy chọn khu vực đặt pallet.')
       return
     }
-    if (!form.destinationLocationId) {
-      setError('Hãy chọn điểm đến cho pallet.')
-      return
-    }
-
     const capacity = Number(form.capacity)
-    if (!Number.isFinite(capacity) || capacity <= 0) {
-      setError('Sức chứa pallet phải lớn hơn 0.')
+    if (!Number.isFinite(capacity) || capacity <= 0 || capacity > 6) {
+      setError('Pallet chỉ được chứa tối đa 6 sack.')
       return
     }
 
     setSaving(true)
     setError(null)
     try {
-      const created = await palletsApi.create({ zoneId: form.zoneId, destinationLocationId: form.destinationLocationId, capacity })
+      const created = await palletsApi.create({ zoneId: form.zoneId, destinationLocationId: null, capacity })
       setDialogOpen(false)
       setNotice(`Đã tạo pallet ${created.palletId}. Hệ thống đặt trạng thái ban đầu là trống.`)
-      load()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const setPalletDestination = async (pallet: Pallet, destinationLocationId: string) => {
-    if (!destinationLocationId || destinationLocationId === pallet.destinationLocationId) return
-    setSaving(true)
-    setError(null)
-    try {
-      await palletsApi.setDestination(pallet.palletId, destinationLocationId)
-      setNotice(`Đã gán ${pallet.palletId} cho ${destinationName(destinationLocationId)}.`)
       load()
     } catch (err) {
       setError((err as Error).message)
@@ -311,9 +306,8 @@ export default function PalletsPage() {
               <TableRow>
                 <TableHead>Mã pallet</TableHead>
                 <TableHead>Zone</TableHead>
-                <TableHead>Đích pallet</TableHead>
-                <TableHead>Luồng</TableHead>
-                <TableHead>Sức chứa</TableHead>
+                <TableHead>Tên khu vực</TableHead>
+                <TableHead>Sack tối đa</TableHead>
                 <TableHead>Trạng thái</TableHead>
                 <TableHead>Chuyển zone</TableHead>
                 <TableHead className="text-right">Thao tác</TableHead>
@@ -323,18 +317,8 @@ export default function PalletsPage() {
               {filteredPallets.map((pallet) => (
                 <TableRow key={pallet.palletId}>
                   <TableCell className="font-mono font-medium">{pallet.palletId}</TableCell>
-                  <TableCell>{zoneName(pallet.zoneId)}</TableCell>
-                  <TableCell>
-                    <Select
-                      value={pallet.destinationLocationId ?? ''}
-                      onChange={(event) => void setPalletDestination(pallet, event.target.value)}
-                      disabled={saving || pallet.status === 'Finalized' || pallet.status === 'Locked'}
-                    >
-                      <option value="">Chọn location</option>
-                      {destinations.map((location) => <option key={location.locationId} value={location.locationId}>{location.locationName}</option>)}
-                    </Select>
-                  </TableCell>
                   <TableCell>{zoneProcessRoleLabel(zoneRole(pallet))}</TableCell>
+                  <TableCell>{zoneName(pallet.zoneId)}</TableCell>
                   <TableCell>{pallet.capacity}</TableCell>
                   <TableCell><Badge status={pallet.status}>{statusLabel(pallet.status)}</Badge></TableCell>
                   <TableCell>
@@ -359,7 +343,7 @@ export default function PalletsPage() {
               ))}
               {filteredPallets.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-10 text-center text-sm text-slate-500">Không có pallet phù hợp với bộ lọc hiện tại.</TableCell>
+                  <TableCell colSpan={7} className="py-10 text-center text-sm text-slate-500">Không có pallet phù hợp với bộ lọc hiện tại.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -393,24 +377,18 @@ export default function PalletsPage() {
             </Select>
           </div>
           <div>
-            <Label>Đích pallet</Label>
-            <Select value={form.destinationLocationId} onChange={(event) => setForm({ ...form, destinationLocationId: event.target.value })}>
-              <option value="">Chọn location</option>
-              {destinations.map((location) => <option key={location.locationId} value={location.locationId}>{location.locationName}</option>)}
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="pallet-capacity">Sức chứa tối đa</Label>
+            <Label htmlFor="pallet-capacity">Số sack tối đa</Label>
             <Input
               id="pallet-capacity"
               className="mt-1"
               type="number"
               min="1"
+              max="6"
               step="1"
               value={form.capacity}
               onChange={(event) => setForm({ ...form, capacity: event.target.value })}
             />
-            <p className="mt-1 text-xs text-slate-500">Đơn vị sức chứa theo quy ước vận hành của kho.</p>
+            <p className="mt-1 text-xs text-slate-500">Mỗi pallet chứa tối đa 6 sack.</p>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Hủy</Button>
@@ -428,23 +406,28 @@ export default function PalletsPage() {
       >
         {detailPallet && (
           <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-lg border bg-slate-50 p-3">
                 <p className="text-xs text-slate-500">Trạng thái</p>
                 <div className="mt-1"><Badge status={detailPallet.status}>{statusLabel(detailPallet.status)}</Badge></div>
               </div>
               <div className="rounded-lg border bg-slate-50 p-3">
                 <p className="text-xs text-slate-500">Zone</p>
-                <p className="mt-1 font-medium">{zoneName(detailPallet.zoneId)}</p>
+                <p className="mt-1 font-medium">{zoneProcessRoleLabel(zoneRole(detailPallet))}</p>
               </div>
               <div className="rounded-lg border bg-slate-50 p-3">
-                <p className="text-xs text-slate-500">Đích pallet</p>
-                <p className="mt-1 font-medium">{destinationName(detailPallet.destinationLocationId)}</p>
-              </div>
-              <div className="rounded-lg border bg-slate-50 p-3">
-                <p className="text-xs text-slate-500">Số bao / sức chứa</p>
+                <p className="text-xs text-slate-500">Số sack / giới hạn</p>
                 <p className="mt-1 font-medium">{detailSacks.length} / {detailPallet.capacity}</p>
               </div>
+            </div>
+
+            <div className="flex flex-col items-center rounded-xl border border-slate-200 bg-slate-50 p-4 text-center">
+              <p className="text-sm font-semibold text-slate-800">QR ID pallet</p>
+              <div className="mt-3">
+                <PalletQrCode value={detailPallet.palletId} />
+              </div>
+              <p className="mt-3 break-all font-mono text-xs text-slate-600">{detailPallet.palletId}</p>
+              <p className="mt-2 text-xs text-slate-500">Dùng mã này để xác nhận pallet trong Sorting Zone A.</p>
             </div>
 
             {detailLoading && <LoadingState message="Đang tải danh sách bao hàng..." />}

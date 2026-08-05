@@ -28,7 +28,7 @@ namespace WMS_.Data.Entities
 
         [Required]
         [Column("capacity", TypeName = "decimal(10,2)")]
-        public decimal Capacity { get; set; } = 1000;
+        public decimal Capacity { get; set; } = PalletCapacityRules.MaxSacks;
 
         [ForeignKey("ZoneId")]
         public virtual Zone Zone { get; set; } = null!;
